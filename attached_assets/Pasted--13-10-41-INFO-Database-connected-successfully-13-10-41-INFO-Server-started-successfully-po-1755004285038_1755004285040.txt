@@ -1,0 +1,83 @@
+[13:10:41] INFO: Database connected successfully
+[13:10:41] INFO: Server started successfully
+    port: 5000
+    host: "0.0.0.0"
+    env: "development"
+    aiEnabled: true
+[13:10:42] INFO: HTTP Request
+    method: "GET"
+    url: "/"
+    ip: "172.31.81.194"
+    userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Replit/1.0.14 Chrome/124.0.6367.119 Electron/30.0.3 Safari/537.36"
+[13:10:48] INFO: HTTP Request
+    method: "POST"
+    url: "/api/ai/explain-routing"
+    ip: "127.0.0.1"
+    userAgent: "curl/8.14.1"
+[13:10:48] DEBUG: Database query
+    query: "SELECT `main`.`rules`.`id`, `main`.`rules`.`priority`, `main`.`rules`.`mcc`, `main`.`rules`.`merchant`, `main`.`rules`.`geofence`, `main`.`rules`.`envelopeId`, `main`.`rules`.`enabled`, `main`.`rules`.`userId`, `main`.`rules`.`createdAt`, `main`.`rules`.`updatedAt` FROM `main`.`rules` WHERE (`main`.`rules`.`userId` = ? AND `main`.`rules`.`enabled` = ?) ORDER BY `main`.`rules`.`priority` ASC LIMIT ? OFFSET ?"
+    params: "[1,true,-1,0]"
+    duration: 0
+[13:10:48] DEBUG: Database query
+    query: "SELECT `main`.`envelopes`.`id`, `main`.`envelopes`.`name`, `main`.`envelopes`.`icon`, `main`.`envelopes`.`color`, `main`.`envelopes`.`balanceCents`, `main`.`envelopes`.`spentThisMonth`, `main`.`envelopes`.`order`, `main`.`envelopes`.`isActive`, `main`.`envelopes`.`userId`, `main`.`envelopes`.`createdAt`, `main`.`envelopes`.`updatedAt` FROM `main`.`envelopes` WHERE `main`.`envelopes`.`id` IN (?,?) LIMIT ? OFFSET ?"
+    params: "[1,2,-1,0]"
+    duration: 0
+[13:10:48] DEBUG: Database query
+    query: "SELECT `main`.`rules`.`id`, `main`.`rules`.`priority`, `main`.`rules`.`mcc`, `main`.`rules`.`merchant`, `main`.`rules`.`geofence`, `main`.`rules`.`envelopeId`, `main`.`rules`.`enabled`, `main`.`rules`.`userId`, `main`.`rules`.`createdAt`, `main`.`rules`.`updatedAt` FROM `main`.`rules` WHERE (`main`.`rules`.`userId` = ? AND `main`.`rules`.`enabled` = ?) ORDER BY `main`.`rules`.`priority` ASC LIMIT ? OFFSET ?"
+    params: "[1,true,-1,0]"
+    duration: 0
+[13:10:48] DEBUG: Database query
+    query: "SELECT `main`.`envelopes`.`id`, `main`.`envelopes`.`name` FROM `main`.`envelopes` WHERE `main`.`envelopes`.`id` IN (?,?) LIMIT ? OFFSET ?"
+    params: "[1,2,-1,0]"
+    duration: 0
+[13:10:48] ERROR: OpenAI API error
+    err: {
+      "type": "PermissionDeniedError",
+      "message": "403 Project `proj_0oB7cBSGNAFJaUlNQVw9LZro` does not have access to model `gpt-3.5-turbo`",
+      "stack":
+          Error: 403 Project `proj_0oB7cBSGNAFJaUlNQVw9LZro` does not have access to model `gpt-3.5-turbo`
+              at Function.generate (/home/runner/workspace/node_modules/openai/src/error.ts:80:14)
+              at OpenAI.makeStatusError (/home/runner/workspace/node_modules/openai/src/core.ts:462:21)
+              at OpenAI.makeRequest (/home/runner/workspace/node_modules/openai/src/core.ts:526:24)
+              at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+              at async createChatCompletion (/home/runner/workspace/src/lib/openai.ts:18:22)
+              at async <anonymous> (/home/runner/workspace/src/routes/ai.ts:106:25)
+      "status": 403,
+      "headers": {
+        "alt-svc": "h3=\":443\"; ma=86400",
+        "cf-cache-status": "DYNAMIC",
+        "cf-ray": "96e03707886db097-ATL",
+        "connection": "keep-alive",
+        "content-encoding": "gzip",
+        "content-type": "application/json; charset=utf-8",
+        "date": "Tue, 12 Aug 2025 13:10:48 GMT",
+        "server": "cloudflare",
+        "set-cookie": "__cf_bm=pou9X29.MINqDVlmY7SydKao.Jc__bMNtB8W3fFWT.g-1755004248-1.0.1.1-_SX6W.1foLN7rPKivZ6meEnEsRfum_1.QxZlIr3eI7304snNxkH3bTx70nVpbv.DkTGsJnpjewfY8voeWoJqhrYXPhDz_zWV1hYVMkQH2TQ; path=/; expires=Tue, 12-Aug-25 13:40:48 GMT; domain=.api.openai.com; HttpOnly; Secure; SameSite=None, _cfuvid=khiv3cUbF7p1NpxAnmKNB4ltVkRaZzMsyCoLolcjims-1755004248894-0.0.1.1-604800000; path=/; domain=.api.openai.com; HttpOnly; Secure; SameSite=None",
+        "strict-transport-security": "max-age=31536000; includeSubDomains; preload",
+        "transfer-encoding": "chunked",
+        "vary": "Origin",
+        "x-content-type-options": "nosniff",
+        "x-envoy-upstream-service-time": "246",
+        "x-request-id": "req_15576a47c3964a818ef772d027d6f6bb"
+      },
+      "request_id": "req_15576a47c3964a818ef772d027d6f6bb",
+      "error": {
+        "type": "Object",
+        "message": "Project `proj_0oB7cBSGNAFJaUlNQVw9LZro` does not have access to model `gpt-3.5-turbo`",
+        "stack":
+            
+        "param": null,
+        "code": "model_not_found"
+      },
+      "code": "model_not_found",
+      "param": null
+    }
+[13:10:48] ERROR: Error explaining routing
+    err: {
+      "type": "Error",
+      "message": "AI service unavailable",
+      "stack":
+          Error: AI service unavailable
+              at createChatCompletion (/home/runner/workspace/src/lib/openai.ts:28:11)
+              at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+              at async <anonymous> (/home/runner/workspace/src/routes/ai.ts:106:25)
