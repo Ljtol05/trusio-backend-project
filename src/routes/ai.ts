@@ -1,3 +1,4 @@
+
 import { Router } from 'express';
 import { z } from 'zod';
 import { db } from '../lib/db.js';
@@ -5,7 +6,6 @@ import { logger } from '../lib/logger.js';
 import { requireAuth } from './auth.js';
 import { chatJSON, isAIEnabled } from '../lib/openai.js';
 import { AICoachRequestSchema, RoutingExplanationRequestSchema } from '../types/dto.js';
-import { findBestEnvelope } from './routing.js';
 
 const router = Router();
 
@@ -72,9 +72,9 @@ router.post('/coach', async (req: any, res) => {
 
     const { question, context } = AICoachRequestSchema.parse(req.body);
 
-    // -- get envelopes (already good)
+    // Get envelopes with correct field names
     const envelopes = await db.envelope.findMany({
-      where: { userId: 1 }, // TODO: swap to req.user.id
+      where: { userId: req.user.id },
       select: {
         name: true,
         icon: true,
@@ -84,11 +84,11 @@ router.post('/coach', async (req: any, res) => {
       },
     });
 
-    // dollars helper
+    // Helper to convert cents to dollars
     const toDollars = (cents: number | null) =>
-      typeof cents === "number" ? Number((cents / 100).toFixed(2)) : 0;
+      typeof cents === "number" ? (cents / 100).toFixed(2) : "0.00";
 
-    // context for envelopes
+    // Context for envelopes
     const envelopeContext = envelopes.map(e => ({
       name: e.name,
       icon: e.icon,
@@ -97,7 +97,7 @@ router.post('/coach', async (req: any, res) => {
       spentThisMonth: toDollars(e.spentThisMonth),
     }));
 
-    // -- recent transactions (fix: amountCents)
+    // Get recent transactions with correct field names
     const recentTransactions = await db.transaction.findMany({
       where: { userId: req.user.id },
       take: 5,
@@ -112,25 +112,23 @@ router.post('/coach', async (req: any, res) => {
     }));
 
     const systemPrompt = `You are a helpful financial coach for an envelope budgeting app.
-    The user has the following envelopes: ${JSON.stringify(envelopes, null, 2)}
-    Recent transactions: ${JSON.stringify(recentTransactions, null, 2)}
+The user has these envelopes: ${JSON.stringify(envelopeContext, null, 2)}
+Recent transactions: ${JSON.stringify(txContext, null, 2)}
 
-    Provide helpful, actionable advice about budgeting, spending habits, and envelope management.
-    Keep responses concise and practical.`;
+Provide helpful, actionable advice about budgeting and spending habits. Keep responses concise and practical.`;
 
-      const result = await chatJSON({
-        system: systemPrompt,
-        user: question,
-        schemaName: "coachResponse",
-        validate: (obj: any) => {
-          if (obj && typeof obj.advice === "string") return obj;
-          if (obj && typeof obj.response === "string") return { advice: obj.response };
-          throw new Error("Invalid response format");
-        },
-      });
+    const result = await chatJSON({
+      system: systemPrompt,
+      user: question,
+      schemaName: "coachResponse",
+      validate: (obj: any) => {
+        if (obj && typeof obj.advice === "string") return obj;
+        if (obj && typeof obj.response === "string") return { advice: obj.response };
+        throw new Error("Invalid response format");
+      },
+    });
 
-      res.json({ response: result.advice });
-JSON.stringify(result) });
+    res.json({ response: result.advice });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: 'Validation failed', details: error.errors });
@@ -151,7 +149,6 @@ router.post('/explain-routing', async (req: any, res) => {
     }
 
     const { transactionData } = RoutingExplanationRequestSchema.parse(req.body);
-
 
     // Get user's routing rules for context
     const rules = await db.rule.findMany({
@@ -209,37 +206,36 @@ router.post('/explain-routing', async (req: any, res) => {
     // Create AI explanation
     const systemPrompt = `You are a financial advisor explaining why a transaction was routed to a specific envelope in a budgeting app.
 
-    Transaction details:
-    - Merchant: ${transactionData.merchant || 'Unknown'}
-    - Amount: $${Math.abs(transactionData.amountCents) / 100}
-    - MCC: ${transactionData.mcc || 'Unknown'}
-    - Location: ${transactionData.location || 'Unknown'}
+Transaction details:
+- Merchant: ${transactionData.merchant || 'Unknown'}
+- Amount: $${Math.abs(transactionData.amountCents) / 100}
+- MCC: ${transactionData.mcc || 'Unknown'}
+- Location: ${transactionData.location || 'Unknown'}
 
-    Routing result:
-    - Envelope: ${targetEnvelope.name}
-    - Rule matched: ${matchedRule ? 'Yes' : 'No'}
-    - Reason: ${reason}
+Routing result:
+- Envelope: ${targetEnvelope.name}
+- Rule matched: ${matchedRule ? 'Yes' : 'No'}
+- Reason: ${reason}
 
-    Available rules: ${rules.map(r => `Priority ${r.priority}: ${r.mcc ? `MCC ${r.mcc}` : ''}${r.merchant ? ` "${r.merchant}"` : ''}${r.geofence ? ` at "${r.geofence}"` : ''} → ${r.envelope?.name || 'Unknown'}`).join(', ')}
+Available rules: ${rules.map(r => `Priority ${r.priority}: ${r.mcc ? `MCC ${r.mcc}` : ''}${r.merchant ? ` "${r.merchant}"` : ''}${r.geofence ? ` at "${r.geofence}"` : ''} → ${r.envelope?.name || 'Unknown'}`).join(', ')}
 
-    Provide a brief, friendly explanation (2-3 sentences) of why this transaction was routed to this envelope.`;
+Provide a brief, friendly explanation (2-3 sentences) of why this transaction was routed to this envelope.`;
 
     const result = await chatJSON({
       system: systemPrompt,
       user: 'Please explain this routing decision.',
       schemaName: "explanationResponse",
       validate: (obj: any) => {
-        if (typeof obj.explanation !== 'string') {
-          throw new Error('Invalid response format');
-        }
-        return obj;
+        if (obj && typeof obj.explanation === 'string') return obj;
+        if (obj && typeof obj.response === 'string') return { explanation: obj.response };
+        throw new Error('Invalid response format');
       }
     });
 
     res.json({
       envelope: targetEnvelope,
       rule: matchedRule,
-      explanation: result.explanation || result.response || JSON.stringify(result),
+      explanation: result.explanation,
       reason,
     });
   } catch (error) {
