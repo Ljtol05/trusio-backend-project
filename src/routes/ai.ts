@@ -225,7 +225,6 @@ Be conversational but specific. Reference their actual envelope names and balanc
 
       if (questionLower.includes('raise') || questionLower.includes('income') || questionLower.includes('money')) {
         // Handle income/raise questions
-        const suggestedAmount = 500; // Default assumption
         const suggestedAmount = Math.min(1000, avgBalance * 2); // Base on current avg
         contextualAdvice = `With your current $${toDollars(totalBalance)} across ${envelopeContext.length} envelopes (avg: $${avgBalance.toFixed(0)} each), I'd allocate new income strategically: 40% to ${lowestBalanceEnv.name} (currently $${lowestBalanceEnv.balance}), 35% to ${highestSpendingEnv.name} (your top spending at $${highestSpendingEnv.spentThisMonth}), and 25% to emergency savings.`;
         suggestedActions = [{
