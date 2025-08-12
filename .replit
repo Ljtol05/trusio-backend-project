@@ -8,6 +8,9 @@ requiredFiles = [".replit", "replit.nix", "package.json", "package-lock.json"]
 [nix]
 channel = "stable-24_11"
 
+[env]
+DATABASE_URL = "file:./dev.db"
+
 [deployment]
 run = ["node", "index.js"]
 deploymentTarget = "autoscale"
