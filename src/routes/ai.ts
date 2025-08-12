@@ -162,37 +162,33 @@ Provide practical, actionable advice about budgeting and spending habits. Keep r
 });
 
 /**
- * Auto-routing explanation
+ * Auto-routing explanation - optimized for approval workflow
  */
 router.post('/explain-routing', async (req: any, res) => {
   try {
-    if (!isAIEnabled()) {
-      return res
-        .status(503)
-        .json({ error: 'AI service not available', message: 'OpenAI API key not configured' });
-    }
-
     const { transactionData } = RoutingExplanationRequestSchema.parse(req.body);
 
-    // Rules and envelopes for the current user
-    const rules = await db.rule.findMany({
-      where: { userId: req.user.id, enabled: true },
-      orderBy: { priority: 'asc' },
-      include: { envelope: true },
-    });
-
-    const envelopes = await db.envelope.findMany({
-      where: { userId: req.user.id },
-    });
+    // Get active rules and envelopes for routing decision
+    const [rules, envelopes] = await Promise.all([
+      db.rule.findMany({
+        where: { userId: req.user.id, enabled: true },
+        orderBy: { priority: 'asc' },
+        select: { id: true, priority: true, mcc: true, merchant: true, geofence: true, envelope: { select: { id: true, name: true, icon: true, color: true } } },
+      }),
+      db.envelope.findMany({
+        where: { userId: req.user.id, isActive: true },
+        select: { id: true, name: true, icon: true, color: true },
+        orderBy: { order: 'asc' },
+      }),
+    ]);
 
     if (envelopes.length === 0) {
       return res.status(404).json({ error: 'No active envelopes found' });
     }
 
-    // Match rule
+    // Find matching rule
     let matchedRule: any = null;
     let targetEnvelope: any = null;
-    let reason = 'Default routing - no specific rule matched';
 
     for (const rule of rules) {
       let matches = true;
@@ -218,76 +214,54 @@ router.post('/explain-routing', async (req: any, res) => {
       }
 
       if (matches && rule.envelope) {
-        matchedRule = rule;
+        matchedRule = { id: rule.id, priority: rule.priority };
         targetEnvelope = rule.envelope;
-        reason = `Matched rule: ${[
-          rule.mcc ? `MCC ${rule.mcc}` : '',
-          rule.merchant ? `Merchant "${rule.merchant}"` : '',
-          rule.geofence ? `Location "${rule.geofence}"` : '',
-        ]
-          .filter(Boolean)
-          .join(' ')}`;
         break;
       }
     }
 
     if (!targetEnvelope) {
-      // Use 'Misc' envelope as default, or first available if Misc doesn't exist
+      // Use 'Misc' envelope as default, or first available
       targetEnvelope = envelopes.find(e => e.name === 'Misc') || envelopes[0];
-      reason = 'No matching rule found, using default envelope (Misc)';
     }
 
-    const systemPrompt = `You are a financial advisor explaining why a transaction was routed to a specific envelope in a budgeting app.
+    // Generate concise explanation if AI is available
+    let explanation = `Routed to ${targetEnvelope.name}`;
+    
+    if (isAIEnabled()) {
+      try {
+        const result = await chatJSON({
+          system: `Explain why this $${Math.abs(Number(transactionData.amountCents || 0)) / 100} transaction at ${transactionData.merchant || 'Unknown'} was routed to ${targetEnvelope.name}. ${matchedRule ? 'A rule matched.' : 'No rules matched, using default.'} Keep it to 1 sentence. Return JSON only.`,
+          user: 'Explain this routing decision briefly.',
+          schemaName: 'explanationResponse',
+          temperature: 0.1,
+          validate: (obj: any) => {
+            if (obj && typeof obj.explanation === 'string' && obj.explanation.trim()) {
+              return obj;
+            }
+            return { explanation };
+          },
+        });
+        explanation = result.explanation;
+      } catch (aiError) {
+        // Fallback to simple explanation if AI fails
+        explanation = matchedRule 
+          ? `Routed to ${targetEnvelope.name} based on your routing rules`
+          : `Routed to ${targetEnvelope.name} (default category)`;
+      }
+    }
 
-Transaction details:
-- Merchant: ${transactionData.merchant || 'Unknown'}
-- Amount: $${Math.abs(Number(transactionData.amountCents || 0)) / 100}
-- MCC: ${transactionData.mcc || 'Unknown'}
-- Location: ${transactionData.location || 'Unknown'}
-
-Routing result:
-- Envelope: ${targetEnvelope.name}
-- Rule matched: ${matchedRule ? 'Yes' : 'No'}
-- Reason: ${reason}
-
-Available rules: ${rules
-      .map(
-        (r) =>
-          `Priority ${r.priority}: ${[
-            r.mcc ? `MCC ${r.mcc}` : '',
-            r.merchant ? `"${r.merchant}"` : '',
-            r.geofence ? `at "${r.geofence}"` : '',
-          ]
-            .filter(Boolean)
-            .join(' ')} → ${r.envelope?.name || 'Unknown'}`
-      )
-      .join(', ')}
-
-Provide a brief, friendly explanation (2–3 sentences). Return JSON only.`;
-
-    const result = await chatJSON({
-      system: systemPrompt,
-      user: 'Please explain this routing decision.',
-      schemaName: 'explanationResponse',
-      validate: (obj: any) => {
-        if (obj && typeof obj.explanation === 'string' && obj.explanation.trim()) {
-          return obj;
-        }
-        if (obj && typeof obj.response === 'string' && obj.response.trim()) {
-          return { explanation: obj.response };
-        }
-        // Fallback for empty or malformed responses
-        return { 
-          explanation: `This transaction was routed to ${targetEnvelope?.name || 'the default envelope'} ${matchedRule ? 'based on your routing rules' : 'as no specific rules matched'}.` 
-        };
-      },
-    });
-
+    // Return optimized response for approval workflow
     res.json({
-      envelope: targetEnvelope,
+      envelope: {
+        id: targetEnvelope.id,
+        name: targetEnvelope.name,
+        icon: targetEnvelope.icon,
+        color: targetEnvelope.color,
+      },
       rule: matchedRule,
-      explanation: result.explanation,
-      reason,
+      explanation,
+      alternativeEnvelopes: envelopes.filter(e => e.id !== targetEnvelope.id),
     });
   } catch (error: any) {
     if (error instanceof z.ZodError) {
@@ -295,22 +269,7 @@ Provide a brief, friendly explanation (2–3 sentences). Return JSON only.`;
     }
     
     logger.error({ err: error }, 'Error explaining routing');
-    
-    // Provide a helpful fallback response with the routing decision
-    if (error?.code === 'NO_KEY') {
-      return res.status(503).json({
-        error: 'AI service not configured',
-        message: 'Please set OPENAI_API_KEY in Replit Secrets',
-      });
-    }
-    
-    // Still return the routing result even if AI explanation fails
-    res.json({
-      envelope: targetEnvelope,
-      rule: matchedRule,
-      explanation: `Transaction routed to ${targetEnvelope?.name || 'default envelope'} ${matchedRule ? 'based on your routing rules' : 'as no specific rules matched'}.`,
-      reason,
-    });
+    res.status(500).json({ error: 'Failed to process routing explanation' });
   }
 });
 
