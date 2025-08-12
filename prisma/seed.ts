@@ -1,182 +1,65 @@
 
 import { PrismaClient } from '@prisma/client';
-
-const db = new PrismaClient();
+const prisma = new PrismaClient();
 
 async function main() {
-  console.log('🌱 Starting seed...');
-
-  // Create or get user
-  const user = await db.user.upsert({
-    where: { id: 1 },
+  // single stub user
+  const user = await prisma.user.upsert({
+    where: { email: 'demo@envelopes.app' },
     update: {},
-    create: {
-      id: 1,
-      email: 'demo@example.com',
-      name: 'Demo User',
-    },
+    create: { email: 'demo@envelopes.app' },
   });
 
-  console.log('👤 Created user');
-
-  // Create envelopes with cents-based amounts
-  const envelopeData = [
-    { name: 'Groceries', balanceCents: 50000, color: 'green', icon: 'cart', order: 1 }, // $500
-    { name: 'Dining', balanceCents: 25000, color: 'orange', icon: 'utensils', order: 2 }, // $250
-    { name: 'Gas', balanceCents: 15000, color: 'blue', icon: 'fuel', order: 3 }, // $150
-    { name: 'Bills', balanceCents: 120000, color: 'red', icon: 'receipt', order: 4 }, // $1200
-    { name: 'Buffer', balanceCents: 10000, color: 'gray', icon: 'shield', order: 5 }, // $100
-    { name: 'Misc', balanceCents: 5000, color: 'purple', icon: 'dots', order: 6 }, // $50
+  const names = [
+    { name: 'Groceries', balanceCents: 42012, icon: 'cart', color: 'green', order: 1 },
+    { name: 'Dining',    balanceCents:  8650, icon: 'utensils', color: 'amber', order: 2 },
+    { name: 'Gas',       balanceCents: 11000, icon: 'fuel', color: 'teal', order: 3 },
+    { name: 'Bills',     balanceCents:124500, icon: 'receipt', color: 'blue', order: 4 },
+    { name: 'Buffer',    balanceCents: 30000, icon: 'shield', color: 'slate', order: 5 },
+    { name: 'Misc',      balanceCents:  7500, icon: 'dots', color: 'gray', order: 6 },
   ];
 
   const envelopes = [];
-  for (const envData of envelopeData) {
-    const envelope = await db.envelope.upsert({
-      where: {
-        userId_name: {
-          userId: user.id,
-          name: envData.name,
-        },
-      },
-      update: {
-        balanceCents: envData.balanceCents,
-        color: envData.color,
-        icon: envData.icon,
-        order: envData.order,
-      },
-      create: {
-        ...envData,
-        userId: user.id,
-      },
+  for (const n of names) {
+    const env = await prisma.envelope.upsert({
+      where: { userId_name: { userId: user.id, name: n.name } },
+      update: { balanceCents: n.balanceCents, icon: n.icon, color: n.color, order: n.order },
+      create: { userId: user.id, name: n.name, balanceCents: n.balanceCents, icon: n.icon, color: n.color, order: n.order },
     });
-    envelopes.push(envelope);
+    envelopes.push(env);
   }
 
-  console.log('💰 Created envelopes');
-
-  // Create routing rules
-  const groceriesEnvelope = envelopes.find(e => e.name === 'Groceries');
-  const diningEnvelope = envelopes.find(e => e.name === 'Dining');
-  const gasEnvelope = envelopes.find(e => e.name === 'Gas');
-
-  const rules = [
-    {
-      priority: 1,
-      mcc: '5411', // Grocery stores
-      envelopeId: groceriesEnvelope!.id,
-    },
-    {
-      priority: 2,
-      mcc: '5814', // Restaurants
-      envelopeId: diningEnvelope!.id,
-    },
-    {
-      priority: 3,
-      mcc: '5541', // Gas stations
-      envelopeId: gasEnvelope!.id,
-    },
-    {
-      priority: 4,
-      merchant: 'starbucks',
-      envelopeId: diningEnvelope!.id,
-    },
-    {
-      priority: 5,
-      merchant: 'kroger',
-      envelopeId: groceriesEnvelope!.id,
-    },
-  ];
-
-  for (const ruleData of rules) {
-    await db.rule.create({
+  // create 1:1 category virtual cards for a few envelopes
+  for (const env of envelopes.slice(0, 4)) {
+    await prisma.card.create({
       data: {
-        ...ruleData,
         userId: user.id,
+        last4: String(4000 + Math.floor(Math.random() * 5000)).slice(-4),
+        envelopeId: env.id,
+        label: `${env.name} Card`,
+        inWallet: true,
       },
     });
   }
 
-  console.log('📋 Created routing rules');
+  // a couple of rules for demo
+  await prisma.rule.createMany({
+    data: [
+      { userId: user.id, priority: 1, mcc: '5411', envelopeId: envelopes.find(e => e.name==='Groceries')!.id }, // Grocery stores
+      { userId: user.id, priority: 2, merchant: 'Chipotle', envelopeId: envelopes.find(e => e.name==='Dining')!.id },
+    ]
+  });
 
-  // Create routing config
-  await db.routingConfig.upsert({
+  // routing config defaults
+  await prisma.routingConfig.upsert({
     where: { userId: user.id },
-    update: {
-      spendMode: 'SMART_AUTO',
-      useGeneralPool: true,
-      bufferCents: 2000, // $20
-      confidence: 75,
-    },
-    create: {
-      userId: user.id,
-      spendMode: 'SMART_AUTO',
-      useGeneralPool: true,
-      bufferCents: 2000,
-      confidence: 75,
-    },
+    update: {},
+    create: { userId: user.id, spendMode: 'SMART_AUTO', useGeneralPool: true, bufferCents: 2000, confidence: 75 },
   });
 
-  console.log('⚙️ Created routing config');
-
-  // Create sample transactions
-  const transactions = [
-    {
-      amountCents: -4567, // -$45.67
-      merchant: 'Kroger',
-      mcc: '5411',
-      envelopeId: groceriesEnvelope!.id,
-      status: 'SETTLED',
-      reason: 'MCC Match',
-    },
-    {
-      amountCents: -1250, // -$12.50
-      merchant: 'Starbucks',
-      mcc: '5814',
-      envelopeId: diningEnvelope!.id,
-      status: 'SETTLED',
-      reason: 'Merchant Match',
-    },
-    {
-      amountCents: -3895, // -$38.95
-      merchant: 'Shell',
-      mcc: '5541',
-      envelopeId: gasEnvelope!.id,
-      status: 'SETTLED',
-      reason: 'MCC Match',
-    },
-  ];
-
-  for (const txnData of transactions) {
-    await db.transaction.create({
-      data: {
-        ...txnData,
-        userId: user.id,
-      },
-    });
-  }
-
-  console.log('💳 Created sample transactions');
-
-  // Create sample cards
-  await db.card.create({
-    data: {
-      last4: '1234',
-      label: 'Main Card',
-      inWallet: true,
-      userId: user.id,
-    },
-  });
-
-  console.log('🎴 Created sample cards');
-
-  console.log('✅ Seed completed successfully!');
+  console.log('Seed complete.');
 }
 
 main()
-  .catch((e) => {
-    console.error('❌ Seed failed:', e);
-    process.exit(1);
-  })
-  .finally(async () => {
-    await db.$disconnect();
-  });
+  .catch(e => { console.error(e); process.exit(1); })
+  .finally(async () => { await prisma.$disconnect(); });

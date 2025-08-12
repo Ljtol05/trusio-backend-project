@@ -154,4 +154,38 @@ router.delete('/:id', async (req: any, res) => {
   }
 });
 
+// Reorder rules
+router.post('/reorder', async (req: any, res) => {
+  try {
+    const { ruleIds } = req.body;
+    
+    if (!Array.isArray(ruleIds)) {
+      return res.status(400).json({ error: 'ruleIds must be an array' });
+    }
+    
+    // Update priorities based on array order
+    const updates = ruleIds.map((id, index) => 
+      db.rule.updateMany({
+        where: { id: parseInt(id), userId: req.user.id },
+        data: { priority: index },
+      })
+    );
+    
+    await Promise.all(updates);
+    
+    const rules = await db.rule.findMany({
+      where: { userId: req.user.id },
+      include: {
+        envelope: { select: { id: true, name: true } },
+      },
+      orderBy: { priority: 'asc' },
+    });
+    
+    res.json({ rules });
+  } catch (error) {
+    logger.error(error, 'Error reordering rules');
+    res.status(500).json({ error: 'Failed to reorder rules' });
+  }
+});
+
 export default router;

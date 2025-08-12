@@ -1,4 +1,3 @@
-
 import { Router } from 'express';
 import { z } from 'zod';
 import { db } from '../lib/db.js';
@@ -14,7 +13,7 @@ router.get('/', async (req: any, res) => {
   try {
     const { page, limit } = PaginationSchema.parse(req.query);
     const offset = (page - 1) * limit;
-    
+
     const transfers = await db.transfer.findMany({
       where: { userId: req.user.id },
       include: {
@@ -25,11 +24,11 @@ router.get('/', async (req: any, res) => {
       skip: offset,
       take: limit,
     });
-    
+
     const total = await db.transfer.count({
       where: { userId: req.user.id },
     });
-    
+
     res.json({
       transfers,
       pagination: {
@@ -48,42 +47,45 @@ router.get('/', async (req: any, res) => {
 // Create transfer
 router.post('/', async (req: any, res) => {
   try {
-    const data = CreateTransferSchema.parse(req.body);
-    
-    // Validate envelopes exist and belong to user
-    const fromEnvelope = await db.envelope.findFirst({
-      where: { id: data.fromEnvelopeId, userId: req.user.id },
-    });
-    
-    const toEnvelope = await db.envelope.findFirst({
-      where: { id: data.toEnvelopeId, userId: req.user.id },
-    });
-    
-    if (!fromEnvelope || !toEnvelope) {
-      return res.status(400).json({ error: 'Invalid envelope selection' });
+    const { fromId, toId, amountCents, note } = req.body;
+
+    if (amountCents <= 0) {
+      return res.status(400).json({ error: 'Amount must be positive' });
     }
-    
-    if (fromEnvelope.balance < data.amount) {
-      return res.status(400).json({ error: 'Insufficient balance in source envelope' });
-    }
-    
-    // Perform transfer in transaction
-    const result = await db.$transaction(async (tx) => {
-      // Update balances
-      await tx.envelope.update({
-        where: { id: data.fromEnvelopeId },
-        data: { balance: { decrement: data.amount } },
-      });
-      
-      await tx.envelope.update({
-        where: { id: data.toEnvelopeId },
-        data: { balance: { increment: data.amount } },
-      });
-      
-      // Create transfer record
-      return await tx.transfer.create({
+
+    // Use transaction to ensure balance consistency
+    const transfer = await db.$transaction(async (tx) => {
+      // If moving from an envelope, deduct the amount
+      if (fromId) {
+        await tx.envelope.update({
+          where: { id: fromId, userId: req.user.id },
+          data: {
+            balanceCents: {
+              decrement: amountCents,
+            },
+          },
+        });
+      }
+
+      // If moving to an envelope, add the amount
+      if (toId) {
+        await tx.envelope.update({
+          where: { id: toId, userId: req.user.id },
+          data: {
+            balanceCents: {
+              increment: amountCents,
+            },
+          },
+        });
+      }
+
+      // Create the transfer record
+      return tx.transfer.create({
         data: {
-          ...data,
+          fromId,
+          toId,
+          amountCents,
+          note,
           userId: req.user.id,
         },
         include: {
@@ -92,8 +94,8 @@ router.post('/', async (req: any, res) => {
         },
       });
     });
-    
-    res.status(201).json({ transfer: result });
+
+    res.status(201).json({ transfer });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: 'Validation failed', details: error.errors });

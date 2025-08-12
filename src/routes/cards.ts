@@ -106,6 +106,39 @@ router.patch('/:id', async (req: any, res) => {
   }
 });
 
+// Add/remove card from wallet
+router.post('/:id/wallet', async (req: any, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const { inWallet } = req.body;
+    
+    if (typeof inWallet !== 'boolean') {
+      return res.status(400).json({ error: 'inWallet must be a boolean' });
+    }
+    
+    const card = await db.card.updateMany({
+      where: { id, userId: req.user.id },
+      data: { inWallet },
+    });
+    
+    if (card.count === 0) {
+      return res.status(404).json({ error: 'Card not found' });
+    }
+    
+    const updatedCard = await db.card.findUnique({
+      where: { id },
+      include: {
+        envelope: { select: { id: true, name: true } },
+      },
+    });
+    
+    res.json({ card: updatedCard });
+  } catch (error) {
+    logger.error(error, 'Error updating card wallet status');
+    res.status(500).json({ error: 'Failed to update card wallet status' });
+  }
+});
+
 // Delete card
 router.delete('/:id', async (req: any, res) => {
   try {

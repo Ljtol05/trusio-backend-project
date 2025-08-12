@@ -116,4 +116,69 @@ router.post('/explain-routing', async (req: any, res) => {
   }
 });
 
+// AI Coach endpoint
+router.post('/coach', async (req: any, res) => {
+  try {
+    if (!isAIEnabled()) {
+      return res.status(503).json({ 
+        error: 'AI service not available',
+        message: 'OpenAI API key not configured'
+      });
+    }
+    
+    const { goal, constraints, months } = req.body;
+    
+    // Get user's current envelope data
+    const envelopes = await db.envelope.findMany({
+      where: { userId: req.user.id, isActive: true },
+      select: { name: true, balanceCents: true, spentThisMonth: true },
+    });
+    
+    const totalBalance = envelopes.reduce((sum, env) => sum + env.balanceCents, 0);
+    const totalSpent = envelopes.reduce((sum, env) => sum + env.spentThisMonth, 0);
+    
+    const systemPrompt = `You are an AI financial coach for envelope budgeting.
+    
+    User's current situation:
+    - Total balance: $${(totalBalance / 100).toFixed(2)}
+    - Total spent this month: $${(totalSpent / 100).toFixed(2)}
+    - Current envelopes: ${JSON.stringify(envelopes, null, 2)}
+    
+    User's goal: ${goal || 'General budgeting advice'}
+    Constraints: ${constraints?.join(', ') || 'None specified'}
+    Planning period: ${months || 3} months
+    
+    Provide specific advice including:
+    1. Suggested envelope allocations (in cents)
+    2. Monthly spending plan
+    3. Risk assessment and recommendations
+    
+    Return your response as JSON with structure:
+    {
+      "allocations": [{"envelope": "name", "recommendedCents": number}],
+      "monthlyPlan": {"totalBudget": number, "categories": [{"name": "string", "budget": number}]},
+      "risks": ["risk1", "risk2"],
+      "recommendations": ["rec1", "rec2"]
+    }`;
+    
+    const advice = await createChatCompletion([
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: 'Please analyze my budget and provide recommendations.' },
+    ]);
+    
+    // Try to parse as JSON, fallback to text if needed
+    let parsedAdvice;
+    try {
+      parsedAdvice = JSON.parse(advice);
+    } catch {
+      parsedAdvice = { message: advice };
+    }
+    
+    res.json(parsedAdvice);
+  } catch (error) {
+    logger.error(error, 'Error getting AI coach advice');
+    res.status(500).json({ error: 'AI service unavailable' });
+  }
+});
+
 export default router;

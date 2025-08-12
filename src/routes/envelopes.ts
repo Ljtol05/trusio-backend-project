@@ -1,4 +1,3 @@
-
 import { Router } from 'express';
 import { z } from 'zod';
 import { db } from '../lib/db.js';
@@ -14,9 +13,18 @@ router.get('/', async (req: any, res) => {
   try {
     const envelopes = await db.envelope.findMany({
       where: { userId: req.user.id },
-      orderBy: { name: 'asc' },
+      select: {
+        id: true,
+        name: true,
+        balanceCents: true,
+        spentThisMonth: true,
+        icon: true,
+        color: true,
+        order: true,
+      },
+      orderBy: { order: 'asc' },
     });
-    
+
     res.json({ envelopes });
   } catch (error) {
     logger.error(error, 'Error fetching envelopes');
@@ -31,11 +39,11 @@ router.get('/:id', async (req: any, res) => {
     const envelope = await db.envelope.findFirst({
       where: { id, userId: req.user.id },
     });
-    
+
     if (!envelope) {
       return res.status(404).json({ error: 'Envelope not found' });
     }
-    
+
     res.json({ envelope });
   } catch (error) {
     logger.error(error, 'Error fetching envelope');
@@ -46,20 +54,19 @@ router.get('/:id', async (req: any, res) => {
 // Create envelope
 router.post('/', async (req: any, res) => {
   try {
-    const data = CreateEnvelopeSchema.parse(req.body);
-    
+    const { name, startingBalanceCents, ...otherData } = req.body;
+
     const envelope = await db.envelope.create({
       data: {
-        ...data,
+        name,
+        balanceCents: startingBalanceCents || 0,
+        ...otherData,
         userId: req.user.id,
       },
     });
-    
+
     res.status(201).json({ envelope });
   } catch (error) {
-    if (error instanceof z.ZodError) {
-      return res.status(400).json({ error: 'Validation failed', details: error.errors });
-    }
     logger.error(error, 'Error creating envelope');
     res.status(500).json({ error: 'Failed to create envelope' });
   }
@@ -70,16 +77,16 @@ router.patch('/:id', async (req: any, res) => {
   try {
     const id = parseInt(req.params.id);
     const data = UpdateEnvelopeSchema.parse(req.body);
-    
+
     const envelope = await db.envelope.updateMany({
       where: { id, userId: req.user.id },
       data,
     });
-    
+
     if (envelope.count === 0) {
       return res.status(404).json({ error: 'Envelope not found' });
     }
-    
+
     const updatedEnvelope = await db.envelope.findUnique({ where: { id } });
     res.json({ envelope: updatedEnvelope });
   } catch (error) {
@@ -95,15 +102,15 @@ router.patch('/:id', async (req: any, res) => {
 router.delete('/:id', async (req: any, res) => {
   try {
     const id = parseInt(req.params.id);
-    
+
     const deleted = await db.envelope.deleteMany({
       where: { id, userId: req.user.id },
     });
-    
+
     if (deleted.count === 0) {
       return res.status(404).json({ error: 'Envelope not found' });
     }
-    
+
     res.json({ message: 'Envelope deleted successfully' });
   } catch (error) {
     logger.error(error, 'Error deleting envelope');

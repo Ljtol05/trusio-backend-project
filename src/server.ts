@@ -1,4 +1,3 @@
-
 import express from 'express';
 import cors from 'cors';
 import { env } from './config/env.js';
@@ -79,7 +78,7 @@ const startServer = async () => {
     // Test database connection
     await db.$connect();
     logger.info('Database connected successfully');
-    
+
     const server = app.listen(env.PORT, '0.0.0.0', () => {
       logger.info({
         port: env.PORT,
@@ -87,28 +86,28 @@ const startServer = async () => {
         aiEnabled: !!env.OPENAI_API_KEY,
       }, 'Server started successfully');
     });
-    
+
     // Graceful shutdown
     const shutdown = async (signal: string) => {
       logger.info(`Received ${signal}, starting graceful shutdown...`);
-      
+
       server.close(async () => {
         logger.info('HTTP server closed');
         await db.$disconnect();
         logger.info('Database disconnected');
         process.exit(0);
       });
-      
+
       // Force shutdown after 10 seconds
       setTimeout(() => {
         logger.error('Forced shutdown due to timeout');
         process.exit(1);
       }, 10000);
     };
-    
+
     process.on('SIGTERM', () => shutdown('SIGTERM'));
     process.on('SIGINT', () => shutdown('SIGINT'));
-    
+
   } catch (error) {
     logger.error(error, 'Failed to start server');
     process.exit(1);

@@ -1,43 +1,33 @@
-
 import { Router } from 'express';
 import { db } from '../lib/db.js';
 import { logger } from '../lib/logger.js';
 
 const router = Router();
 
-// TODO: Replace with real authentication
-// For now, stub with userId = 1
-export const getCurrentUser = async () => {
-  let user = await db.user.findUnique({ where: { id: 1 } });
-  
-  if (!user) {
-    user = await db.user.create({
-      data: {
-        id: 1,
-        email: 'user@example.com',
-        name: 'Demo User',
-      },
-    });
-  }
-  
-  return user;
+// Stub auth middleware
+export const requireAuth = (req: any, res: any, next: any) => {
+  // For now, always use the first user (stub)
+  req.user = { id: 1 };
+  next();
 };
 
-// Middleware to inject user into request
-export const requireAuth = async (req: any, res: any, next: any) => {
+// Get current user (stub)
+router.get('/me', async (req, res) => {
   try {
-    const user = await getCurrentUser();
-    req.user = user;
-    next();
-  } catch (error) {
-    logger.error(error, 'Auth middleware error');
-    res.status(500).json({ error: 'Authentication failed' });
-  }
-};
+    const user = await db.user.findUnique({
+      where: { id: 1 },
+      select: { id: true, email: true },
+    });
 
-// Get current user
-router.get('/me', requireAuth, async (req: any, res) => {
-  res.json({ user: req.user });
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.json({ user });
+  } catch (error) {
+    logger.error(error, 'Error fetching user');
+    res.status(500).json({ error: 'Failed to fetch user' });
+  }
 });
 
 export default router;
