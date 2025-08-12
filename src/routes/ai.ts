@@ -137,7 +137,7 @@ router.post('/coach', async (req: any, res) => {
       env.balanceCents < min.balanceCents ? env : min
     );
 
-    const systemPrompt = `You are an expert financial advisor for an envelope budgeting system. Analyze the user's financial situation and provide specific, actionable advice.
+    const systemPrompt = `You are an expert financial advisor for an envelope budgeting system. Analyze this specific situation and provide actionable advice with concrete numbers and steps.
 
 CURRENT FINANCIAL STATE:
 Total Balance: $${toDollars(totalBalance)}
@@ -148,64 +148,96 @@ ENVELOPE BREAKDOWN:
 ${envelopeContext.map(e => `• ${e.name}: $${e.balance} available (spent $${e.spentThisMonth} this month)`).join('\n')}
 
 SPENDING INSIGHTS:
-• Highest spending category: ${highestSpendingEnv.name} ($${highestSpendingEnv.spentThisMonth})
-• Lowest balance envelope: ${lowestBalanceEnv.name} ($${lowestBalanceEnv.balance})
-• Average spending per category: $${avgSpendingPerEnvelope.toFixed(2)}
+• Highest spending: ${highestSpendingEnv.name} ($${highestSpendingEnv.spentThisMonth})
+• Lowest balance: ${lowestBalanceEnv.name} ($${lowestBalanceEnv.balance})
+• Average per category: $${avgSpendingPerEnvelope.toFixed(2)}
 
-RECENT ACTIVITY:
+RECENT TRANSACTIONS:
 ${recentTransactions.slice(0, 5).map(t => `• $${toDollars(Math.abs(t.amountCents))} at ${t.merchant || 'Unknown'} → ${t.envelope?.name || 'Unassigned'}`).join('\n')}
-
-CAPABILITIES I CAN HELP WITH:
-1. Transfer money between envelopes
-2. Create new envelopes (max 8 total)
-3. Analyze spending patterns
-4. Suggest budget rebalancing
-5. Emergency fund planning
 
 USER QUESTION: "${question}"
 
-Respond with specific, actionable advice. If the user needs money moved between envelopes or new envelopes created, include those recommendations. Return JSON with:
-- "advice": detailed financial advice
-- "actions": array of suggested actions (if any), each with "type", "description", and "params"
+Provide specific advice addressing their exact question. Include dollar amounts, envelope names, and actionable steps. If recommending transfers or new envelopes, be specific about amounts and reasons.
 
-Example actions:
-- {"type": "transfer", "description": "Move $200 from Bills to Groceries", "params": {"fromEnvelope": "Bills", "toEnvelope": "Groceries", "amount": 200}}
-- {"type": "create_envelope", "description": "Create Emergency Fund", "params": {"name": "Emergency Fund", "initialAmount": 500, "icon": "shield", "color": "red"}}`;
+Respond in JSON format only:
+{
+  "advice": "Detailed, specific advice addressing the user's question with actual numbers and envelope names",
+  "actions": [
+    {
+      "type": "transfer|create_envelope", 
+      "description": "Clear description with specific amounts", 
+      "params": {
+        "fromEnvelope": "Source envelope name",
+        "toEnvelope": "Target envelope name", 
+        "amount": 100
+      }
+    }
+  ]
+}
 
-    const result = await chatJSON({
-      system: systemPrompt,
-      user: question,
-      schemaName: 'coachResponse',
-      temperature: 0.4,
-      validate: (obj: any) => {
-        if (obj && typeof obj === 'object') {
-          const advice = obj.advice || obj.response || obj.recommendation || obj.suggestion;
-          const actions = obj.actions || obj.suggestions || obj.recommendations || [];
-          
-          if (typeof advice === 'string' && advice.trim()) {
-            return { 
-              advice: advice.trim(),
-              actions: Array.isArray(actions) ? actions : []
-            };
+Be conversational but specific. Reference their actual envelope names and balances in your advice.`;
+
+    let result;
+    try {
+      result = await chatJSON({
+        system: systemPrompt,
+        user: question,
+        schemaName: 'coachResponse',
+        temperature: 0.7, // Increased for more variation
+        validate: (obj: any) => {
+          if (obj && typeof obj === 'object') {
+            const advice = obj.advice || obj.response || obj.recommendation || obj.suggestion;
+            const actions = obj.actions || obj.suggestions || obj.recommendations || [];
+            
+            if (typeof advice === 'string' && advice.trim()) {
+              return { 
+                advice: advice.trim(),
+                actions: Array.isArray(actions) ? actions : []
+              };
+            }
           }
+          return null; // Let the outer catch handle fallback
+        },
+      });
+    } catch (aiError) {
+      logger.error({ err: aiError, question }, 'AI Coach API failed, generating contextual fallback');
+      
+      // Generate contextual fallback based on the specific question
+      let contextualAdvice = '';
+      const questionLower = question.toLowerCase();
+      
+      if (questionLower.includes('raise') || questionLower.includes('income') || questionLower.includes('money')) {
+        // Handle income/raise questions
+        const suggestedAllocation = Math.round(500 * 0.5); // Assume $500 raise, allocate 50%
+        contextualAdvice = `With extra income, I'd suggest allocating 50% to your lowest balance envelope (${lowestBalanceEnv.name}: $${lowestBalanceEnv.balance}) and 30% to savings. Your highest spending category ${highestSpendingEnv.name} ($${highestSpendingEnv.spentThisMonth} this month) might also need a boost.`;
+      } else if (questionLower.includes('car') || questionLower.includes('repair') || questionLower.includes('emergency')) {
+        // Handle emergency/repair questions
+        const availableFromMultiple = envelopeContext
+          .filter(env => env.balanceCents > 1000)
+          .map(env => `${env.name} ($${env.balance})`)
+          .join(', ');
+        contextualAdvice = `For emergency expenses, consider pulling from multiple envelopes: ${availableFromMultiple || `${lowestBalanceEnv.name} and others`}. You might also want to create an Emergency Fund envelope for future unexpected costs.`;
+      } else if (questionLower.includes('dining') || questionLower.includes('food') || questionLower.includes('restaurant')) {
+        // Handle dining/food questions
+        const diningEnv = envelopeContext.find(env => env.name.toLowerCase().includes('dining') || env.name.toLowerCase().includes('food'));
+        contextualAdvice = `You've spent $${diningEnv?.spentThisMonth || '0.00'} on dining this month. Consider setting a stricter weekly limit or transferring funds from ${envelopeContext.find(env => env.balanceCents > 5000)?.name || 'your highest balance envelope'} to better control food spending.`;
+      } else {
+        // General advice with specific numbers
+        const needsAttention = envelopeContext.filter(env => env.balanceCents < 1000);
+        contextualAdvice = `Based on your $${toDollars(totalBalance)} total balance across ${envelopeContext.length} envelopes, `;
+        
+        if (needsAttention.length > 0) {
+          contextualAdvice += `${needsAttention.map(env => env.name).join(' and ')} need${needsAttention.length === 1 ? 's' : ''} attention. `;
         }
         
-        // Enhanced fallback with specific advice based on user's situation
-        let specificAdvice = '';
-        if (lowestBalanceEnv.balanceCents < 1000) {
-          specificAdvice = `Your ${lowestBalanceEnv.name} envelope is running low ($${lowestBalanceEnv.balance}). `;
-        }
-        if (parseFloat(highestSpendingEnv.spentThisMonth) > avgSpendingPerEnvelope * 1.5) {
-          specificAdvice += `You've been spending heavily in ${highestSpendingEnv.name} this month ($${highestSpendingEnv.spentThisMonth}). `;
-        }
-        specificAdvice += `Consider rebalancing your ${envelopeContext.length} envelopes based on your actual spending patterns.`;
-        
-        return { 
-          advice: specificAdvice || `Based on your $${toDollars(totalBalance)} across ${envelopeContext.length} envelopes, your budget looks balanced. Keep monitoring your spending patterns.`,
-          actions: []
-        };
-      },
-    });
+        contextualAdvice += `Your ${highestSpendingEnv.name} category has the highest spending ($${highestSpendingEnv.spentThisMonth}). Consider adjusting allocations based on your actual usage patterns.`;
+      }
+      
+      result = { 
+        advice: contextualAdvice,
+        actions: []
+      };
+    }
 
     res.json({ 
       response: result.advice,
