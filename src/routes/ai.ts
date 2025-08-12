@@ -51,7 +51,7 @@ router.post('/test', async (req, res) => {
   }
 });
 
-// router.use(requireAuth); // Temporarily disabled for testing
+router.use(requireAuth);
 
 /**
  * Helper: cents → "12.34"
