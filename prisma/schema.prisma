@@ -1,0 +1,125 @@
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL") != "" ? env("DATABASE_URL") : "file:./dev.db"
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  email     String?  @unique
+  name      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  envelopes    Envelope[]
+  transactions Transaction[]
+  transfers    Transfer[]
+  rules        RoutingRule[]
+  cards        Card[]
+
+  @@map("users")
+}
+
+model Envelope {
+  id          Int     @id @default(autoincrement())
+  name        String
+  balance     Decimal @default(0)
+  budgetLimit Decimal @default(0)
+  color       String  @default("#3B82F6")
+  isActive    Boolean @default(true)
+  userId      Int
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user              User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactionsFrom  Transaction[]     @relation("FromEnvelope")
+  transactionsTo    Transaction[]     @relation("ToEnvelope")
+  transfersFrom     Transfer[]        @relation("TransferFrom")
+  transfersTo       Transfer[]        @relation("TransferTo")
+  routingRules      RoutingRule[]
+
+  @@unique([userId, name])
+  @@map("envelopes")
+}
+
+model Transaction {
+  id            Int      @id @default(autoincrement())
+  amount        Decimal
+  description   String
+  merchantName  String?
+  mcc           String?
+  location      String?
+  reason        String?
+  status        String   @default("pending") // pending, completed, failed
+  externalId    String?  @unique
+  fromEnvelopeId Int?
+  toEnvelopeId   Int?
+  userId        Int
+  cardId        Int?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fromEnvelope Envelope? @relation("FromEnvelope", fields: [fromEnvelopeId], references: [id])
+  toEnvelope   Envelope? @relation("ToEnvelope", fields: [toEnvelopeId], references: [id])
+  card         Card?     @relation(fields: [cardId], references: [id])
+
+  @@map("transactions")
+}
+
+model Transfer {
+  id             Int      @id @default(autoincrement())
+  amount         Decimal
+  description    String?
+  fromEnvelopeId Int
+  toEnvelopeId   Int
+  userId         Int
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fromEnvelope Envelope @relation("TransferFrom", fields: [fromEnvelopeId], references: [id])
+  toEnvelope   Envelope @relation("TransferTo", fields: [toEnvelopeId], references: [id])
+
+  @@map("transfers")
+}
+
+model RoutingRule {
+  id         Int     @id @default(autoincrement())
+  name       String
+  priority   Int
+  isActive   Boolean @default(true)
+  conditions Json    // Store conditions as JSON
+  envelopeId Int
+  userId     Int
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  envelope Envelope @relation(fields: [envelopeId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, name])
+  @@map("routing_rules")
+}
+
+model Card {
+  id           Int      @id @default(autoincrement())
+  name         String
+  last4        String
+  cardType     String   @default("virtual") // virtual, physical
+  status       String   @default("active") // active, inactive, blocked
+  isDefault    Boolean  @default(false)
+  userId       Int
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions Transaction[]
+
+  @@unique([userId, name])
+  @@map("cards")
+}

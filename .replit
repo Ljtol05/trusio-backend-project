@@ -12,3 +12,27 @@ channel = "stable-24_11"
 run = ["node", "index.js"]
 deploymentTarget = "autoscale"
 ignorePorts = false
+
+[workflows]
+runButton = "Development Server"
+
+[[workflows.workflow]]
+name = "Development Server"
+author = 46306395
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npm run prisma:generate"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npm run prisma:migrate"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npm run prisma:seed"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npm run dev"
