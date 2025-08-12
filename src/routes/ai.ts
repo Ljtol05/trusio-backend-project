@@ -178,17 +178,16 @@ Respond in JSON format only:
 Be conversational but specific. Reference their actual envelope names and balances in your advice.`;
 
     let result;
+    let aiSuccess = false;
+    
     try {
-      // Set shorter timeout for better UX and faster fallback
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
-      
+      // Try AI with optimized settings and faster timeout
       result = await Promise.race([
         chatJSON({
           system: systemPrompt,
           user: question,
           schemaName: 'coachResponse',
-          temperature: 0.7,
+          temperature: undefined, // Let the model use its default
           validate: (obj: any) => {
             if (obj && typeof obj === 'object') {
               const advice = obj.advice || obj.response || obj.recommendation || obj.suggestion;
@@ -204,75 +203,116 @@ Be conversational but specific. Reference their actual envelope names and balanc
             throw new Error('Invalid AI response format');
           },
         }),
-        new Promise((_, reject) => {
-          controller.signal.addEventListener('abort', () => {
-            reject(new Error('Request timeout - using fallback'));
-          });
-        })
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('AI timeout - using smart fallback')), 15000)
+        )
       ]);
       
-      clearTimeout(timeoutId);
+      aiSuccess = true;
     } catch (aiError) {
-      logger.warn({ err: aiError, question }, 'AI Coach timeout/error, using enhanced fallback');
+      logger.warn({ err: aiError, question }, 'AI Coach timeout/error, using smart fallback');
       
-      // Generate enhanced contextual fallback with specific recommendations
+      // Enhanced smart fallback using actual user data
       let contextualAdvice = '';
       let suggestedActions = [];
       const questionLower = question.toLowerCase();
       
+      // Analyze user's actual financial state for smarter recommendations
+      const hasLowBalances = envelopeContext.filter(env => env.balanceCents < 2000).length;
+      const hasHighBalances = envelopeContext.filter(env => env.balanceCents > 10000);
+      const totalSpentThisMonth = envelopeContext.reduce((sum, env) => sum + parseFloat(env.spentThisMonth), 0);
+      const avgBalance = totalBalance / 100 / envelopeContext.length;
+      
       if (questionLower.includes('raise') || questionLower.includes('income') || questionLower.includes('money')) {
         // Handle income/raise questions
         const suggestedAmount = 500; // Default assumption
-        contextualAdvice = `With additional income, I recommend the 50/30/20 rule: 50% to your lowest balance envelope (${lowestBalanceEnv.name}: $${lowestBalanceEnv.balance}), 30% to your highest spending category (${highestSpendingEnv.name}), and 20% to emergency savings.`;
+        const suggestedAmount = Math.min(1000, avgBalance * 2); // Base on current avg
+        contextualAdvice = `With your current $${toDollars(totalBalance)} across ${envelopeContext.length} envelopes (avg: $${avgBalance.toFixed(0)} each), I'd allocate new income strategically: 40% to ${lowestBalanceEnv.name} (currently $${lowestBalanceEnv.balance}), 35% to ${highestSpendingEnv.name} (your top spending at $${highestSpendingEnv.spentThisMonth}), and 25% to emergency savings.`;
         suggestedActions = [{
           type: 'transfer',
-          description: `Transfer $${(suggestedAmount * 0.5).toFixed(0)} to ${lowestBalanceEnv.name}`,
-          params: { fromEnvelope: 'New Income', toEnvelope: lowestBalanceEnv.name, amount: suggestedAmount * 0.5 }
+          description: `Boost ${lowestBalanceEnv.name} with 40% of new income`,
+          params: { fromEnvelope: 'Income Allocation', toEnvelope: lowestBalanceEnv.name, amount: suggestedAmount * 0.4 }
         }];
       } else if (questionLower.includes('car') || questionLower.includes('repair') || questionLower.includes('emergency')) {
-        // Handle emergency/repair questions
-        const highBalanceEnvs = envelopeContext.filter(env => env.balanceCents > 2000);
-        const suggestedPull = Math.min(800, highBalanceEnvs.reduce((sum, env) => sum + env.balanceCents, 0) / 100 * 0.3);
-        contextualAdvice = `For the $800 repair, I suggest pulling from ${highBalanceEnvs.length > 0 ? highBalanceEnvs.map(e => e.name).join(' and ') : 'your available envelopes'}. Consider creating an Emergency Fund envelope (10% of monthly income) to handle future unexpected expenses.`;
-        if (highBalanceEnvs.length > 0) {
+        // Handle emergency/repair questions with real envelope analysis
+        const fundingSources = envelopeContext.filter(env => env.balanceCents > 5000).sort((a, b) => b.balanceCents - a.balanceCents);
+        const neededAmount = 800; // Default repair amount
+        
+        if (fundingSources.length > 0) {
+          const primarySource = fundingSources[0];
+          const canCoverAmount = Math.min(neededAmount, primarySource.balanceCents / 100 * 0.4);
+          contextualAdvice = `For the $${neededAmount} repair: Pull $${canCoverAmount.toFixed(0)} from ${primarySource.name} ($${primarySource.balance} available). ${fundingSources.length > 1 ? `Additional backup: ${fundingSources[1].name} ($${fundingSources[1].balance}).` : ''} Consider setting aside $${(totalBalance / 100 * 0.1).toFixed(0)}/month for future emergencies.`;
           suggestedActions = [{
             type: 'transfer',
-            description: `Transfer $${suggestedPull.toFixed(0)} from ${highBalanceEnvs[0].name} for repairs`,
-            params: { fromEnvelope: highBalanceEnvs[0].name, toEnvelope: 'Emergency/Repairs', amount: suggestedPull }
+            description: `Use ${primarySource.name} for repair ($${canCoverAmount.toFixed(0)})`,
+            params: { fromEnvelope: primarySource.name, toEnvelope: 'Emergency Repair', amount: canCoverAmount }
           }];
+        } else {
+          contextualAdvice = `For the $${neededAmount} repair, you'll need to combine multiple envelopes. Your top options: ${envelopeContext.slice(0, 3).map(e => `${e.name} ($${e.balance})`).join(', ')}. Total available: $${toDollars(totalBalance)}.`;
         }
       } else if (questionLower.includes('dining') || questionLower.includes('food') || questionLower.includes('restaurant') || questionLower.includes('overspending')) {
-        // Handle dining/food overspending questions
-        const diningEnv = envelopeContext.find(env => env.name.toLowerCase().includes('dining') || env.name.toLowerCase().includes('food'));
+        // Handle dining/food overspending questions with envelope analysis
+        const diningEnv = envelopeContext.find(env => 
+          env.name.toLowerCase().includes('dining') || 
+          env.name.toLowerCase().includes('food') || 
+          env.name.toLowerCase().includes('restaurant')
+        );
         const currentSpending = parseFloat(diningEnv?.spentThisMonth || '0');
-        const suggestedLimit = Math.max(currentSpending * 0.7, 50); // Reduce by 30% or min $50
-        contextualAdvice = `You've spent $${currentSpending.toFixed(2)} on dining this month. Try setting a weekly limit of $${(suggestedLimit / 4).toFixed(0)} and meal prep 2-3 days per week. Consider transferring excess from ${diningEnv?.name || 'Dining'} to ${lowestBalanceEnv.name} to enforce the limit.`;
-        if (diningEnv && parseFloat(diningEnv.balance) > 50) {
+        const currentBalance = parseFloat(diningEnv?.balance || '0');
+        const suggestedMonthlyLimit = Math.max(avgBalance, 150); // Based on user's average or minimum
+        
+        contextualAdvice = `Your ${diningEnv?.name || 'dining'} spending: $${currentSpending.toFixed(2)} this month with $${currentBalance.toFixed(2)} remaining. For your budget level ($${avgBalance.toFixed(0)} avg/envelope), target $${suggestedMonthlyLimit.toFixed(0)}/month dining. Weekly limit: $${(suggestedMonthlyLimit / 4).toFixed(0)}. ${currentBalance > suggestedMonthlyLimit * 0.5 ? `Consider moving $${(currentBalance * 0.3).toFixed(0)} to ${lowestBalanceEnv.name}.` : 'Focus on meal prep 3x/week.'}`;
+        
+        if (diningEnv && currentBalance > suggestedMonthlyLimit * 0.5) {
           suggestedActions = [{
             type: 'transfer',
-            description: `Move $${(parseFloat(diningEnv.balance) * 0.3).toFixed(0)} from ${diningEnv.name} to reduce temptation`,
-            params: { fromEnvelope: diningEnv.name, toEnvelope: lowestBalanceEnv.name, amount: parseFloat(diningEnv.balance) * 0.3 }
+            description: `Reallocate excess dining funds to ${lowestBalanceEnv.name}`,
+            params: { fromEnvelope: diningEnv.name, toEnvelope: lowestBalanceEnv.name, amount: currentBalance * 0.3 }
+          }];
+        }
+      } else if (questionLower.includes('vacation') || questionLower.includes('save') || questionLower.includes('trip')) {
+        // Handle vacation/savings questions
+        const targetAmount = questionLower.match(/\$?(\d+)/)?.[1] ? parseInt(questionLower.match(/\$?(\d+)/)?.[1] || '2000') : 2000;
+        const timeframe = questionLower.match(/(\d+)\s*(month|week)/)?.[1] ? parseInt(questionLower.match(/(\d+)\s*(month|week)/)?.[1] || '6') : 6;
+        const monthlyNeeded = targetAmount / timeframe;
+        const canContribute = envelopeContext.filter(env => env.balanceCents > 5000);
+        
+        contextualAdvice = `For $${targetAmount} in ${timeframe} months, save $${monthlyNeeded.toFixed(0)}/month. With your $${toDollars(totalBalance)} total, ${canContribute.length > 0 ? `transfer $${(canContribute.reduce((sum, env) => sum + env.balanceCents, 0) / 100 * 0.15).toFixed(0)} from higher-balance envelopes (${canContribute.map(e => e.name).join(', ')}) to start.` : `reduce spending by $${monthlyNeeded.toFixed(0)}/month across all categories.`}`;
+        
+        if (canContribute.length > 0) {
+          suggestedActions = [{
+            type: 'create_envelope',
+            description: `Create vacation fund with initial $${(canContribute[0].balanceCents / 100 * 0.2).toFixed(0)}`,
+            params: { name: 'Vacation Fund', initialAmount: canContribute[0].balanceCents / 100 * 0.2, icon: 'gift', color: 'purple' }
           }];
         }
       } else {
-        // Enhanced general advice with actionable recommendations
-        const needsAttention = envelopeContext.filter(env => env.balanceCents < 1000);
-        const overFunded = envelopeContext.filter(env => env.balanceCents > 5000);
+        // Enhanced general advice based on spending patterns and balance distribution
+        const needsAttention = envelopeContext.filter(env => env.balanceCents < avgBalance * 50); // Below 50% of average
+        const overFunded = envelopeContext.filter(env => env.balanceCents > avgBalance * 200); // Above 200% of average
+        const topSpenders = envelopeContext.sort((a, b) => parseFloat(b.spentThisMonth) - parseFloat(a.spentThisMonth)).slice(0, 3);
         
-        contextualAdvice = `Based on your $${toDollars(totalBalance)} across ${envelopeContext.length} envelopes: `;
+        contextualAdvice = `Your $${toDollars(totalBalance)} budget analysis: Average $${avgBalance.toFixed(0)} per envelope. `;
         
         if (needsAttention.length > 0 && overFunded.length > 0) {
-          contextualAdvice += `${needsAttention.map(env => env.name).join(' and ')} need funding. Consider redistributing from ${overFunded[0].name} ($${overFunded[0].balance}). `;
+          const rebalanceAmount = Math.min(avgBalance, overFunded[0].balanceCents / 100 * 0.25);
+          contextualAdvice += `Rebalancing opportunity: ${needsAttention.map(env => `${env.name} ($${env.balance})`).join(', ')} are underfunded. Transfer $${rebalanceAmount.toFixed(0)} from ${overFunded[0].name} ($${overFunded[0].balance}). `;
           suggestedActions = [{
             type: 'transfer',
-            description: `Rebalance: move $${Math.min(1000, overFunded[0].balanceCents / 100 * 0.2).toFixed(0)} to ${needsAttention[0].name}`,
-            params: { fromEnvelope: overFunded[0].name, toEnvelope: needsAttention[0].name, amount: Math.min(1000, overFunded[0].balanceCents / 100 * 0.2) }
+            description: `Rebalance $${rebalanceAmount.toFixed(0)} from ${overFunded[0].name} to ${needsAttention[0].name}`,
+            params: { fromEnvelope: overFunded[0].name, toEnvelope: needsAttention[0].name, amount: rebalanceAmount }
           }];
-        } else {
-          contextualAdvice += `Your spending pattern shows ${highestSpendingEnv.name} as your top category ($${highestSpendingEnv.spentThisMonth}). `;
+        } else if (topSpenders.length > 0) {
+          contextualAdvice += `Top spending: ${topSpenders.map(env => `${env.name} ($${env.spentThisMonth})`).join(', ')}. `;
         }
         
-        contextualAdvice += `Track your top 3 spending categories for better budget accuracy.`;
+        // Add specific budget health insights
+        const budgetHealth = totalSpentThisMonth / (totalBalance / 100) * 100;
+        if (budgetHealth > 50) {
+          contextualAdvice += `You've spent ${budgetHealth.toFixed(0)}% of available funds this month - consider slowing discretionary spending.`;
+        } else {
+          contextualAdvice += `Good spending pace at ${budgetHealth.toFixed(0)}% of budget used this month.`;
+        }
       }
       
       result = { advice: contextualAdvice, actions: suggestedActions };
@@ -289,9 +329,13 @@ Be conversational but specific. Reference their actual envelope names and balanc
         envelopeCount: envelopeContext.length,
         highestSpending: highestSpendingEnv.name,
         lowestBalance: lowestBalanceEnv.name,
+        averageBalance: avgBalance.toFixed(0),
+        budgetUtilization: (totalSpentThisMonth / (totalBalance / 100) * 100).toFixed(0) + '%'
       },
-      isAiFallback: !result?.advice, // Indicate when using fallback
-      confidence: result?.advice ? 85 : 70 // Lower confidence for fallbacks
+      isAiFallback: !aiSuccess,
+      confidence: aiSuccess ? 90 : 80, // Higher confidence for data-driven fallbacks
+      processingTime: aiSuccess ? 'AI response' : 'Smart fallback (AI timeout)',
+      recommendations: result?.actions?.length > 0 ? 'Actions available' : 'Informational only'
     });
   } catch (error: any) {
     if (error instanceof z.ZodError) {
