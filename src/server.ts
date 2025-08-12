@@ -38,12 +38,26 @@ app.use((req, res, next) => {
 });
 
 // Health check
-app.get('/healthz', (req, res) => {
-  res.json({
+app.get('/healthz', async (_req, res) => {
+  const health = {
     status: 'ok',
     timestamp: new Date().toISOString(),
-    version: '1.0.0',
-  });
+    services: {
+      database: 'ok',
+      openai: 'checking...'
+    }
+  };
+
+  // Quick OpenAI health check (non-blocking)
+  try {
+    const { openaiPing } = await import('./lib/openai.js');
+    const pingResult = await openaiPing();
+    health.services.openai = pingResult.ok ? 'ok' : `error: ${pingResult.reason}`;
+  } catch (error) {
+    health.services.openai = 'error: unavailable';
+  }
+
+  res.json(health);
 });
 
 // API routes
