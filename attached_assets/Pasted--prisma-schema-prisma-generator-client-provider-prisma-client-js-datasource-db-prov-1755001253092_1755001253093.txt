@@ -1,0 +1,120 @@
+// prisma/schema.prisma
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = env("PRISMA_DB_PROVIDER") // "sqlite" or "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id             String        @id @default(cuid())
+  email          String        @unique
+  createdAt      DateTime      @default(now())
+  envelopes      Envelope[]
+  transactions   Transaction[]
+  cards          Card[]
+  rules          Rule[]
+  routingConfigs RoutingConfig?
+}
+
+model Envelope {
+  id         String       @id @default(cuid())
+  userId     String
+  user       User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name       String
+  icon       String?      // ui icon name, e.g. "cart", "fuel"
+  color      String?      // tailwind token e.g. "amber", "blue"
+  balanceCents   Int      @default(0)
+  spentThisMonth Int      @default(0)
+  order      Int          @default(0)
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+
+  // One-to-one "virtual card" mapping optional (category card)
+  card       Card?
+}
+
+model Transfer {
+  id          String     @id @default(cuid())
+  userId      String
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fromId      String?
+  from        Envelope?  @relation("FromEnv", fields: [fromId], references: [id])
+  toId        String?
+  to          Envelope?  @relation("ToEnv", fields: [toId], references: [id])
+  amountCents Int
+  note        String?
+  createdAt   DateTime   @default(now())
+}
+
+model Transaction {
+  id             String     @id @default(cuid())
+  userId         String
+  user           User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  envelopeId     String?
+  envelope       Envelope?  @relation(fields: [envelopeId], references: [id])
+  merchant       String
+  mcc            String?    // merchant category code
+  amountCents    Int        // negative for spend, positive for refund
+  wasHold        Boolean    @default(false)
+  holdAmountCents Int? 
+  location       String?
+  status         TransactionStatus @default(SETTLED)
+  authorizedAt   DateTime?
+  postedAt       DateTime?
+  createdAt      DateTime   @default(now())
+  reason         String?    // e.g., "MCC Match", "Location", "Active Choice"
+}
+
+enum TransactionStatus {
+  PENDING
+  SETTLED
+  DECLINED
+}
+
+model Card {
+  id           String     @id @default(cuid())
+  userId       String
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  last4        String
+  token        String?    // tokenized PAN (for future issuer)
+  envelopeId   String?    // link 1:1 to envelope for category cards
+  envelope     Envelope?  @relation(fields: [envelopeId], references: [id])
+  label        String?
+  inWallet     Boolean    @default(false)
+  createdAt    DateTime   @default(now())
+}
+
+model Rule {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  priority    Int      @default(0)
+  // simple predicates for MVP:
+  mcc         String?  // equals
+  merchant    String?  // contains (case-insensitive)
+  geofence    String?  // name or id to match later
+  envelopeId  String?  // route to this envelope if matched
+  enabled     Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model RoutingConfig {
+  id            String  @id @default(cuid())
+  userId        String  @unique
+  user          User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  spendMode     SpendMode @default(SMART_AUTO) // LOCKED | SMART_AUTO | GENERAL_POOL
+  lockedEnvelopeId String?
+  useGeneralPool  Boolean @default(true)       // “General Pool” fallback
+  bufferCents     Int     @default(0)          // tip/gas holds buffer
+  confidence      Int     @default(75)         // UI slider 0–100 for auto-routing
+}
+
+enum SpendMode {
+  LOCKED
+  SMART_AUTO
+  GENERAL_POOL
+}
