@@ -26,8 +26,12 @@ mode = "sequential"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "npm run prisma:generate && npm run prisma:migrate && npm run dev"
+args = "npm run prisma:generate"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npm run dev"
 
 [[ports]]
-localPort = 8787
+localPort = 5000
 externalPort = 80
