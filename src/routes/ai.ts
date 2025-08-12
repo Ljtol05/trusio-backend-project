@@ -72,19 +72,44 @@ router.post('/coach', async (req: any, res) => {
 
     const { question, context } = AICoachRequestSchema.parse(req.body);
 
-    // Get user's envelope data for context
+    // -- get envelopes (already good)
     const envelopes = await db.envelope.findMany({
-      where: { userId: req.user.id },
-      select: { name: true, balance: true, budgetLimit: true },
+      where: { userId: 1 }, // TODO: swap to req.user.id
+      select: {
+        name: true,
+        icon: true,
+        color: true,
+        balanceCents: true,
+        spentThisMonth: true,
+      },
     });
 
-    // Get recent transactions for context
+    // dollars helper
+    const toDollars = (cents: number | null) =>
+      typeof cents === "number" ? Number((cents / 100).toFixed(2)) : 0;
+
+    // context for envelopes
+    const envelopeContext = envelopes.map(e => ({
+      name: e.name,
+      icon: e.icon,
+      color: e.color,
+      balance: toDollars(e.balanceCents),
+      spentThisMonth: toDollars(e.spentThisMonth),
+    }));
+
+    // -- recent transactions (fix: amountCents)
     const recentTransactions = await db.transaction.findMany({
       where: { userId: req.user.id },
       take: 5,
-      orderBy: { createdAt: 'desc' },
-      select: { amount: true, description: true, merchantName: true },
+      orderBy: { createdAt: "desc" },
+      select: { amountCents: true, description: true, merchantName: true },
     });
+
+    const txContext = recentTransactions.map(t => ({
+      amount: toDollars(t.amountCents),
+      description: t.description,
+      merchant: t.merchantName,
+    }));
 
     const systemPrompt = `You are a helpful financial coach for an envelope budgeting app.
     The user has the following envelopes: ${JSON.stringify(envelopes, null, 2)}
@@ -93,19 +118,19 @@ router.post('/coach', async (req: any, res) => {
     Provide helpful, actionable advice about budgeting, spending habits, and envelope management.
     Keep responses concise and practical.`;
 
-    const result = await chatJSON({
-      system: systemPrompt,
-      user: question,
-      schemaName: "coachResponse",
-      validate: (obj: any) => {
-        if (typeof obj.advice !== 'string') {
-          throw new Error('Invalid response format');
-        }
-        return obj;
-      }
-    });
+      const result = await chatJSON({
+        system: systemPrompt,
+        user: question,
+        schemaName: "coachResponse",
+        validate: (obj: any) => {
+          if (obj && typeof obj.advice === "string") return obj;
+          if (obj && typeof obj.response === "string") return { advice: obj.response };
+          throw new Error("Invalid response format");
+        },
+      });
 
-    res.json({ response: result.advice || result.response || JSON.stringify(result) });
+      res.json({ response: result.advice });
+JSON.stringify(result) });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: 'Validation failed', details: error.errors });

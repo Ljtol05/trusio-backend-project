@@ -4,12 +4,13 @@ import { env } from "../config/env.js";
 import { logger } from "./logger.js";
 
 export const MODELS = {
-  primary: env.OPENAI_MODEL_PRIMARY,     // default: gpt-4o-mini
-  fallback: env.OPENAI_MODEL_FALLBACK,   // default: gpt-3.5-turbo
+  primary: env.OPENAI_MODEL_PRIMARY,     // default: gpt-4.1-mini
+  fallback: env.OPENAI_MODEL_FALLBACK,   // default: gpt-5-mini
 } as const;
 
 export const openai = env.OPENAI_API_KEY ? new OpenAI({
   apiKey: env.OPENAI_API_KEY, // service-account project key
+  project: env.OPENAI_PROJECT_ID || undefined,  // <- important
   timeout: env.OPENAI_TIMEOUT_MS,
   maxRetries: env.OPENAI_MAX_RETRIES,
 }) : null;
@@ -78,13 +79,23 @@ export async function chatJSON<T = unknown>({
 export async function openaiPing(model = MODELS.primary) {
   if (!env.OPENAI_API_KEY || !openai) return { ok: false, reason: "NO_KEY" as const };
   try {
-    const res = await openai.chat.completions.create({
-      model,
-      messages: [{ role: "user", content: "reply with {\"ok\":true}" }],
-      response_format: { type: "json_object" },
-      temperature: 0,
-      timeout: 8000,
-    });
+    const res = await openai.chat.completions.create(
+      {
+        model,
+        messages: [
+          {
+            role: "user",
+            // include the word 'json' in the prompt
+            content: 'reply with a json object: {"ok": true}',
+          },
+        ],
+        response_format: { type: "json_object" },
+        temperature: 0,
+      },
+      // <-- timeout belongs here (request options), not in the body
+      { timeout: 8000 }
+    );
+
     const json = JSON.parse(res.choices[0]?.message?.content ?? "{}");
     return { ok: Boolean(json.ok), model };
   } catch (e: any) {

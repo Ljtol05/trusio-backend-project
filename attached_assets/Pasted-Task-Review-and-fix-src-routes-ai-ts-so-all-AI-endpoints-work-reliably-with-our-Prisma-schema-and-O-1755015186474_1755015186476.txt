@@ -1,0 +1,44 @@
+Task: Review and fix src/routes/ai.ts so all AI endpoints work reliably with our Prisma schema and OpenAI wrapper. Keep changes scoped to this file unless a small helper type is needed.
+
+Context you can assume:
+	•	Prisma models (names/fields used by this file):
+	•	Envelope { id, name, icon, color, balanceCents, spentThisMonth, order, isActive, userId, createdAt, updatedAt }
+	•	Transaction { id, userId, amountCents, description, merchantName, createdAt }
+	•	Rule { id, userId, envelopeId, priority, mcc?, merchant?, geofence?, enabled, createdAt, updatedAt } with envelope relation.
+	•	OpenAI helper is src/lib/openai.ts and exports:
+	•	isAIEnabled(): boolean
+	•	openaiPing(model?: string)
+	•	chatJSON<T>({ system, user, schemaName, temperature, model, validate }): Promise<T>
+	•	It already sets response_format: "json_object" and will throw; we just need to catch properly.
+
+What to fix in src/routes/ai.ts:
+	1.	Health (GET /api/ai/health)
+	•	Leave as is, just ensure it returns { openai: { ok: boolean, model?: string, reason?: string }, timestamp } with 200 on success and 500 on failure.
+	2.	Test (POST /api/ai/test)
+	•	Uses chatJSON. Keep it simple and robust.
+	3.	Coach (POST /api/ai/coach)
+	•	Use req.user.id (not hardcoded 1).
+	•	Prisma selects must use the correct fields: balanceCents and spentThisMonth (not balance / amount).
+	•	Build envelopeContext with dollars: balance and spentThisMonth derived via (cents/100).toFixed(2).
+	•	Pull last 5 transactions for the user, ordered createdAt desc, selecting amountCents, description, merchantName, then map to { amount: dollars, description, merchant }.
+	•	Prompt: small system prompt that explains the app and provides both contexts (envelopes + recent transactions). Keep it short and action-oriented.
+	•	Validation: accept either { advice: string } or { response: string } and normalize to { advice }. If invalid, throw an error so we can 400/500 accordingly.
+	•	Response shape: { response: string } (the normalized advice).
+	4.	Explain routing (POST /api/ai/explain-routing)
+	•	Use req.user.id.
+	•	Load enabled rules for the user (orderBy: { priority: 'asc' }, include: { envelope: true }).
+	•	Load active envelopes for the user.
+	•	Perform simple rule matching against the provided transactionData (merchant, mcc, location, amountCents) and pick targetEnvelope.
+	•	Prompt: Explain (2–3 sentences) why the transaction was routed to that envelope, including the matched rule if there is one, and list a short “reason”.
+	•	Validation: accept { explanation: string } or { response: string } and normalize to { explanation }.
+	•	Response shape: { envelope, rule, explanation, reason } where envelope is the chosen envelope object, rule is the matched rule or null, and reason is the short text reason we built.
+	5.	Error handling
+	•	If !isAIEnabled() return 503 with { error: 'AI service not available', message: 'OpenAI API key not configured' }.
+	•	If Zod validation fails, return 400 with { error: 'Validation failed', details }.
+	•	Otherwise, 500 with { error: 'AI service unavailable' }. In development, log the actual error with logger.error.
+
+Acceptance criteria (please run these mentally or prep them as comments):
+	•	GET /api/ai/health returns { openai: { ok: true, model }, timestamp }.
+	•	POST /api/ai/test returns { success: true, result: { … } }.
+	•	POST /api/ai/coach with { "question": "How should I allocate $3000 this month?" } returns { "response": "..." } (200).
+	•	POST /api/ai/explain-routing with:
