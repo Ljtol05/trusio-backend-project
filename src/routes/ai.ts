@@ -112,28 +112,43 @@ router.post('/coach', async (req: any, res) => {
       location: t.location,
     }));
 
-    const systemPrompt = `You are a helpful financial coach for an envelope budgeting app.
-The user has these envelopes: ${JSON.stringify(envelopeContext, null, 2)}
-Recent transactions: ${JSON.stringify(txContext, null, 2)}
-${context ? `User-provided context: ${JSON.stringify(context, null, 2)}` : ''}
+    // Calculate total available balance
+    const totalBalance = envelopeContext.reduce((sum, env) => sum + parseFloat(env.balance), 0);
+    const totalSpent = envelopeContext.reduce((sum, env) => sum + parseFloat(env.spentThisMonth), 0);
 
-Provide practical, actionable advice about budgeting and spending habits. Keep responses concise. Return JSON only.`;
+    const systemPrompt = `You are a knowledgeable financial coach for an envelope budgeting app. The user has $${totalBalance.toFixed(2)} total across their envelopes and has spent $${totalSpent.toFixed(2)} this month.
+
+Current envelope balances:
+${envelopeContext.map(e => `• ${e.name}: $${e.balance} (spent $${e.spentThisMonth} this month)`).join('\n')}
+
+Recent spending patterns:
+${txContext.map(t => `• $${t.amount} at ${t.merchant || 'Unknown'}`).join('\n')}
+
+${context ? `Additional context: ${JSON.stringify(context, null, 2)}` : ''}
+
+Provide specific, actionable budgeting advice based on their actual data. Focus on practical recommendations for allocation, spending patterns, and envelope management. Be encouraging but realistic. Return your response in JSON format with an "advice" field.`;
 
     const result = await chatJSON({
       system: systemPrompt,
       user: question,
       schemaName: 'coachResponse',
+      temperature: 0.3,
       validate: (obj: any) => {
-        // Accept either { advice } or { response } and normalize
-        if (obj && typeof obj.advice === 'string' && obj.advice.trim()) {
-          return obj;
+        // More flexible validation for different response formats
+        if (obj && typeof obj === 'object') {
+          const advice = obj.advice || obj.response || obj.recommendation || obj.suggestion;
+          if (typeof advice === 'string' && advice.trim()) {
+            return { advice: advice.trim() };
+          }
+          // If obj has any string value, use it
+          const firstStringValue = Object.values(obj).find(val => typeof val === 'string' && val.trim());
+          if (firstStringValue) {
+            return { advice: firstStringValue };
+          }
         }
-        if (obj && typeof obj.response === 'string' && obj.response.trim()) {
-          return { advice: obj.response };
-        }
-        // Fallback for empty or malformed responses
+        // Enhanced fallback with user's data
         return { 
-          advice: "I'm having trouble processing your request right now. Please try asking about your specific spending patterns or budget goals." 
+          advice: `Based on your current balance of $${totalBalance.toFixed(2)} across ${envelopeContext.length} envelopes, I'd recommend reviewing your spending in categories where you've used the most this month. Your ${envelopeContext.find(e => parseFloat(e.spentThisMonth) === Math.max(...envelopeContext.map(env => parseFloat(env.spentThisMonth))))?.name || 'highest spending'} category might need attention.`
         };
       },
     });
