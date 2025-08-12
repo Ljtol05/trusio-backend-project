@@ -56,7 +56,7 @@ export async function chatJSON<T = unknown>({
           ...(system ? [{ role: "system" as const, content: system }] : []),
           {
             role: "user",
-            content: `${user}\n\nRespond with a single JSON object named "${schemaName}".`,
+            content: `${user}\n\nRespond with a single JSON object named "${schemaName}". Use JSON format.`,
           },
         ],
         response_format: { type: "json_object" },

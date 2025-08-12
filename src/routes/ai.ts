@@ -94,7 +94,7 @@ router.post('/coach', async (req: any, res) => {
 
     // Get recent transactions for context
     const recentTransactions = await db.transaction.findMany({
-      where: { userId: req. user.id },
+      where: { userId: req.user.id },
       take: 5,
       orderBy: { createdAt: 'desc' },
       select: {
