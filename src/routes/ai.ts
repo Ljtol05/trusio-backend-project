@@ -146,27 +146,129 @@ router.post('/coach', async (req: any, res) => {
         )
       : { name: 'No envelopes', balance: '0.00', balanceCents: 0 };
 
-    // Handle new users with no envelopes
+    // Enhanced handling for new users with no envelopes
     if (envelopeContext.length === 0) {
+      // Extract context for personalized response
+      const monthlyIncome = context?.monthly_income || context?.monthlyIncome || 0;
+      const experienceLevel = context?.experience_level || context?.experienceLevel || 'beginner';
+      const problemAreas = context?.problem_areas || context?.problemAreas || [];
+      const personality = context?.personality || 'standard';
+      const fixedExpenses = context?.fixed_expenses || context?.fixedExpenses || 0;
+      const goals = context?.goals || [];
+
+      // Calculate personalized allocations based on income
+      let personalizedResponse = "Welcome to envelope budgeting! ";
+      let suggestedEnvelopes = [];
+
+      if (monthlyIncome > 0) {
+        // Use 50/30/20 rule as base with adjustments for personality/problems
+        const needs = Math.round(monthlyIncome * 0.5);
+        const wants = Math.round(monthlyIncome * 0.3);
+        const savings = Math.round(monthlyIncome * 0.2);
+
+        // Adjust for specific problems and personality
+        let groceries, bills, dining, emergency, misc;
+        
+        if (fixedExpenses > 0) {
+          bills = fixedExpenses;
+          const remaining = needs - bills;
+          groceries = Math.round(remaining * 0.6);
+          misc = remaining - groceries;
+        } else {
+          bills = Math.round(needs * 0.6);
+          groceries = Math.round(needs * 0.4);
+          misc = Math.round(wants * 0.3);
+        }
+
+        // Personality-based adjustments
+        if (personality === 'impulsive spender' || problemAreas.includes('impulse spending')) {
+          dining = Math.round(wants * 0.4); // Smaller dining budget for impulse spenders
+          emergency = Math.round(savings * 1.2); // Bigger emergency fund
+          personalizedResponse += `Since you mentioned being an impulsive spender, I've designed a system with smaller discretionary budgets and a larger emergency fund. `;
+        } else {
+          dining = Math.round(wants * 0.5);
+          emergency = savings;
+        }
+
+        // Problem-specific adjustments
+        if (problemAreas.includes('food overspending') || problemAreas.includes('impulse purchases')) {
+          const totalFood = groceries + dining;
+          groceries = Math.round(totalFood * 0.75); // More for groceries
+          dining = Math.round(totalFood * 0.25); // Less for dining
+          personalizedResponse += `I've allocated more to groceries ($${groceries}) and less to dining ($${dining}) to help control food overspending. `;
+        }
+
+        personalizedResponse += `Based on your $${monthlyIncome} monthly income, here's a personalized envelope system:\n\n`;
+        personalizedResponse += `💰 **Your Custom Budget:**\n`;
+        personalizedResponse += `• Bills/Rent: $${bills} (${Math.round(bills/monthlyIncome*100)}%)\n`;
+        personalizedResponse += `• Groceries: $${groceries} (${Math.round(groceries/monthlyIncome*100)}%)\n`;
+        personalizedResponse += `• Dining: $${dining} (${Math.round(dining/monthlyIncome*100)}%)\n`;
+        personalizedResponse += `• Emergency: $${emergency} (${Math.round(emergency/monthlyIncome*100)}%)\n`;
+        personalizedResponse += `• Miscellaneous: $${misc} (${Math.round(misc/monthlyIncome*100)}%)\n\n`;
+
+        if (problemAreas.includes('no savings') || goals.includes('build emergency fund')) {
+          personalizedResponse += `🎯 **Emergency Fund Priority:** Start with just $${Math.min(emergency, 500)} this month. Your goal is 3-6 months of expenses ($${Math.round((bills + groceries) * 3)}-${Math.round((bills + groceries) * 6)}).\n\n`;
+        }
+
+        // Specific advice for their situation
+        if (experienceLevel === 'beginner') {
+          personalizedResponse += `📚 **Beginner Tips:**\n• Start with these 5 envelopes first\n• Track spending for 2 weeks before adjusting\n• Use the "envelope test" - if money runs out, stop spending in that category\n\n`;
+        }
+
+        personalizedResponse += `Would you like me to create these envelopes with your personalized amounts?`;
+
+        suggestedEnvelopes = [
+          { name: 'Bills', amount: bills, icon: 'home', color: 'blue' },
+          { name: 'Groceries', amount: groceries, icon: 'cart', color: 'green' },
+          { name: 'Dining', amount: dining, icon: 'utensils', color: 'amber' },
+          { name: 'Emergency', amount: emergency, icon: 'shield', color: 'red' },
+          { name: 'Miscellaneous', amount: misc, icon: 'dots', color: 'gray' }
+        ];
+      } else {
+        personalizedResponse += "I'd love to create a personalized budget for you! To give you specific dollar amounts for each envelope, could you tell me your monthly take-home income? ";
+        personalizedResponse += "I'll use proven budgeting principles to create the perfect envelope system for your situation.";
+        
+        suggestedEnvelopes = [
+          { name: 'Groceries', amount: 300, icon: 'cart', color: 'green' },
+          { name: 'Bills', amount: 800, icon: 'home', color: 'blue' },
+          { name: 'Dining', amount: 150, icon: 'utensils', color: 'amber' },
+          { name: 'Emergency', amount: 200, icon: 'shield', color: 'red' }
+        ];
+      }
+
       return res.json({
-        response: "Welcome! I see you don't have any envelopes set up yet. To help you with budgeting advice, you'll need to create some spending categories first. I recommend starting with these essential envelopes: Groceries ($200-400), Bills ($500-1000), Dining ($100-200), Gas ($100-200), and Emergency Buffer ($200-500). Would you like me to help you set up a complete envelope system based on your budget?",
+        response: personalizedResponse,
         suggestedActions: [{
-          type: 'create_envelope_setup',
-          description: 'Set up basic envelope structure',
-          params: { suggestedCategories: ['Groceries', 'Bills', 'Dining', 'Gas', 'Emergency'] }
+          type: 'create_envelopes_batch',
+          description: `Create personalized envelope system${monthlyIncome > 0 ? ` for $${monthlyIncome} budget` : ''}`,
+          params: { 
+            envelopes: suggestedEnvelopes,
+            totalBudget: monthlyIncome || suggestedEnvelopes.reduce((sum, env) => sum + env.amount, 0),
+            isPersonalized: true
+          }
         }],
         analytics: { 
           totalBalance: '0.00', 
           totalSpent: '0.00', 
           envelopeCount: 0,
-          needsSetup: true 
+          needsSetup: true,
+          budgetAnalyzed: monthlyIncome > 0,
+          personalityConsidered: !!personality,
+          problemsAddressed: problemAreas.length
         },
         isNewUser: true,
-        processingTime: 'Instant - Setup Required'
+        processingTime: 'Personalized Analysis Complete',
+        budgetBreakdown: monthlyIncome > 0 ? {
+          income: monthlyIncome,
+          needsPercent: 50,
+          wantsPercent: 30,
+          savingsPercent: 20,
+          customAdjustments: problemAreas.length > 0 || personality !== 'standard'
+        } : null
       });
     }
 
-    const systemPrompt = `You are an expert financial advisor for an envelope budgeting system. Analyze this specific situation and provide actionable advice with concrete numbers and steps.
+    const systemPrompt = `You are an expert financial advisor specializing in envelope budgeting. Analyze the user's specific situation and provide personalized, actionable advice.
 
 CURRENT FINANCIAL STATE:
 Total Balance: $${toDollars(totalBalance)}
@@ -180,31 +282,41 @@ SPENDING INSIGHTS:
 • Highest spending: ${highestSpendingEnv.name} ($${highestSpendingEnv.spentThisMonth || '0.00'})
 • Lowest balance: ${lowestBalanceEnv.name} ($${lowestBalanceEnv.balance})
 • Average per category: $${avgSpendingPerEnvelope.toFixed(2)}
+• Budget utilization: ${(totalSpentThisMonth / (totalBalance / 100) * 100).toFixed(0)}% of available funds used
 
-RECENT TRANSACTIONS:
+RECENT ACTIVITY:
 ${recentTransactions.slice(0, 5).map(t => `• $${toDollars(Math.abs(t.amountCents))} at ${t.merchant || 'Unknown'} → ${t.envelope?.name || 'Unassigned'}`).join('\n')}
 
+USER CONTEXT: ${JSON.stringify(context || {})}
 USER QUESTION: "${question}"
 
-Provide specific advice addressing their exact question. Include dollar amounts, envelope names, and actionable steps. If recommending transfers or new envelopes, be specific about amounts and reasons.
+RESPONSE GUIDELINES:
+1. Address their exact question with specific dollar amounts and envelope names
+2. Consider their emotional state and experience level in your tone
+3. Provide 1-3 concrete actionable steps with precise amounts
+4. If suggesting transfers, explain why and include safety buffers
+5. For complex questions, break down into immediate vs. long-term actions
+6. Reference their actual spending patterns and envelope balances
+7. Be encouraging but realistic about their financial situation
 
-Respond in JSON format only:
+Respond in JSON format:
 {
-  "advice": "Detailed, specific advice addressing the user's question with actual numbers and envelope names",
+  "advice": "Personalized advice addressing their question, referencing specific envelopes and amounts. Use an encouraging but practical tone.",
   "actions": [
     {
-      "type": "transfer|create_envelope", 
-      "description": "Clear description with specific amounts", 
+      "type": "transfer|create_envelope|rebalance", 
+      "description": "Specific action with exact amounts and reasoning", 
       "params": {
-        "fromEnvelope": "Source envelope name",
-        "toEnvelope": "Target envelope name", 
-        "amount": 100
+        "fromEnvelope": "Exact envelope name",
+        "toEnvelope": "Exact envelope name", 
+        "amount": 100,
+        "reasoning": "Why this specific amount and timing"
       }
     }
   ]
 }
 
-Be conversational but specific. Reference their actual envelope names and balances in your advice.`;
+Be conversational and reference their actual envelope names. Match your tone to their experience level and emotional state.`;
 
     let result;
     let aiSuccess = false;
@@ -284,25 +396,58 @@ Be conversational but specific. Reference their actual envelope names and balanc
         const emergencyFundAmount = Math.max(50, totalBalance / 100 * 0.05);
         contextualAdvice += ` Start building an emergency fund with $${emergencyFundAmount.toFixed(0)}/month.`;
       } else if (questionLower.includes('dining') || questionLower.includes('food') || questionLower.includes('restaurant') || questionLower.includes('overspending')) {
-        // Handle dining/food overspending questions with envelope analysis
+        // Enhanced dining/food overspending analysis
         const diningEnv = envelopeContext.find(env => 
           env.name.toLowerCase().includes('dining') || 
           env.name.toLowerCase().includes('food') || 
           env.name.toLowerCase().includes('restaurant')
         );
-        const currentSpending = parseFloat(diningEnv?.spentThisMonth || '0');
-        const currentBalance = parseFloat(diningEnv?.balance || '0');
-        const suggestedMonthlyLimit = Math.max(avgBalance, 150); // Based on user's average or minimum
+        const groceryEnv = envelopeContext.find(env => 
+          env.name.toLowerCase().includes('grocery') || 
+          env.name.toLowerCase().includes('groceries')
+        );
+        
+        const currentDiningSpending = parseFloat(diningEnv?.spentThisMonth || '0');
+        const currentDiningBalance = parseFloat(diningEnv?.balance || '0');
+        const currentGrocerySpending = parseFloat(groceryEnv?.spentThisMonth || '0');
+        
+        const totalFoodSpending = currentDiningSpending + currentGrocerySpending;
+        const suggestedFoodBudget = Math.max(avgBalance * 1.5, 250); // 1.5x average for total food
+        const suggestedDiningLimit = suggestedFoodBudget * 0.3; // 30% for dining out
+        const suggestedGroceryBudget = suggestedFoodBudget * 0.7; // 70% for groceries
 
-        contextualAdvice = `Your ${diningEnv?.name || 'dining'} spending: $${currentSpending.toFixed(2)} this month with $${currentBalance.toFixed(2)} remaining. For your budget level ($${avgBalance.toFixed(0)} avg/envelope), target $${suggestedMonthlyLimit.toFixed(0)}/month dining. Weekly limit: $${(suggestedMonthlyLimit / 4).toFixed(0)}. ${currentBalance > suggestedMonthlyLimit * 0.5 ? `Consider moving $${(currentBalance * 0.3).toFixed(0)} to ${lowestBalanceEnv.name}.` : 'Focus on meal prep 3x/week.'}`;
-
-        if (diningEnv && currentBalance > suggestedMonthlyLimit * 0.5) {
-          suggestedActions = [{
-            type: 'transfer',
-            description: `Reallocate excess dining funds to ${lowestBalanceEnv.name}`,
-            params: { fromEnvelope: diningEnv.name, toEnvelope: lowestBalanceEnv.name, amount: currentBalance * 0.3 }
-          }];
+        contextualAdvice = `Food spending analysis: Total $${totalFoodSpending.toFixed(2)} this month (Dining: $${currentDiningSpending.toFixed(2)}, Groceries: $${currentGrocerySpending.toFixed(2)}). `;
+        
+        if (totalFoodSpending > suggestedFoodBudget) {
+          contextualAdvice += `You're over budget by $${(totalFoodSpending - suggestedFoodBudget).toFixed(2)}. `;
         }
+        
+        contextualAdvice += `Recommended split: $${suggestedGroceryBudget.toFixed(0)} groceries, $${suggestedDiningLimit.toFixed(0)} dining. `;
+        
+        if (currentDiningSpending > suggestedDiningLimit) {
+          const overspend = currentDiningSpending - suggestedDiningLimit;
+          contextualAdvice += `Try meal prep 4x/week to save ~$${overspend.toFixed(0)}/month. `;
+          
+          if (currentDiningBalance > 50) {
+            const transferAmount = Math.min(currentDiningBalance * 0.4, overspend);
+            contextualAdvice += `Consider moving $${transferAmount.toFixed(0)} from ${diningEnv?.name || 'dining'} to ${groceryEnv?.name || lowestBalanceEnv.name} for meal ingredients.`;
+            
+            suggestedActions = [{
+              type: 'transfer',
+              description: `Move excess dining budget to groceries for meal prep`,
+              params: { 
+                fromEnvelope: diningEnv?.name || 'Dining', 
+                toEnvelope: groceryEnv?.name || lowestBalanceEnv.name, 
+                amount: transferAmount,
+                reasoning: `Reduce dining overspend and boost grocery budget for meal prep`
+              }
+            }];
+          }
+        } else {
+          contextualAdvice += `Good job staying within dining budget! `;
+        }
+        
+        contextualAdvice += `Weekly targets: $${(suggestedGroceryBudget / 4).toFixed(0)} groceries, $${(suggestedDiningLimit / 4).toFixed(0)} dining.`;
       } else if (questionLower.includes('vacation') || questionLower.includes('save') || questionLower.includes('trip')) {
         // Handle vacation/savings questions
         const targetAmount = questionLower.match(/\$?(\d+)/)?.[1] ? parseInt(questionLower.match(/\$?(\d+)/)?.[1] || '2000') : 2000;
