@@ -196,7 +196,7 @@ Be conversational but specific. Reference their actual envelope names and balanc
               };
             }
           }
-          return null; // Let the outer catch handle fallback
+          throw new Error('Invalid AI response format'); // Force fallback
         },
       });
     } catch (aiError) {
@@ -233,15 +233,12 @@ Be conversational but specific. Reference their actual envelope names and balanc
         contextualAdvice += `Your ${highestSpendingEnv.name} category has the highest spending ($${highestSpendingEnv.spentThisMonth}). Consider adjusting allocations based on your actual usage patterns.`;
       }
       
-      result = { 
-        advice: contextualAdvice,
-        actions: []
-      };
+      result = contextualAdvice;
     }
 
     res.json({ 
-      response: result.advice,
-      suggestedActions: result.actions || [],
+      response: result?.advice || result,
+      suggestedActions: result?.actions || [],
       analytics: {
         totalBalance: toDollars(totalBalance),
         totalSpent: totalSpent.toFixed(2),
