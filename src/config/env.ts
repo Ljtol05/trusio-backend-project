@@ -7,7 +7,7 @@ const envSchema = z.object({
   DATABASE_URL: z.string().optional(),
   
   // OpenAI
-  OPENAI_API_KEY: z.string().default(''),
+  OPENAI_API_KEY: z.string().optional().default(''),
   OPENAI_MODEL_PRIMARY: z.string().default('gpt-4o-mini'),
   OPENAI_MODEL_FALLBACK: z.string().default('gpt-3.5-turbo'),
   
