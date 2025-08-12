@@ -10,6 +10,7 @@ channel = "stable-24_11"
 
 [env]
 DATABASE_URL = "file:./dev.db"
+OPENAI_API_KEY = "${REPLIT_SECRET_OPENAI_API_KEY}"
 
 [deployment]
 run = ["node", "index.js"]
