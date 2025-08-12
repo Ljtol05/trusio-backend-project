@@ -3,193 +3,180 @@ import { PrismaClient } from '@prisma/client';
 
 const db = new PrismaClient();
 
-async function seed() {
-  console.log('🌱 Seeding database...');
-  
-  try {
-    // Create demo user
-    const user = await db.user.upsert({
-      where: { id: 1 },
-      update: {},
+async function main() {
+  console.log('🌱 Starting seed...');
+
+  // Create or get user
+  const user = await db.user.upsert({
+    where: { id: 1 },
+    update: {},
+    create: {
+      id: 1,
+      email: 'demo@example.com',
+      name: 'Demo User',
+    },
+  });
+
+  console.log('👤 Created user');
+
+  // Create envelopes with cents-based amounts
+  const envelopeData = [
+    { name: 'Groceries', balanceCents: 50000, color: 'green', icon: 'cart', order: 1 }, // $500
+    { name: 'Dining', balanceCents: 25000, color: 'orange', icon: 'utensils', order: 2 }, // $250
+    { name: 'Gas', balanceCents: 15000, color: 'blue', icon: 'fuel', order: 3 }, // $150
+    { name: 'Bills', balanceCents: 120000, color: 'red', icon: 'receipt', order: 4 }, // $1200
+    { name: 'Buffer', balanceCents: 10000, color: 'gray', icon: 'shield', order: 5 }, // $100
+    { name: 'Misc', balanceCents: 5000, color: 'purple', icon: 'dots', order: 6 }, // $50
+  ];
+
+  const envelopes = [];
+  for (const envData of envelopeData) {
+    const envelope = await db.envelope.upsert({
+      where: {
+        userId_name: {
+          userId: user.id,
+          name: envData.name,
+        },
+      },
+      update: {
+        balanceCents: envData.balanceCents,
+        color: envData.color,
+        icon: envData.icon,
+        order: envData.order,
+      },
       create: {
-        id: 1,
-        email: 'demo@envelopes.app',
-        name: 'Demo User',
+        ...envData,
+        userId: user.id,
       },
     });
-    
-    console.log('👤 Created demo user');
-    
-    // Create default envelopes with realistic balances
-    const envelopes = [
-      { name: 'Groceries', balance: 450, budgetLimit: 500, color: '#10B981' },
-      { name: 'Dining', balance: 180, budgetLimit: 250, color: '#F59E0B' },
-      { name: 'Gas', balance: 120, budgetLimit: 150, color: '#EF4444' },
-      { name: 'Bills', balance: 1200, budgetLimit: 1200, color: '#6366F1' },
-      { name: 'Buffer', balance: 500, budgetLimit: 1000, color: '#8B5CF6' },
-      { name: 'Misc', balance: 75, budgetLimit: 200, color: '#6B7280' },
-    ];
-    
-    for (const envelopeData of envelopes) {
-      await db.envelope.upsert({
-        where: { 
-          userId_name: {
-            userId: user.id,
-            name: envelopeData.name,
-          },
-        },
-        update: {
-          balance: envelopeData.balance,
-          budgetLimit: envelopeData.budgetLimit,
-          color: envelopeData.color,
-        },
-        create: {
-          ...envelopeData,
-          userId: user.id,
-        },
-      });
-    }
-    
-    console.log('💰 Created default envelopes');
-    
-    // Create demo cards
-    const cards = [
-      { name: 'Primary Card', last4: '1234', cardType: 'virtual', isDefault: true },
-      { name: 'Backup Card', last4: '5678', cardType: 'physical', isDefault: false },
-    ];
-    
-    for (const cardData of cards) {
-      await db.card.upsert({
-        where: {
-          userId_name: {
-            userId: user.id,
-            name: cardData.name,
-          },
-        },
-        update: cardData,
-        create: {
-          ...cardData,
-          userId: user.id,
-        } as any,
-      });
-    }
-    
-    console.log('💳 Created demo cards');
-    
-    // Get created envelopes for routing rules
-    const groceriesEnvelope = await db.envelope.findFirst({
-      where: { userId: user.id, name: 'Groceries' },
-    });
-    
-    const diningEnvelope = await db.envelope.findFirst({
-      where: { userId: user.id, name: 'Dining' },
-    });
-    
-    const gasEnvelope = await db.envelope.findFirst({
-      where: { userId: user.id, name: 'Gas' },
-    });
-    
-    // Create routing rules
-    const rules = [
-      {
-        name: 'Grocery Stores',
-        priority: 1,
-        conditions: {
-          mcc: ['5411', '5499'], // Grocery stores
-          merchantName: ['walmart', 'target', 'kroger', 'safeway'],
-        },
-        envelopeId: groceriesEnvelope!.id,
-      },
-      {
-        name: 'Restaurants',
-        priority: 2,
-        conditions: {
-          mcc: ['5812', '5814'], // Restaurants and fast food
-          merchantName: ['mcdonalds', 'starbucks', 'chipotle', 'subway'],
-        },
-        envelopeId: diningEnvelope!.id,
-      },
-      {
-        name: 'Gas Stations',
-        priority: 3,
-        conditions: {
-          mcc: ['5541', '5542'], // Gas stations
-          merchantName: ['shell', 'chevron', 'exxon', 'bp'],
-        },
-        envelopeId: gasEnvelope!.id,
-      },
-    ];
-    
-    for (const ruleData of rules) {
-      await db.routingRule.upsert({
-        where: {
-          userId_name: {
-            userId: user.id,
-            name: ruleData.name,
-          },
-        },
-        update: {
-          priority: ruleData.priority,
-          conditions: ruleData.conditions,
-          envelopeId: ruleData.envelopeId,
-        },
-        create: {
-          ...ruleData,
-          userId: user.id,
-        },
-      });
-    }
-    
-    console.log('📋 Created routing rules');
-    
-    // Create sample transactions
-    const transactions = [
-      {
-        amount: -45.67,
-        description: 'Weekly groceries',
-        merchantName: 'Kroger',
-        mcc: '5411',
-        fromEnvelopeId: groceriesEnvelope!.id,
-        status: 'completed',
-      },
-      {
-        amount: -12.50,
-        description: 'Coffee',
-        merchantName: 'Starbucks',
-        mcc: '5814',
-        fromEnvelopeId: diningEnvelope!.id,
-        status: 'completed',
-      },
-      {
-        amount: -38.95,
-        description: 'Gas fill-up',
-        merchantName: 'Shell',
-        mcc: '5541',
-        fromEnvelopeId: gasEnvelope!.id,
-        status: 'completed',
-      },
-    ];
-    
-    for (const transactionData of transactions) {
-      await db.transaction.create({
-        data: {
-          ...transactionData,
-          userId: user.id,
-          reason: 'Auto-routed by rule',
-        },
-      });
-    }
-    
-    console.log('💸 Created sample transactions');
-    
-    console.log('✅ Database seeded successfully!');
-    
-  } catch (error) {
-    console.error('❌ Error seeding database:', error);
-    throw error;
-  } finally {
-    await db.$disconnect();
+    envelopes.push(envelope);
   }
+
+  console.log('💰 Created envelopes');
+
+  // Create routing rules
+  const groceriesEnvelope = envelopes.find(e => e.name === 'Groceries');
+  const diningEnvelope = envelopes.find(e => e.name === 'Dining');
+  const gasEnvelope = envelopes.find(e => e.name === 'Gas');
+
+  const rules = [
+    {
+      priority: 1,
+      mcc: '5411', // Grocery stores
+      envelopeId: groceriesEnvelope!.id,
+    },
+    {
+      priority: 2,
+      mcc: '5814', // Restaurants
+      envelopeId: diningEnvelope!.id,
+    },
+    {
+      priority: 3,
+      mcc: '5541', // Gas stations
+      envelopeId: gasEnvelope!.id,
+    },
+    {
+      priority: 4,
+      merchant: 'starbucks',
+      envelopeId: diningEnvelope!.id,
+    },
+    {
+      priority: 5,
+      merchant: 'kroger',
+      envelopeId: groceriesEnvelope!.id,
+    },
+  ];
+
+  for (const ruleData of rules) {
+    await db.rule.create({
+      data: {
+        ...ruleData,
+        userId: user.id,
+      },
+    });
+  }
+
+  console.log('📋 Created routing rules');
+
+  // Create routing config
+  await db.routingConfig.upsert({
+    where: { userId: user.id },
+    update: {
+      spendMode: 'SMART_AUTO',
+      useGeneralPool: true,
+      bufferCents: 2000, // $20
+      confidence: 75,
+    },
+    create: {
+      userId: user.id,
+      spendMode: 'SMART_AUTO',
+      useGeneralPool: true,
+      bufferCents: 2000,
+      confidence: 75,
+    },
+  });
+
+  console.log('⚙️ Created routing config');
+
+  // Create sample transactions
+  const transactions = [
+    {
+      amountCents: -4567, // -$45.67
+      merchant: 'Kroger',
+      mcc: '5411',
+      envelopeId: groceriesEnvelope!.id,
+      status: 'SETTLED',
+      reason: 'MCC Match',
+    },
+    {
+      amountCents: -1250, // -$12.50
+      merchant: 'Starbucks',
+      mcc: '5814',
+      envelopeId: diningEnvelope!.id,
+      status: 'SETTLED',
+      reason: 'Merchant Match',
+    },
+    {
+      amountCents: -3895, // -$38.95
+      merchant: 'Shell',
+      mcc: '5541',
+      envelopeId: gasEnvelope!.id,
+      status: 'SETTLED',
+      reason: 'MCC Match',
+    },
+  ];
+
+  for (const txnData of transactions) {
+    await db.transaction.create({
+      data: {
+        ...txnData,
+        userId: user.id,
+      },
+    });
+  }
+
+  console.log('💳 Created sample transactions');
+
+  // Create sample cards
+  await db.card.create({
+    data: {
+      last4: '1234',
+      label: 'Main Card',
+      inWallet: true,
+      userId: user.id,
+    },
+  });
+
+  console.log('🎴 Created sample cards');
+
+  console.log('✅ Seed completed successfully!');
 }
 
-seed();
+main()
+  .catch((e) => {
+    console.error('❌ Seed failed:', e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await db.$disconnect();
+  });

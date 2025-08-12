@@ -4,15 +4,32 @@ import { z } from 'zod';
 import { db } from '../lib/db.js';
 import { logger } from '../lib/logger.js';
 import { requireAuth } from './auth.js';
-import { CreateRoutingRuleSchema, UpdateRoutingRuleSchema } from '../types/dto.js';
 
 const router = Router();
 router.use(requireAuth);
 
+// Validation schemas
+const CreateRuleSchema = z.object({
+  priority: z.number().min(0).optional(),
+  mcc: z.string().optional(),
+  merchant: z.string().optional(),
+  geofence: z.string().optional(),
+  envelopeId: z.number().optional(),
+});
+
+const UpdateRuleSchema = z.object({
+  priority: z.number().min(0).optional(),
+  mcc: z.string().optional(),
+  merchant: z.string().optional(),
+  geofence: z.string().optional(),
+  envelopeId: z.number().optional(),
+  enabled: z.boolean().optional(),
+});
+
 // Get all routing rules
 router.get('/', async (req: any, res) => {
   try {
-    const rules = await db.routingRule.findMany({
+    const rules = await db.rule.findMany({
       where: { userId: req.user.id },
       include: {
         envelope: { select: { id: true, name: true } },
@@ -31,7 +48,7 @@ router.get('/', async (req: any, res) => {
 router.get('/:id', async (req: any, res) => {
   try {
     const id = parseInt(req.params.id);
-    const rule = await db.routingRule.findFirst({
+    const rule = await db.rule.findFirst({
       where: { id, userId: req.user.id },
       include: {
         envelope: { select: { id: true, name: true } },
@@ -52,18 +69,20 @@ router.get('/:id', async (req: any, res) => {
 // Create routing rule
 router.post('/', async (req: any, res) => {
   try {
-    const data = CreateRoutingRuleSchema.parse(req.body);
+    const data = CreateRuleSchema.parse(req.body);
     
-    // Validate envelope exists and belongs to user
-    const envelope = await db.envelope.findFirst({
-      where: { id: data.envelopeId, userId: req.user.id },
-    });
-    
-    if (!envelope) {
-      return res.status(400).json({ error: 'Invalid envelope selection' });
+    // Validate envelope exists and belongs to user if provided
+    if (data.envelopeId) {
+      const envelope = await db.envelope.findFirst({
+        where: { id: data.envelopeId, userId: req.user.id },
+      });
+      
+      if (!envelope) {
+        return res.status(400).json({ error: 'Invalid envelope selection' });
+      }
     }
     
-    const rule = await db.routingRule.create({
+    const rule = await db.rule.create({
       data: {
         ...data,
         userId: req.user.id,
@@ -87,9 +106,9 @@ router.post('/', async (req: any, res) => {
 router.patch('/:id', async (req: any, res) => {
   try {
     const id = parseInt(req.params.id);
-    const data = UpdateRoutingRuleSchema.parse(req.body);
+    const data = UpdateRuleSchema.parse(req.body);
     
-    const rule = await db.routingRule.updateMany({
+    const rule = await db.rule.updateMany({
       where: { id, userId: req.user.id },
       data,
     });
@@ -98,7 +117,7 @@ router.patch('/:id', async (req: any, res) => {
       return res.status(404).json({ error: 'Routing rule not found' });
     }
     
-    const updatedRule = await db.routingRule.findUnique({
+    const updatedRule = await db.rule.findUnique({
       where: { id },
       include: {
         envelope: { select: { id: true, name: true } },
@@ -120,7 +139,7 @@ router.delete('/:id', async (req: any, res) => {
   try {
     const id = parseInt(req.params.id);
     
-    const deleted = await db.routingRule.deleteMany({
+    const deleted = await db.rule.deleteMany({
       where: { id, userId: req.user.id },
     });
     
