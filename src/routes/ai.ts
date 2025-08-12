@@ -182,7 +182,7 @@ router.post('/explain-routing', async (req: any, res) => {
     });
 
     const envelopes = await db.envelope.findMany({
-      where: { userId: req.user.id, isActive: true },
+      where: { userId: req.user.id },
     });
 
     if (envelopes.length === 0) {

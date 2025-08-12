@@ -24,8 +24,8 @@ async function main() {
   for (const n of names) {
     const env = await prisma.envelope.upsert({
       where: { userId_name: { userId: user.id, name: n.name } },
-      update: { balanceCents: n.balanceCents, icon: n.icon, color: n.color, order: n.order },
-      create: { userId: user.id, name: n.name, balanceCents: n.balanceCents, icon: n.icon, color: n.color, order: n.order },
+      update: { balanceCents: n.balanceCents, icon: n.icon, color: n.color, order: n.order, isActive: true },
+      create: { userId: user.id, name: n.name, balanceCents: n.balanceCents, icon: n.icon, color: n.color, order: n.order, isActive: true },
     });
     envelopes.push(env);
   }
