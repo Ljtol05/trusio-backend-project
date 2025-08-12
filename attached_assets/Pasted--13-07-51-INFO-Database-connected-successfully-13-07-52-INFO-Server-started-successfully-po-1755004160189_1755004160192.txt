@@ -1,0 +1,60 @@
+[13:07:51] INFO: Database connected successfully
+[13:07:52] INFO: Server started successfully
+    port: 5000
+    host: "0.0.0.0"
+    env: "development"
+    aiEnabled: true
+[13:07:52] INFO: HTTP Request
+    method: "POST"
+    url: "/api/ai/explain-routing"
+    ip: "127.0.0.1"
+    userAgent: "curl/8.14.1"
+[13:07:52] DEBUG: Database query
+    query: "SELECT `main`.`rules`.`id`, `main`.`rules`.`priority`, `main`.`rules`.`mcc`, `main`.`rules`.`merchant`, `main`.`rules`.`geofence`, `main`.`rules`.`envelopeId`, `main`.`rules`.`enabled`, `main`.`rules`.`userId`, `main`.`rules`.`createdAt`, `main`.`rules`.`updatedAt` FROM `main`.`rules` WHERE (`main`.`rules`.`userId` = ? AND `main`.`rules`.`enabled` = ?) ORDER BY `main`.`rules`.`priority` ASC LIMIT ? OFFSET ?"
+    params: "[1,true,-1,0]"
+    duration: 6
+[13:07:52] DEBUG: Database query
+    query: "SELECT `main`.`envelopes`.`id`, `main`.`envelopes`.`name`, `main`.`envelopes`.`icon`, `main`.`envelopes`.`color`, `main`.`envelopes`.`balanceCents`, `main`.`envelopes`.`spentThisMonth`, `main`.`envelopes`.`order`, `main`.`envelopes`.`isActive`, `main`.`envelopes`.`userId`, `main`.`envelopes`.`createdAt`, `main`.`envelopes`.`updatedAt` FROM `main`.`envelopes` WHERE `main`.`envelopes`.`id` IN (?,?) LIMIT ? OFFSET ?"
+    params: "[1,2,-1,0]"
+    duration: 0
+[13:07:52] ERROR: Error explaining routing
+    err: {
+      "type": "TypeError",
+      "message": "Cannot read properties of undefined (reading 'findMany')",
+      "stack":
+          TypeError: Cannot read properties of undefined (reading 'findMany')
+              at <anonymous> (/home/runner/workspace/src/routes/ai.ts:89:40)
+    }
+[13:07:52] INFO: HTTP Request
+    method: "GET"
+    url: "/"
+    ip: "172.31.81.194"
+    userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Replit/1.0.14 Chrome/124.0.6367.119 Electron/30.0.3 Safari/537.36"
+[13:08:41] INFO: HTTP Request
+    method: "POST"
+    url: "/api/ai/explain-routing"
+    ip: "127.0.0.1"
+    userAgent: "curl/8.14.1"
+[13:08:41] DEBUG: Database query
+    query: "SELECT 1"
+    params: "[]"
+    duration: 0
+[13:08:41] DEBUG: Database query
+    query: "SELECT `main`.`rules`.`id`, `main`.`rules`.`priority`, `main`.`rules`.`mcc`, `main`.`rules`.`merchant`, `main`.`rules`.`geofence`, `main`.`rules`.`envelopeId`, `main`.`rules`.`enabled`, `main`.`rules`.`userId`, `main`.`rules`.`createdAt`, `main`.`rules`.`updatedAt` FROM `main`.`rules` WHERE (`main`.`rules`.`userId` = ? AND `main`.`rules`.`enabled` = ?) ORDER BY `main`.`rules`.`priority` ASC LIMIT ? OFFSET ?"
+    params: "[1,true,-1,0]"
+    duration: 0
+[13:08:41] DEBUG: Database query
+    query: "SELECT `main`.`envelopes`.`id`, `main`.`envelopes`.`name`, `main`.`envelopes`.`icon`, `main`.`envelopes`.`color`, `main`.`envelopes`.`balanceCents`, `main`.`envelopes`.`spentThisMonth`, `main`.`envelopes`.`order`, `main`.`envelopes`.`isActive`, `main`.`envelopes`.`userId`, `main`.`envelopes`.`createdAt`, `main`.`envelopes`.`updatedAt` FROM `main`.`envelopes` WHERE `main`.`envelopes`.`id` IN (?,?) LIMIT ? OFFSET ?"
+    params: "[1,2,-1,0]"
+    duration: 0
+[13:08:41] ERROR: Error explaining routing
+    err: {
+      "type": "TypeError",
+      "message": "Cannot read properties of undefined (reading 'findMany')",
+      "stack":
+          TypeError: Cannot read properties of undefined (reading 'findMany')
+              at <anonymous> (/home/runner/workspace/src/routes/ai.ts:89:40)
+    }
+^C[13:09:06] INFO: Received SIGINT, starting graceful shutdown...
+[13:09:06] INFO: HTTP server closed
+[13:09:06] INFO: Database disconnected
