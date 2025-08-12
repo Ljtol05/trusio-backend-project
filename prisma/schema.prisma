@@ -21,6 +21,7 @@ model User {
   rules          Rule[]
   cards          Card[]
   routingConfig  RoutingConfig?
+  memories       UserMemory[]
 
   @@map("users")
 }
@@ -142,4 +143,19 @@ model RoutingConfig {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("routing_configs")
+}
+
+model UserMemory {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  type      String   // conversation, bank_statement, spending_pattern, goal
+  content   String   // The actual content/text
+  embedding String?  // JSON array of embedding vector
+  metadata  String?  // JSON metadata
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_memories")
 }

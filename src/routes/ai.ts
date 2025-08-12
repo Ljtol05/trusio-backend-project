@@ -72,8 +72,8 @@ router.post('/coach', async (req: any, res) => {
 
     const { question, context } = AICoachRequestSchema.parse(req.body);
 
-    // Get comprehensive user data
-    const [envelopes, recentTransactions, transfers] = await Promise.all([
+    // Get comprehensive user data including memories
+    const [envelopes, recentTransactions, transfers, userMemories] = await Promise.all([
       db.envelope.findMany({
         where: { userId: req.user.id },
         select: {
@@ -112,6 +112,12 @@ router.post('/coach', async (req: any, res) => {
           createdAt: true,
         },
       }),
+      // Get recent user memories for context
+      db.userMemory?.findMany({
+        where: { userId: req.user.id },
+        orderBy: { createdAt: 'desc' },
+        take: 10
+      }).catch(() => []) || Promise.resolve([])
     ]);
 
     const envelopeContext = envelopes.map((e) => ({
