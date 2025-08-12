@@ -3,11 +3,61 @@ import { z } from 'zod';
 import { db } from '../lib/db.js';
 import { logger } from '../lib/logger.js';
 import { requireAuth } from './auth.js';
-import { createChatCompletion, isAIEnabled } from '../lib/openai.js';
+import { chatJSON, isAIEnabled } from '../lib/openai.js';
 import { AICoachRequestSchema, RoutingExplanationRequestSchema } from '../types/dto.js';
 import { findBestEnvelope } from './routing.js';
 
 const router = Router();
+
+// Health check endpoint (no auth required for testing)
+router.get('/health', async (req, res) => {
+  try {
+    const { openaiPing } = await import('../lib/openai.js');
+    const result = await openaiPing();
+    
+    res.json({
+      openai: result,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    res.status(500).json({
+      error: 'OpenAI health check failed',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+// Simple test endpoint (no auth required for testing)
+router.post('/test', async (req, res) => {
+  try {
+    const { prompt = "Say hello in JSON format" } = req.body;
+    
+    const result = await chatJSON({
+      user: prompt,
+      schemaName: "testResponse",
+      temperature: 0.1
+    });
+    
+    res.json({
+      success: true,
+      result,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error: any) {
+    if (error.code === 'NO_KEY') {
+      return res.status(503).json({
+        error: 'OpenAI API key not configured',
+        message: 'Please set OPENAI_API_KEY in Replit Secrets'
+      });
+    }
+    
+    res.status(500).json({
+      error: 'OpenAI test failed',
+      details: error.message || 'Unknown error'
+    });
+  }
+});
+
 router.use(requireAuth);
 
 // AI coach endpoint
@@ -43,12 +93,19 @@ router.post('/coach', async (req: any, res) => {
     Provide helpful, actionable advice about budgeting, spending habits, and envelope management.
     Keep responses concise and practical.`;
 
-    const response = await createChatCompletion([
-      { role: 'system', content: systemPrompt },
-      { role: 'user', content: question },
-    ]);
+    const result = await chatJSON({
+      system: systemPrompt,
+      user: question,
+      schemaName: "coachResponse",
+      validate: (obj: any) => {
+        if (typeof obj.advice !== 'string') {
+          throw new Error('Invalid response format');
+        }
+        return obj;
+      }
+    });
 
-    res.json({ response });
+    res.json({ response: result.advice || result.response || JSON.stringify(result) });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: 'Validation failed', details: error.errors });
@@ -142,15 +199,22 @@ router.post('/explain-routing', async (req: any, res) => {
 
     Provide a brief, friendly explanation (2-3 sentences) of why this transaction was routed to this envelope.`;
 
-    const explanation = await createChatCompletion([
-      { role: 'system', content: systemPrompt },
-      { role: 'user', content: 'Please explain this routing decision.' },
-    ]);
+    const result = await chatJSON({
+      system: systemPrompt,
+      user: 'Please explain this routing decision.',
+      schemaName: "explanationResponse",
+      validate: (obj: any) => {
+        if (typeof obj.explanation !== 'string') {
+          throw new Error('Invalid response format');
+        }
+        return obj;
+      }
+    });
 
     res.json({
       envelope: targetEnvelope,
       rule: matchedRule,
-      explanation,
+      explanation: result.explanation || result.response || JSON.stringify(result),
       reason,
     });
   } catch (error) {
