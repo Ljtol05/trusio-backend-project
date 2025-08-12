@@ -14,8 +14,24 @@ router.get('/', async (req: any, res) => {
   try {
     const cards = await db.card.findMany({
       where: { userId: req.user.id },
+      include: {
+        envelope: { 
+          select: { 
+            id: true, 
+            name: true, 
+            icon: true, 
+            color: true, 
+            balanceCents: true 
+          } 
+        },
+        _count: {
+          select: {
+            transactions: true,
+          },
+        },
+      },
       orderBy: [
-        { isDefault: 'desc' },
+        { inWallet: 'desc' },
         { createdAt: 'asc' },
       ],
     });
@@ -24,6 +40,180 @@ router.get('/', async (req: any, res) => {
   } catch (error) {
     logger.error(error, 'Error fetching cards');
     res.status(500).json({ error: 'Failed to fetch cards' });
+  }
+});
+
+// Get card usage analytics
+router.get('/analytics', async (req: any, res) => {
+  try {
+    const { timeframe = '30' } = req.query;
+    const days = parseInt(timeframe as string);
+    const startDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+
+    const cardsWithUsage = await db.card.findMany({
+      where: { userId: req.user.id },
+      include: {
+        envelope: { 
+          select: { 
+            id: true, 
+            name: true, 
+            icon: true, 
+            color: true, 
+            balanceCents: true 
+          } 
+        },
+        transactions: {
+          where: {
+            createdAt: { gte: startDate },
+            status: 'SETTLED',
+          },
+          select: {
+            amountCents: true,
+            merchant: true,
+            mcc: true,
+            createdAt: true,
+          },
+        },
+      },
+    });
+
+    const analytics = cardsWithUsage.map(card => {
+      const totalSpent = card.transactions.reduce(
+        (sum, txn) => sum + Math.abs(txn.amountCents), 
+        0
+      );
+      const transactionCount = card.transactions.length;
+      const uniqueMerchants = new Set(card.transactions.map(txn => txn.merchant)).size;
+      const avgTransactionSize = transactionCount > 0 ? totalSpent / transactionCount : 0;
+      
+      // Usage frequency
+      const daysWithTransactions = new Set(
+        card.transactions.map(txn => txn.createdAt.toISOString().split('T')[0])
+      ).size;
+      
+      const usageFrequency = daysWithTransactions / days;
+
+      return {
+        cardId: card.id,
+        last4: card.last4,
+        label: card.label,
+        inWallet: card.inWallet,
+        envelope: card.envelope,
+        usage: {
+          totalSpentCents: totalSpent,
+          transactionCount,
+          avgTransactionCents: Math.round(avgTransactionSize),
+          uniqueMerchants,
+          daysActive: daysWithTransactions,
+          usageFrequency: Math.round(usageFrequency * 100) / 100,
+          lastUsed: card.transactions[0]?.createdAt || null,
+          isHighUsage: usageFrequency > 0.3, // Used more than 30% of days
+        },
+        topMerchants: Object.entries(
+          card.transactions.reduce((acc: any, txn) => {
+            acc[txn.merchant] = (acc[txn.merchant] || 0) + Math.abs(txn.amountCents);
+            return acc;
+          }, {})
+        )
+        .sort(([,a]: any, [,b]: any) => b - a)
+        .slice(0, 3)
+        .map(([merchant, amount]) => ({ merchant, amountCents: amount })),
+      };
+    });
+
+    const summary = {
+      totalCards: cardsWithUsage.length,
+      activeCards: analytics.filter(card => card.usage.transactionCount > 0).length,
+      cardsInWallet: cardsWithUsage.filter(card => card.inWallet).length,
+      totalSpentAllCards: analytics.reduce((sum, card) => sum + card.usage.totalSpentCents, 0),
+      mostUsedCard: analytics.sort((a, b) => b.usage.transactionCount - a.usage.transactionCount)[0],
+      timeframeDays: days,
+    };
+
+    res.json({ 
+      analytics,
+      summary,
+      recommendations: {
+        unusedCards: analytics.filter(card => card.usage.transactionCount === 0 && card.inWallet),
+        highUsageCards: analytics.filter(card => card.usage.isHighUsage),
+        needsAttention: analytics.filter(card => 
+          card.envelope && card.envelope.balanceCents < card.usage.avgTransactionCents * 3
+        ),
+      }
+    });
+  } catch (error) {
+    logger.error(error, 'Error fetching card analytics');
+    res.status(500).json({ error: 'Failed to fetch card analytics' });
+  }
+});
+
+// Get card spending by envelope
+router.get('/:id/spending', async (req: any, res) => {
+  try {
+    const cardId = parseInt(req.params.id);
+    const { timeframe = '30' } = req.query;
+    const days = parseInt(timeframe as string);
+    const startDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+
+    const card = await db.card.findFirst({
+      where: { id: cardId, userId: req.user.id },
+      include: {
+        envelope: true,
+        transactions: {
+          where: {
+            createdAt: { gte: startDate },
+            status: 'SETTLED',
+          },
+          include: {
+            envelope: { select: { name: true, icon: true, color: true } },
+          },
+          orderBy: { createdAt: 'desc' },
+        },
+      },
+    });
+
+    if (!card) {
+      return res.status(404).json({ error: 'Card not found' });
+    }
+
+    const spendingByCategory = card.transactions.reduce((acc: any, txn) => {
+      const category = txn.envelope?.name || 'Uncategorized';
+      if (!acc[category]) {
+        acc[category] = {
+          envelope: txn.envelope || { name: 'Uncategorized', icon: 'question', color: 'gray' },
+          totalCents: 0,
+          transactionCount: 0,
+          transactions: [],
+        };
+      }
+      acc[category].totalCents += Math.abs(txn.amountCents);
+      acc[category].transactionCount += 1;
+      acc[category].transactions.push({
+        id: txn.id,
+        merchant: txn.merchant,
+        amountCents: txn.amountCents,
+        createdAt: txn.createdAt,
+      });
+      return acc;
+    }, {});
+
+    res.json({
+      card: {
+        id: card.id,
+        last4: card.last4,
+        label: card.label,
+        envelope: card.envelope,
+      },
+      spendingByCategory: Object.values(spendingByCategory),
+      summary: {
+        totalTransactions: card.transactions.length,
+        totalSpentCents: card.transactions.reduce((sum, txn) => sum + Math.abs(txn.amountCents), 0),
+        timeframeDays: days,
+      },
+    });
+  } catch (error) {
+    logger.error(error, 'Error fetching card spending');
+    res.status(500).json({ error: 'Failed to fetch card spending' });
   }
 });
 

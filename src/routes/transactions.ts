@@ -75,9 +75,8 @@ router.get('/:id', async (req: any, res) => {
     const transaction = await db.transaction.findFirst({
       where: { id, userId: req.user.id },
       include: {
-        fromEnvelope: { select: { id: true, name: true } },
-        toEnvelope: { select: { id: true, name: true } },
-        card: { select: { id: true, name: true, last4: true } },
+        envelope: { select: { id: true, name: true, icon: true, color: true } },
+        card: { select: { id: true, last4: true, label: true } },
       },
     });
 
@@ -89,6 +88,154 @@ router.get('/:id', async (req: any, res) => {
   } catch (error) {
     logger.error(error, 'Error fetching transaction');
     res.status(500).json({ error: 'Failed to fetch transaction' });
+  }
+});
+
+// Get spending analytics
+router.get('/analytics/spending', async (req: any, res) => {
+  try {
+    const { timeframe = '30', groupBy = 'envelope' } = req.query;
+    const days = parseInt(timeframe as string);
+    const startDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+
+    const transactions = await db.transaction.findMany({
+      where: {
+        userId: req.user.id,
+        status: 'SETTLED',
+        createdAt: { gte: startDate },
+        amountCents: { lt: 0 }, // Only spending transactions
+      },
+      include: {
+        envelope: { select: { id: true, name: true, icon: true, color: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    // Group by envelope
+    const envelopeSpending = transactions.reduce((acc: any, txn) => {
+      const envelopeName = txn.envelope?.name || 'Uncategorized';
+      if (!acc[envelopeName]) {
+        acc[envelopeName] = {
+          envelope: txn.envelope || { name: 'Uncategorized', icon: 'question', color: 'gray' },
+          totalCents: 0,
+          transactionCount: 0,
+          avgTransactionCents: 0,
+          merchants: new Set(),
+          mccs: new Set(),
+        };
+      }
+      acc[envelopeName].totalCents += Math.abs(txn.amountCents);
+      acc[envelopeName].transactionCount += 1;
+      acc[envelopeName].merchants.add(txn.merchant);
+      if (txn.mcc) acc[envelopeName].mccs.add(txn.mcc);
+      return acc;
+    }, {});
+
+    // Calculate averages and convert sets to arrays
+    Object.keys(envelopeSpending).forEach(key => {
+      const data = envelopeSpending[key];
+      data.avgTransactionCents = Math.round(data.totalCents / data.transactionCount);
+      data.merchants = Array.from(data.merchants);
+      data.mccs = Array.from(data.mccs);
+    });
+
+    // Top merchants analysis
+    const merchantSpending = transactions.reduce((acc: any, txn) => {
+      if (!acc[txn.merchant]) {
+        acc[txn.merchant] = {
+          merchant: txn.merchant,
+          totalCents: 0,
+          transactionCount: 0,
+          envelope: txn.envelope?.name || 'Uncategorized',
+          mcc: txn.mcc,
+        };
+      }
+      acc[txn.merchant].totalCents += Math.abs(txn.amountCents);
+      acc[txn.merchant].transactionCount += 1;
+      return acc;
+    }, {});
+
+    const topMerchants = Object.values(merchantSpending)
+      .sort((a: any, b: any) => b.totalCents - a.totalCents)
+      .slice(0, 10);
+
+    // Spending patterns
+    const dailySpending = transactions.reduce((acc: any, txn) => {
+      const date = txn.createdAt.toISOString().split('T')[0];
+      if (!acc[date]) acc[date] = 0;
+      acc[date] += Math.abs(txn.amountCents);
+      return acc;
+    }, {});
+
+    res.json({
+      summary: {
+        totalSpentCents: transactions.reduce((sum, txn) => sum + Math.abs(txn.amountCents), 0),
+        totalTransactions: transactions.length,
+        avgTransactionCents: Math.round(
+          transactions.reduce((sum, txn) => sum + Math.abs(txn.amountCents), 0) / transactions.length
+        ),
+        uniqueMerchants: new Set(transactions.map(txn => txn.merchant)).size,
+        timeframeDays: days,
+      },
+      envelopeSpending: Object.values(envelopeSpending),
+      topMerchants,
+      dailySpending,
+      spendingTrends: {
+        highestSpendingDay: Object.entries(dailySpending)
+          .sort(([,a]: any, [,b]: any) => b - a)[0],
+        mostFrequentMerchant: topMerchants[0]?.merchant || 'N/A',
+        avgDailySpending: Math.round(
+          Object.values(dailySpending).reduce((sum: number, amount: any) => sum + amount, 0) / 
+          Object.keys(dailySpending).length
+        ),
+      },
+    });
+  } catch (error) {
+    logger.error(error, 'Error fetching spending analytics');
+    res.status(500).json({ error: 'Failed to fetch spending analytics' });
+  }
+});
+
+// Get pending transactions for approval
+router.get('/pending', async (req: any, res) => {
+  try {
+    const pendingTransactions = await db.transaction.findMany({
+      where: { 
+        userId: req.user.id, 
+        status: 'PENDING' 
+      },
+      include: {
+        envelope: { select: { id: true, name: true, icon: true, color: true } },
+        card: { select: { id: true, last4: true, label: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    // Get available envelopes for potential reassignment
+    const availableEnvelopes = await db.envelope.findMany({
+      where: { userId: req.user.id, isActive: true },
+      select: { 
+        id: true, 
+        name: true, 
+        icon: true, 
+        color: true, 
+        balanceCents: true 
+      },
+      orderBy: { order: 'asc' },
+    });
+
+    res.json({ 
+      pendingTransactions,
+      availableEnvelopes,
+      totalPending: pendingTransactions.length,
+      totalPendingAmount: pendingTransactions.reduce(
+        (sum, txn) => sum + Math.abs(txn.amountCents), 
+        0
+      ),
+    });
+  } catch (error) {
+    logger.error(error, 'Error fetching pending transactions');
+    res.status(500).json({ error: 'Failed to fetch pending transactions' });
   }
 });
 

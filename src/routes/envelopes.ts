@@ -21,6 +21,17 @@ router.get('/', async (req: any, res) => {
         icon: true,
         color: true,
         order: true,
+        isActive: true,
+        createdAt: true,
+        updatedAt: true,
+        _count: {
+          select: {
+            transactionsFrom: true,
+            transfersFrom: true,
+            transfersTo: true,
+            rules: true,
+          },
+        },
       },
       orderBy: { order: 'asc' },
     });
@@ -29,6 +40,90 @@ router.get('/', async (req: any, res) => {
   } catch (error) {
     logger.error(error, 'Error fetching envelopes');
     res.status(500).json({ error: 'Failed to fetch envelopes' });
+  }
+});
+
+// Get envelope spending analytics
+router.get('/analytics', async (req: any, res) => {
+  try {
+    const { timeframe = '30' } = req.query;
+    const days = parseInt(timeframe as string);
+    const startDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+
+    const envelopes = await db.envelope.findMany({
+      where: { userId: req.user.id },
+      include: {
+        transactionsFrom: {
+          where: {
+            createdAt: { gte: startDate },
+            status: 'SETTLED',
+          },
+          select: {
+            amountCents: true,
+            merchant: true,
+            mcc: true,
+            createdAt: true,
+          },
+        },
+        transfersFrom: {
+          where: { createdAt: { gte: startDate } },
+          select: { amountCents: true, note: true, createdAt: true },
+        },
+        transfersTo: {
+          where: { createdAt: { gte: startDate } },
+          select: { amountCents: true, note: true, createdAt: true },
+        },
+      },
+      orderBy: { order: 'asc' },
+    });
+
+    const analytics = envelopes.map((envelope) => {
+      const totalSpent = envelope.transactionsFrom.reduce(
+        (sum, txn) => sum + Math.abs(txn.amountCents),
+        0
+      );
+      const transfersOut = envelope.transfersFrom.reduce(
+        (sum, transfer) => sum + transfer.amountCents,
+        0
+      );
+      const transfersIn = envelope.transfersTo.reduce(
+        (sum, transfer) => sum + transfer.amountCents,
+        0
+      );
+      const avgTransactionSize = envelope.transactionsFrom.length > 0 
+        ? totalSpent / envelope.transactionsFrom.length 
+        : 0;
+
+      return {
+        id: envelope.id,
+        name: envelope.name,
+        icon: envelope.icon,
+        color: envelope.color,
+        balanceCents: envelope.balanceCents,
+        totalSpentCents: totalSpent,
+        transfersOutCents: transfersOut,
+        transfersInCents: transfersIn,
+        netTransfersCents: transfersIn - transfersOut,
+        transactionCount: envelope.transactionsFrom.length,
+        avgTransactionCents: Math.round(avgTransactionSize),
+        spendingTrend: envelope.transactionsFrom.length > 1 ? 'active' : 'low',
+        lastActivity: envelope.transactionsFrom[0]?.createdAt || envelope.updatedAt,
+      };
+    });
+
+    res.json({ 
+      analytics,
+      summary: {
+        totalEnvelopes: envelopes.length,
+        totalBalanceCents: envelopes.reduce((sum, env) => sum + env.balanceCents, 0),
+        totalSpentCents: analytics.reduce((sum, env) => sum + env.totalSpentCents, 0),
+        mostUsedEnvelope: analytics.sort((a, b) => b.transactionCount - a.transactionCount)[0],
+        timeframeDays: days,
+      }
+    });
+  } catch (error) {
+    logger.error(error, 'Error fetching envelope analytics');
+    res.status(500).json({ error: 'Failed to fetch envelope analytics' });
   }
 });
 
