@@ -88,14 +88,17 @@ export const UpdateRoutingConfigSchema = z.object({
 
 // AI DTOs
 export const AICoachRequestSchema = z.object({
-  question: z.string().min(1),
+  goal: z.string().optional(),
+  constraints: z.array(z.string()).optional(),
+  months: z.number().optional(),
+  question: z.string().optional(),
   context: z.record(z.any()).optional(),
 });
 
 export const RoutingExplanationRequestSchema = z.object({
   transactionData: z.object({
-    amount: z.number(),
-    merchantName: z.string().optional(),
+    amountCents: z.number(),
+    merchant: z.string().optional(),
     mcc: z.string().optional(),
     location: z.string().optional(),
   }),
