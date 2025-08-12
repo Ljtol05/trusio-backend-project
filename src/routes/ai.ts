@@ -128,7 +128,7 @@ router.post('/coach', async (req: any, res) => {
     const totalBalance = envelopeContext.reduce((sum, env) => sum + env.balanceCents, 0);
     const totalSpent = envelopeContext.reduce((sum, env) => sum + parseFloat(env.spentThisMonth), 0);
     const avgSpendingPerEnvelope = totalSpent / envelopeContext.length;
-    
+
     // Find highest/lowest spending categories
     const highestSpendingEnv = envelopeContext.reduce((max, env) => 
       parseFloat(env.spentThisMonth) > parseFloat(max.spentThisMonth) ? env : max
@@ -179,7 +179,7 @@ Be conversational but specific. Reference their actual envelope names and balanc
 
     let result;
     let aiSuccess = false;
-    
+
     try {
       // Try AI with optimized settings and faster timeout
       result = await Promise.race([
@@ -192,7 +192,7 @@ Be conversational but specific. Reference their actual envelope names and balanc
             if (obj && typeof obj === 'object') {
               const advice = obj.advice || obj.response || obj.recommendation || obj.suggestion;
               const actions = obj.actions || obj.suggestions || obj.recommendations || [];
-              
+
               if (typeof advice === 'string' && advice.trim()) {
                 return { 
                   advice: advice.trim(),
@@ -207,22 +207,22 @@ Be conversational but specific. Reference their actual envelope names and balanc
           setTimeout(() => reject(new Error('AI timeout - using smart fallback')), 15000)
         )
       ]);
-      
+
       aiSuccess = true;
     } catch (aiError) {
       logger.warn({ err: aiError, question }, 'AI Coach timeout/error, using smart fallback');
-      
+
       // Enhanced smart fallback using actual user data
       let contextualAdvice = '';
       let suggestedActions = [];
       const questionLower = question.toLowerCase();
-      
+
       // Analyze user's actual financial state for smarter recommendations
       const hasLowBalances = envelopeContext.filter(env => env.balanceCents < 2000).length;
       const hasHighBalances = envelopeContext.filter(env => env.balanceCents > 10000);
       const totalSpentThisMonth = envelopeContext.reduce((sum, env) => sum + parseFloat(env.spentThisMonth), 0);
       const avgBalance = totalBalance / 100 / envelopeContext.length;
-      
+
       if (questionLower.includes('raise') || questionLower.includes('income') || questionLower.includes('money')) {
         // Handle income/raise questions
         const suggestedAmount = 500; // Default assumption
@@ -237,7 +237,7 @@ Be conversational but specific. Reference their actual envelope names and balanc
         // Handle emergency/repair questions with real envelope analysis
         const fundingSources = envelopeContext.filter(env => env.balanceCents > 5000).sort((a, b) => b.balanceCents - a.balanceCents);
         const neededAmount = 800; // Default repair amount
-        
+
         if (fundingSources.length > 0) {
           const primarySource = fundingSources[0];
           const canCoverAmount = Math.min(neededAmount, primarySource.balanceCents / 100 * 0.4);
@@ -250,6 +250,9 @@ Be conversational but specific. Reference their actual envelope names and balanc
         } else {
           contextualAdvice = `For the $${neededAmount} repair, you'll need to combine multiple envelopes. Your top options: ${envelopeContext.slice(0, 3).map(e => `${e.name} ($${e.balance})`).join(', ')}. Total available: $${toDollars(totalBalance)}.`;
         }
+
+        const emergencyFundAmount = Math.max(50, totalBalance / 100 * 0.05);
+        contextualAdvice += ` Start building an emergency fund with $${emergencyFundAmount.toFixed(0)}/month.`;
       } else if (questionLower.includes('dining') || questionLower.includes('food') || questionLower.includes('restaurant') || questionLower.includes('overspending')) {
         // Handle dining/food overspending questions with envelope analysis
         const diningEnv = envelopeContext.find(env => 
@@ -260,9 +263,9 @@ Be conversational but specific. Reference their actual envelope names and balanc
         const currentSpending = parseFloat(diningEnv?.spentThisMonth || '0');
         const currentBalance = parseFloat(diningEnv?.balance || '0');
         const suggestedMonthlyLimit = Math.max(avgBalance, 150); // Based on user's average or minimum
-        
+
         contextualAdvice = `Your ${diningEnv?.name || 'dining'} spending: $${currentSpending.toFixed(2)} this month with $${currentBalance.toFixed(2)} remaining. For your budget level ($${avgBalance.toFixed(0)} avg/envelope), target $${suggestedMonthlyLimit.toFixed(0)}/month dining. Weekly limit: $${(suggestedMonthlyLimit / 4).toFixed(0)}. ${currentBalance > suggestedMonthlyLimit * 0.5 ? `Consider moving $${(currentBalance * 0.3).toFixed(0)} to ${lowestBalanceEnv.name}.` : 'Focus on meal prep 3x/week.'}`;
-        
+
         if (diningEnv && currentBalance > suggestedMonthlyLimit * 0.5) {
           suggestedActions = [{
             type: 'transfer',
@@ -276,9 +279,9 @@ Be conversational but specific. Reference their actual envelope names and balanc
         const timeframe = questionLower.match(/(\d+)\s*(month|week)/)?.[1] ? parseInt(questionLower.match(/(\d+)\s*(month|week)/)?.[1] || '6') : 6;
         const monthlyNeeded = targetAmount / timeframe;
         const canContribute = envelopeContext.filter(env => env.balanceCents > 5000);
-        
+
         contextualAdvice = `For $${targetAmount} in ${timeframe} months, save $${monthlyNeeded.toFixed(0)}/month. With your $${toDollars(totalBalance)} total, ${canContribute.length > 0 ? `transfer $${(canContribute.reduce((sum, env) => sum + env.balanceCents, 0) / 100 * 0.15).toFixed(0)} from higher-balance envelopes (${canContribute.map(e => e.name).join(', ')}) to start.` : `reduce spending by $${monthlyNeeded.toFixed(0)}/month across all categories.`}`;
-        
+
         if (canContribute.length > 0) {
           suggestedActions = [{
             type: 'create_envelope',
@@ -291,9 +294,9 @@ Be conversational but specific. Reference their actual envelope names and balanc
         const needsAttention = envelopeContext.filter(env => env.balanceCents < avgBalance * 50); // Below 50% of average
         const overFunded = envelopeContext.filter(env => env.balanceCents > avgBalance * 200); // Above 200% of average
         const topSpenders = envelopeContext.sort((a, b) => parseFloat(b.spentThisMonth) - parseFloat(a.spentThisMonth)).slice(0, 3);
-        
+
         contextualAdvice = `Your $${toDollars(totalBalance)} budget analysis: Average $${avgBalance.toFixed(0)} per envelope. `;
-        
+
         if (needsAttention.length > 0 && overFunded.length > 0) {
           const rebalanceAmount = Math.min(avgBalance, overFunded[0].balanceCents / 100 * 0.25);
           contextualAdvice += `Rebalancing opportunity: ${needsAttention.map(env => `${env.name} ($${env.balance})`).join(', ')} are underfunded. Transfer $${rebalanceAmount.toFixed(0)} from ${overFunded[0].name} ($${overFunded[0].balance}). `;
@@ -305,7 +308,7 @@ Be conversational but specific. Reference their actual envelope names and balanc
         } else if (topSpenders.length > 0) {
           contextualAdvice += `Top spending: ${topSpenders.map(env => `${env.name} ($${env.spentThisMonth})`).join(', ')}. `;
         }
-        
+
         // Add specific budget health insights
         const budgetHealth = totalSpentThisMonth / (totalBalance / 100) * 100;
         if (budgetHealth > 50) {
@@ -314,9 +317,9 @@ Be conversational but specific. Reference their actual envelope names and balanc
           contextualAdvice += `Good spending pace at ${budgetHealth.toFixed(0)}% of budget used this month.`;
         }
       }
-      
+
       result = { advice: contextualAdvice, actions: suggestedActions };
-      
+
       result = contextualAdvice;
     }
 
@@ -341,16 +344,16 @@ Be conversational but specific. Reference their actual envelope names and balanc
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: 'Validation failed', details: error.errors });
     }
-    
+
     logger.error({ err: error }, 'Error in AI coach');
-    
+
     if (error?.code === 'NO_KEY') {
       return res.status(503).json({
         error: 'AI service not configured',
         message: 'Please set OPENAI_API_KEY in Replit Secrets',
       });
     }
-    
+
     res.status(500).json({ 
       error: 'AI service temporarily unavailable',
       message: 'Please try again in a moment or rephrase your question.'
@@ -424,7 +427,7 @@ router.post('/explain-routing', async (req: any, res) => {
 
     // Generate concise explanation if AI is available
     let explanation = `Routed to ${targetEnvelope.name}`;
-    
+
     if (isAIEnabled()) {
       try {
         const result = await chatJSON({
@@ -471,7 +474,7 @@ router.post('/explain-routing', async (req: any, res) => {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: 'Validation failed', details: error.errors });
     }
-    
+
     logger.error({ err: error }, 'Error explaining routing');
     res.status(500).json({ error: 'Failed to process routing explanation' });
   }
@@ -487,7 +490,7 @@ router.post('/setup-envelopes', async (req: any, res) => {
     }
 
     const { totalBudget, goals, lifestyle } = req.body;
-    
+
     if (!totalBudget || totalBudget <= 0) {
       return res.status(400).json({ error: 'Valid total budget required' });
     }
@@ -534,7 +537,7 @@ Also include "rationale" explaining the allocation strategy.`;
             return obj;
           }
         }
-        
+
         // Fallback envelope structure
         return {
           envelopes: [
@@ -570,7 +573,7 @@ Also include "rationale" explaining the allocation strategy.`;
 router.post('/execute-action', async (req: any, res) => {
   try {
     const { actionType, params, approved } = req.body;
-    
+
     if (!approved) {
       return res.status(400).json({ error: 'Action not approved' });
     }
@@ -598,12 +601,12 @@ router.post('/execute-action', async (req: any, res) => {
             where: { id: fromEnv.id },
             data: { balanceCents: { decrement: amountCents } }
           });
-          
+
           await tx.envelope.update({
             where: { id: toEnv.id },
             data: { balanceCents: { increment: amountCents } }
           });
-          
+
           return tx.transfer.create({
             data: {
               userId: req.user.id,
@@ -646,7 +649,7 @@ router.post('/execute-action', async (req: any, res) => {
       case 'create_envelopes_batch': {
         const { envelopes, totalBudget } = params;
         const envelopeCount = await db.envelope.count({ where: { userId: req.user.id } });
-        
+
         if (envelopeCount + envelopes.length > 8) {
           return res.status(400).json({ error: 'Would exceed maximum 8 envelopes' });
         }
@@ -656,7 +659,7 @@ router.post('/execute-action', async (req: any, res) => {
           for (let i = 0; i < envelopes.length; i++) {
             const env = envelopes[i];
             const allocatedAmount = Math.round((totalBudget * env.percentage) / 100 * 100);
-            
+
             const envelope = await tx.envelope.create({
               data: {
                 userId: req.user.id,
@@ -744,7 +747,7 @@ router.post('/approve-transaction/:id', async (req: any, res) => {
     }
 
     const targetEnvelopeId = approved ? transaction.envelopeId : newEnvelopeId;
-    
+
     if (!targetEnvelopeId) {
       return res.status(400).json({ error: 'Target envelope required' });
     }
