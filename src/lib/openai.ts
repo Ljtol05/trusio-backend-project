@@ -15,7 +15,7 @@ export const createChatCompletion = async (messages: OpenAI.Chat.Completions.Cha
 
   try {
     const response = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
+      model: 'gpt-3.5-turbo',
       messages,
       max_tokens: 500,
       temperature: 0.7,

@@ -14,20 +14,20 @@ router.use(requireAuth);
 router.post('/coach', async (req: any, res) => {
   try {
     if (!isAIEnabled()) {
-      return res.status(503).json({ 
+      return res.status(503).json({
         error: 'AI service not available',
         message: 'OpenAI API key not configured'
       });
     }
-    
+
     const { question, context } = AICoachRequestSchema.parse(req.body);
-    
+
     // Get user's envelope data for context
     const envelopes = await db.envelope.findMany({
       where: { userId: req.user.id },
       select: { name: true, balance: true, budgetLimit: true },
     });
-    
+
     // Get recent transactions for context
     const recentTransactions = await db.transaction.findMany({
       where: { userId: req.user.id },
@@ -35,19 +35,19 @@ router.post('/coach', async (req: any, res) => {
       orderBy: { createdAt: 'desc' },
       select: { amount: true, description: true, merchantName: true },
     });
-    
-    const systemPrompt = `You are a helpful financial coach for an envelope budgeting app. 
+
+    const systemPrompt = `You are a helpful financial coach for an envelope budgeting app.
     The user has the following envelopes: ${JSON.stringify(envelopes, null, 2)}
     Recent transactions: ${JSON.stringify(recentTransactions, null, 2)}
-    
+
     Provide helpful, actionable advice about budgeting, spending habits, and envelope management.
     Keep responses concise and practical.`;
-    
+
     const response = await createChatCompletion([
       { role: 'system', content: systemPrompt },
       { role: 'user', content: question },
     ]);
-    
+
     res.json({ response });
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -62,57 +62,96 @@ router.post('/coach', async (req: any, res) => {
 router.post('/explain-routing', async (req: any, res) => {
   try {
     if (!isAIEnabled()) {
-      return res.status(503).json({ 
+      return res.status(503).json({
         error: 'AI service not available',
         message: 'OpenAI API key not configured'
       });
     }
-    
-    const { transactionData } = req.body;
 
-    // Convert amountCents to amount for routing logic
-    const routingData = {
-      amount: transactionData.amountCents || transactionData.amount,
-      merchantName: transactionData.merchantName,
-      mcc: transactionData.mcc,
-      location: transactionData.location,
-    };
-    
-    // Get routing suggestion
-    const routingResult = await findBestEnvelope(req.user.id, routingData);
-    
-    if (!routingResult.envelope) {
-      return res.status(404).json({ error: 'No routing suggestion available' });
-    }
-    
+    const { transactionData } = RoutingExplanationRequestSchema.parse(req.body);
+
+
     // Get user's routing rules for context
     const rules = await db.rule.findMany({
       where: { userId: req.user.id, enabled: true },
-      include: { envelope: { select: { name: true } } },
       orderBy: { priority: 'asc' },
+      include: { envelope: true }
     });
-    
-    const systemPrompt = `You are an AI assistant explaining envelope budgeting routing decisions.
-    
-    Transaction details: ${JSON.stringify(transactionData, null, 2)}
-    Chosen envelope: ${routingResult.envelope.name}
-    Routing reason: ${routingResult.reason}
-    User's routing rules: ${JSON.stringify(rules, null, 2)}
-    
-    Explain in simple terms why this envelope was chosen for this transaction.
-    Include any relevant rules that were applied or why the fallback was used.
-    Keep the explanation clear and educational.`;
-    
+
+    // Get user's envelopes
+    const envelopes = await db.envelope.findMany({
+      where: { userId: req.user.id, isActive: true }
+    });
+
+    if (envelopes.length === 0) {
+      return res.status(404).json({ error: 'No active envelopes found' });
+    }
+
+    // Find the best matching rule or use default routing logic
+    let matchedRule = null;
+    let targetEnvelope = null;
+    let reason = 'Default routing - no specific rule matched';
+
+    // Check rules in priority order
+    for (const rule of rules) {
+      let matches = true;
+
+      if (rule.mcc && transactionData.mcc && rule.mcc !== transactionData.mcc) {
+        matches = false;
+      }
+
+      if (rule.merchant && transactionData.merchant &&
+          !transactionData.merchant.toLowerCase().includes(rule.merchant.toLowerCase())) {
+        matches = false;
+      }
+
+      if (rule.geofence && transactionData.location &&
+          !transactionData.location.toLowerCase().includes(rule.geofence.toLowerCase())) {
+        matches = false;
+      }
+
+      if (matches && rule.envelope) {
+        matchedRule = rule;
+        targetEnvelope = rule.envelope;
+        reason = `Matched rule: ${rule.mcc ? `MCC ${rule.mcc}` : ''}${rule.merchant ? ` Merchant "${rule.merchant}"` : ''}${rule.geofence ? ` Location "${rule.geofence}"` : ''}`;
+        break;
+      }
+    }
+
+    // If no rule matched, use the first available envelope
+    if (!targetEnvelope) {
+      targetEnvelope = envelopes[0];
+      reason = 'No matching rule found, using default envelope';
+    }
+
+    // Create AI explanation
+    const systemPrompt = `You are a financial advisor explaining why a transaction was routed to a specific envelope in a budgeting app.
+
+    Transaction details:
+    - Merchant: ${transactionData.merchant || 'Unknown'}
+    - Amount: $${Math.abs(transactionData.amountCents) / 100}
+    - MCC: ${transactionData.mcc || 'Unknown'}
+    - Location: ${transactionData.location || 'Unknown'}
+
+    Routing result:
+    - Envelope: ${targetEnvelope.name}
+    - Rule matched: ${matchedRule ? 'Yes' : 'No'}
+    - Reason: ${reason}
+
+    Available rules: ${rules.map(r => `Priority ${r.priority}: ${r.mcc ? `MCC ${r.mcc}` : ''}${r.merchant ? ` "${r.merchant}"` : ''}${r.geofence ? ` at "${r.geofence}"` : ''} → ${r.envelope?.name || 'Unknown'}`).join(', ')}
+
+    Provide a brief, friendly explanation (2-3 sentences) of why this transaction was routed to this envelope.`;
+
     const explanation = await createChatCompletion([
       { role: 'system', content: systemPrompt },
-      { role: 'user', content: 'Explain why this envelope was chosen for my transaction.' },
+      { role: 'user', content: 'Please explain this routing decision.' },
     ]);
-    
+
     res.json({
-      envelope: routingResult.envelope,
-      rule: routingResult.rule,
+      envelope: targetEnvelope,
+      rule: matchedRule,
       explanation,
-      reason: routingResult.reason,
+      reason,
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
