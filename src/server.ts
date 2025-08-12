@@ -82,6 +82,7 @@ const startServer = async () => {
     const server = app.listen(env.PORT, '0.0.0.0', () => {
       logger.info({
         port: env.PORT,
+        host: '0.0.0.0',
         env: env.NODE_ENV,
         aiEnabled: !!env.OPENAI_API_KEY,
       }, 'Server started successfully');
