@@ -232,8 +232,9 @@ router.post('/explain-routing', async (req: any, res) => {
     }
 
     if (!targetEnvelope) {
-      targetEnvelope = envelopes[0];
-      reason = 'No matching rule found, using default envelope';
+      // Use 'Misc' envelope as default, or first available if Misc doesn't exist
+      targetEnvelope = envelopes.find(e => e.name === 'Misc') || envelopes[0];
+      reason = 'No matching rule found, using default envelope (Misc)';
     }
 
     const systemPrompt = `You are a financial advisor explaining why a transaction was routed to a specific envelope in a budgeting app.

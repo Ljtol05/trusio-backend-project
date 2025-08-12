@@ -13,10 +13,11 @@ async function main() {
   const names = [
     { name: 'Groceries', balanceCents: 42012, icon: 'cart', color: 'green', order: 1 },
     { name: 'Dining',    balanceCents:  8650, icon: 'utensils', color: 'amber', order: 2 },
-    { name: 'Gas',       balanceCents: 11000, icon: 'fuel', color: 'teal', order: 3 },
-    { name: 'Bills',     balanceCents:124500, icon: 'receipt', color: 'blue', order: 4 },
-    { name: 'Buffer',    balanceCents: 30000, icon: 'shield', color: 'slate', order: 5 },
+    { name: 'Fast Food', balanceCents:  5500, icon: 'burger', color: 'orange', order: 3 },
+    { name: 'Gas',       balanceCents: 11000, icon: 'fuel', color: 'teal', order: 4 },
+    { name: 'Bills',     balanceCents:124500, icon: 'receipt', color: 'blue', order: 5 },
     { name: 'Misc',      balanceCents:  7500, icon: 'dots', color: 'gray', order: 6 },
+    { name: 'Buffer',    balanceCents: 30000, icon: 'shield', color: 'slate', order: 7 },
   ];
 
   const envelopes = [];
@@ -42,11 +43,28 @@ async function main() {
     });
   }
 
-  // a couple of rules for demo
+  // Comprehensive routing rules for common spending categories
   await prisma.rule.createMany({
     data: [
+      // Groceries
       { userId: user.id, priority: 1, mcc: '5411', envelopeId: envelopes.find(e => e.name==='Groceries')!.id }, // Grocery stores
-      { userId: user.id, priority: 2, merchant: 'Chipotle', envelopeId: envelopes.find(e => e.name==='Dining')!.id },
+      { userId: user.id, priority: 2, mcc: '5499', envelopeId: envelopes.find(e => e.name==='Groceries')!.id }, // Misc food stores
+      
+      // Fast Food
+      { userId: user.id, priority: 3, mcc: '5814', envelopeId: envelopes.find(e => e.name==='Fast Food')!.id }, // Fast Food (Starbucks, McDonald's)
+      { userId: user.id, priority: 4, mcc: '5812', envelopeId: envelopes.find(e => e.name==='Fast Food')!.id }, // Eating places
+      
+      // Dining (sit-down restaurants)
+      { userId: user.id, priority: 5, mcc: '5813', envelopeId: envelopes.find(e => e.name==='Dining')!.id }, // Drinking places (bars)
+      { userId: user.id, priority: 6, merchant: 'Chipotle', envelopeId: envelopes.find(e => e.name==='Dining')!.id },
+      
+      // Gas
+      { userId: user.id, priority: 7, mcc: '5541', envelopeId: envelopes.find(e => e.name==='Gas')!.id }, // Service stations
+      { userId: user.id, priority: 8, mcc: '5542', envelopeId: envelopes.find(e => e.name==='Gas')!.id }, // Automated fuel dispensers
+      
+      // Bills/Utilities
+      { userId: user.id, priority: 9, mcc: '4900', envelopeId: envelopes.find(e => e.name==='Bills')!.id }, // Utilities
+      { userId: user.id, priority: 10, mcc: '4814', envelopeId: envelopes.find(e => e.name==='Bills')!.id }, // Telecom
     ]
   });
 
