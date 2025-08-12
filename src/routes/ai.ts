@@ -125,19 +125,39 @@ Provide practical, actionable advice about budgeting and spending habits. Keep r
       schemaName: 'coachResponse',
       validate: (obj: any) => {
         // Accept either { advice } or { response } and normalize
-        if (obj && typeof obj.advice === 'string') return obj;
-        if (obj && typeof obj.response === 'string') return { advice: obj.response };
-        throw new Error('Invalid response format');
+        if (obj && typeof obj.advice === 'string' && obj.advice.trim()) {
+          return obj;
+        }
+        if (obj && typeof obj.response === 'string' && obj.response.trim()) {
+          return { advice: obj.response };
+        }
+        // Fallback for empty or malformed responses
+        return { 
+          advice: "I'm having trouble processing your request right now. Please try asking about your specific spending patterns or budget goals." 
+        };
       },
     });
 
     res.json({ response: result.advice });
-  } catch (error) {
+  } catch (error: any) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: 'Validation failed', details: error.errors });
     }
+    
     logger.error({ err: error }, 'Error in AI coach');
-    res.status(500).json({ error: 'AI service unavailable' });
+    
+    // Provide a helpful fallback response
+    if (error?.code === 'NO_KEY') {
+      return res.status(503).json({
+        error: 'AI service not configured',
+        message: 'Please set OPENAI_API_KEY in Replit Secrets',
+      });
+    }
+    
+    res.status(500).json({ 
+      error: 'AI service temporarily unavailable',
+      message: 'Please try again in a moment or rephrase your question.'
+    });
   }
 });
 
@@ -249,9 +269,16 @@ Provide a brief, friendly explanation (2–3 sentences). Return JSON only.`;
       user: 'Please explain this routing decision.',
       schemaName: 'explanationResponse',
       validate: (obj: any) => {
-        if (obj && typeof obj.explanation === 'string') return obj;
-        if (obj && typeof obj.response === 'string') return { explanation: obj.response };
-        throw new Error('Invalid response format');
+        if (obj && typeof obj.explanation === 'string' && obj.explanation.trim()) {
+          return obj;
+        }
+        if (obj && typeof obj.response === 'string' && obj.response.trim()) {
+          return { explanation: obj.response };
+        }
+        // Fallback for empty or malformed responses
+        return { 
+          explanation: `This transaction was routed to ${targetEnvelope?.name || 'the default envelope'} ${matchedRule ? 'based on your routing rules' : 'as no specific rules matched'}.` 
+        };
       },
     });
 
@@ -261,12 +288,28 @@ Provide a brief, friendly explanation (2–3 sentences). Return JSON only.`;
       explanation: result.explanation,
       reason,
     });
-  } catch (error) {
+  } catch (error: any) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: 'Validation failed', details: error.errors });
     }
+    
     logger.error({ err: error }, 'Error explaining routing');
-    res.status(500).json({ error: 'AI service unavailable' });
+    
+    // Provide a helpful fallback response with the routing decision
+    if (error?.code === 'NO_KEY') {
+      return res.status(503).json({
+        error: 'AI service not configured',
+        message: 'Please set OPENAI_API_KEY in Replit Secrets',
+      });
+    }
+    
+    // Still return the routing result even if AI explanation fails
+    res.json({
+      envelope: targetEnvelope,
+      rule: matchedRule,
+      explanation: `Transaction routed to ${targetEnvelope?.name || 'default envelope'} ${matchedRule ? 'based on your routing rules' : 'as no specific rules matched'}.`,
+      reason,
+    });
   }
 });
 
