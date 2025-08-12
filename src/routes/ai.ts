@@ -124,18 +124,47 @@ router.post('/coach', async (req: any, res) => {
       balanceCents: e.balanceCents,
     }));
 
-    // Calculate analytics
-    const totalBalance = envelopeContext.reduce((sum, env) => sum + env.balanceCents, 0);
-    const totalSpent = envelopeContext.reduce((sum, env) => sum + parseFloat(env.spentThisMonth), 0);
-    const avgSpendingPerEnvelope = totalSpent / envelopeContext.length;
+    // Calculate analytics with null checks
+    const totalBalance = envelopeContext.length > 0 
+      ? envelopeContext.reduce((sum, env) => sum + env.balanceCents, 0)
+      : 0;
+    const totalSpent = envelopeContext.length > 0 
+      ? envelopeContext.reduce((sum, env) => sum + parseFloat(env.spentThisMonth), 0)
+      : 0;
+    const avgSpendingPerEnvelope = envelopeContext.length > 0 ? totalSpent / envelopeContext.length : 0;
 
-    // Find highest/lowest spending categories
-    const highestSpendingEnv = envelopeContext.reduce((max, env) => 
-      parseFloat(env.spentThisMonth) > parseFloat(max.spentThisMonth) ? env : max
-    );
-    const lowestBalanceEnv = envelopeContext.reduce((min, env) => 
-      env.balanceCents < min.balanceCents ? env : min
-    );
+    // Find highest/lowest spending categories with defaults
+    const highestSpendingEnv = envelopeContext.length > 0 
+      ? envelopeContext.reduce((max, env) => 
+          parseFloat(env.spentThisMonth) > parseFloat(max.spentThisMonth) ? env : max
+        )
+      : { name: 'No envelopes', spentThisMonth: '0.00', balanceCents: 0, balance: '0.00' };
+    
+    const lowestBalanceEnv = envelopeContext.length > 0 
+      ? envelopeContext.reduce((min, env) => 
+          env.balanceCents < min.balanceCents ? env : min
+        )
+      : { name: 'No envelopes', balance: '0.00', balanceCents: 0 };
+
+    // Handle new users with no envelopes
+    if (envelopeContext.length === 0) {
+      return res.json({
+        response: "Welcome! I see you don't have any envelopes set up yet. To help you with budgeting advice, you'll need to create some spending categories first. I recommend starting with these essential envelopes: Groceries ($200-400), Bills ($500-1000), Dining ($100-200), Gas ($100-200), and Emergency Buffer ($200-500). Would you like me to help you set up a complete envelope system based on your budget?",
+        suggestedActions: [{
+          type: 'create_envelope_setup',
+          description: 'Set up basic envelope structure',
+          params: { suggestedCategories: ['Groceries', 'Bills', 'Dining', 'Gas', 'Emergency'] }
+        }],
+        analytics: { 
+          totalBalance: '0.00', 
+          totalSpent: '0.00', 
+          envelopeCount: 0,
+          needsSetup: true 
+        },
+        isNewUser: true,
+        processingTime: 'Instant - Setup Required'
+      });
+    }
 
     const systemPrompt = `You are an expert financial advisor for an envelope budgeting system. Analyze this specific situation and provide actionable advice with concrete numbers and steps.
 
@@ -148,7 +177,7 @@ ENVELOPE BREAKDOWN:
 ${envelopeContext.map(e => `• ${e.name}: $${e.balance} available (spent $${e.spentThisMonth} this month)`).join('\n')}
 
 SPENDING INSIGHTS:
-• Highest spending: ${highestSpendingEnv.name} ($${highestSpendingEnv.spentThisMonth})
+• Highest spending: ${highestSpendingEnv.name} ($${highestSpendingEnv.spentThisMonth || '0.00'})
 • Lowest balance: ${lowestBalanceEnv.name} ($${lowestBalanceEnv.balance})
 • Average per category: $${avgSpendingPerEnvelope.toFixed(2)}
 
@@ -220,8 +249,10 @@ Be conversational but specific. Reference their actual envelope names and balanc
       // Analyze user's actual financial state for smarter recommendations
       const hasLowBalances = envelopeContext.filter(env => env.balanceCents < 2000).length;
       const hasHighBalances = envelopeContext.filter(env => env.balanceCents > 10000);
-      const totalSpentThisMonth = envelopeContext.reduce((sum, env) => sum + parseFloat(env.spentThisMonth), 0);
-      const avgBalance = totalBalance / 100 / envelopeContext.length;
+      const totalSpentThisMonth = envelopeContext.length > 0 
+        ? envelopeContext.reduce((sum, env) => sum + parseFloat(env.spentThisMonth), 0)
+        : 0;
+      const avgBalance = envelopeContext.length > 0 ? totalBalance / 100 / envelopeContext.length : 0;
 
       if (questionLower.includes('raise') || questionLower.includes('income') || questionLower.includes('money')) {
         // Handle income/raise questions
