@@ -60,7 +60,7 @@ const toDollars = (cents: number | null | undefined) =>
   typeof cents === 'number' ? (cents / 100).toFixed(2) : '0.00';
 
 /**
- * AI budgeting coach
+ * AI budgeting coach with envelope management capabilities
  */
 router.post('/coach', async (req: any, res) => {
   try {
@@ -72,88 +72,152 @@ router.post('/coach', async (req: any, res) => {
 
     const { question, context } = AICoachRequestSchema.parse(req.body);
 
-    // Envelopes (valid fields per Prisma schema)
-    const envelopes = await db.envelope.findMany({
-      where: { userId: req.user.id },
-      select: {
-        name: true,
-        icon: true,
-        color: true,
-        balanceCents: true,
-        spentThisMonth: true,
-      },
-    });
+    // Get comprehensive user data
+    const [envelopes, recentTransactions, transfers] = await Promise.all([
+      db.envelope.findMany({
+        where: { userId: req.user.id },
+        select: {
+          id: true,
+          name: true,
+          icon: true,
+          color: true,
+          balanceCents: true,
+          spentThisMonth: true,
+          order: true,
+        },
+        orderBy: { order: 'asc' },
+      }),
+      db.transaction.findMany({
+        where: { userId: req.user.id },
+        take: 10,
+        orderBy: { createdAt: 'desc' },
+        select: {
+          amountCents: true,
+          merchant: true,
+          mcc: true,
+          location: true,
+          envelope: { select: { name: true } },
+          createdAt: true,
+        },
+      }),
+      db.transfer.findMany({
+        where: { userId: req.user.id },
+        take: 5,
+        orderBy: { createdAt: 'desc' },
+        select: {
+          amountCents: true,
+          note: true,
+          fromEnvelope: { select: { name: true } },
+          toEnvelope: { select: { name: true } },
+          createdAt: true,
+        },
+      }),
+    ]);
 
     const envelopeContext = envelopes.map((e) => ({
+      id: e.id,
       name: e.name,
       icon: e.icon,
       color: e.color,
       balance: toDollars(e.balanceCents),
       spentThisMonth: toDollars(e.spentThisMonth),
+      balanceCents: e.balanceCents,
     }));
 
-    // Get recent transactions for context
-    const recentTransactions = await db.transaction.findMany({
-      where: { userId: req.user.id },
-      take: 5,
-      orderBy: { createdAt: 'desc' },
-      select: {
-        amountCents: true,
-        merchant: true,
-        mcc: true,
-        location: true,
-      },
-    });
-
-    const txContext = recentTransactions.map(t => ({
-      amount: toDollars(t.amountCents),
-      merchant: t.merchant,
-      mcc: t.mcc,
-      location: t.location,
-    }));
-
-    // Calculate total available balance
-    const totalBalance = envelopeContext.reduce((sum, env) => sum + parseFloat(env.balance), 0);
+    // Calculate analytics
+    const totalBalance = envelopeContext.reduce((sum, env) => sum + env.balanceCents, 0);
     const totalSpent = envelopeContext.reduce((sum, env) => sum + parseFloat(env.spentThisMonth), 0);
+    const avgSpendingPerEnvelope = totalSpent / envelopeContext.length;
+    
+    // Find highest/lowest spending categories
+    const highestSpendingEnv = envelopeContext.reduce((max, env) => 
+      parseFloat(env.spentThisMonth) > parseFloat(max.spentThisMonth) ? env : max
+    );
+    const lowestBalanceEnv = envelopeContext.reduce((min, env) => 
+      env.balanceCents < min.balanceCents ? env : min
+    );
 
-    const systemPrompt = `You are a knowledgeable financial coach for an envelope budgeting app. The user has $${totalBalance.toFixed(2)} total across their envelopes and has spent $${totalSpent.toFixed(2)} this month.
+    const systemPrompt = `You are an expert financial advisor for an envelope budgeting system. Analyze the user's financial situation and provide specific, actionable advice.
 
-Current envelope balances:
-${envelopeContext.map(e => `• ${e.name}: $${e.balance} (spent $${e.spentThisMonth} this month)`).join('\n')}
+CURRENT FINANCIAL STATE:
+Total Balance: $${toDollars(totalBalance)}
+Total Spent This Month: $${totalSpent.toFixed(2)}
+Number of Envelopes: ${envelopeContext.length}
 
-Recent spending patterns:
-${txContext.map(t => `• $${t.amount} at ${t.merchant || 'Unknown'}`).join('\n')}
+ENVELOPE BREAKDOWN:
+${envelopeContext.map(e => `• ${e.name}: $${e.balance} available (spent $${e.spentThisMonth} this month)`).join('\n')}
 
-${context ? `Additional context: ${JSON.stringify(context, null, 2)}` : ''}
+SPENDING INSIGHTS:
+• Highest spending category: ${highestSpendingEnv.name} ($${highestSpendingEnv.spentThisMonth})
+• Lowest balance envelope: ${lowestBalanceEnv.name} ($${lowestBalanceEnv.balance})
+• Average spending per category: $${avgSpendingPerEnvelope.toFixed(2)}
 
-Provide specific, actionable budgeting advice based on their actual data. Focus on practical recommendations for allocation, spending patterns, and envelope management. Be encouraging but realistic. Return your response in JSON format with an "advice" field.`;
+RECENT ACTIVITY:
+${recentTransactions.slice(0, 5).map(t => `• $${toDollars(Math.abs(t.amountCents))} at ${t.merchant || 'Unknown'} → ${t.envelope?.name || 'Unassigned'}`).join('\n')}
+
+CAPABILITIES I CAN HELP WITH:
+1. Transfer money between envelopes
+2. Create new envelopes (max 8 total)
+3. Analyze spending patterns
+4. Suggest budget rebalancing
+5. Emergency fund planning
+
+USER QUESTION: "${question}"
+
+Respond with specific, actionable advice. If the user needs money moved between envelopes or new envelopes created, include those recommendations. Return JSON with:
+- "advice": detailed financial advice
+- "actions": array of suggested actions (if any), each with "type", "description", and "params"
+
+Example actions:
+- {"type": "transfer", "description": "Move $200 from Bills to Groceries", "params": {"fromEnvelope": "Bills", "toEnvelope": "Groceries", "amount": 200}}
+- {"type": "create_envelope", "description": "Create Emergency Fund", "params": {"name": "Emergency Fund", "initialAmount": 500, "icon": "shield", "color": "red"}}`;
 
     const result = await chatJSON({
       system: systemPrompt,
       user: question,
       schemaName: 'coachResponse',
-      temperature: 0.3,
+      temperature: 0.4,
       validate: (obj: any) => {
-        // More flexible validation for different response formats
         if (obj && typeof obj === 'object') {
           const advice = obj.advice || obj.response || obj.recommendation || obj.suggestion;
+          const actions = obj.actions || obj.suggestions || obj.recommendations || [];
+          
           if (typeof advice === 'string' && advice.trim()) {
-            return { advice: advice.trim() };
-          }
-          // If obj has any string value, use it
-          const firstStringValue = Object.values(obj).find(val => typeof val === 'string' && val.trim());
-          if (firstStringValue) {
-            return { advice: firstStringValue };
+            return { 
+              advice: advice.trim(),
+              actions: Array.isArray(actions) ? actions : []
+            };
           }
         }
-        // Enhanced fallback with user's data
+        
+        // Enhanced fallback with specific advice based on user's situation
+        let specificAdvice = '';
+        if (lowestBalanceEnv.balanceCents < 1000) {
+          specificAdvice = `Your ${lowestBalanceEnv.name} envelope is running low ($${lowestBalanceEnv.balance}). `;
+        }
+        if (parseFloat(highestSpendingEnv.spentThisMonth) > avgSpendingPerEnvelope * 1.5) {
+          specificAdvice += `You've been spending heavily in ${highestSpendingEnv.name} this month ($${highestSpendingEnv.spentThisMonth}). `;
+        }
+        specificAdvice += `Consider rebalancing your ${envelopeContext.length} envelopes based on your actual spending patterns.`;
+        
         return { 
-          advice: `Based on your current balance of $${totalBalance.toFixed(2)} across ${envelopeContext.length} envelopes, I'd recommend reviewing your spending in categories where you've used the most this month. Your ${envelopeContext.find(e => parseFloat(e.spentThisMonth) === Math.max(...envelopeContext.map(env => parseFloat(env.spentThisMonth))))?.name || 'highest spending'} category might need attention.`
+          advice: specificAdvice || `Based on your $${toDollars(totalBalance)} across ${envelopeContext.length} envelopes, your budget looks balanced. Keep monitoring your spending patterns.`,
+          actions: []
         };
       },
     });
 
-    res.json({ response: result.advice });
+    res.json({ 
+      response: result.advice,
+      suggestedActions: result.actions || [],
+      analytics: {
+        totalBalance: toDollars(totalBalance),
+        totalSpent: totalSpent.toFixed(2),
+        envelopeCount: envelopeContext.length,
+        highestSpending: highestSpendingEnv.name,
+        lowestBalance: lowestBalanceEnv.name,
+      }
+    });
   } catch (error: any) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: 'Validation failed', details: error.errors });
@@ -161,7 +225,6 @@ Provide specific, actionable budgeting advice based on their actual data. Focus 
     
     logger.error({ err: error }, 'Error in AI coach');
     
-    // Provide a helpful fallback response
     if (error?.code === 'NO_KEY') {
       return res.status(503).json({
         error: 'AI service not configured',
@@ -276,7 +339,14 @@ router.post('/explain-routing', async (req: any, res) => {
       },
       rule: matchedRule,
       explanation,
-      alternativeEnvelopes: envelopes.filter(e => e.id !== targetEnvelope.id),
+      confidence: matchedRule ? 85 : 45, // Higher confidence when rule matched
+      amount: toDollars(Math.abs(Number(transactionData.amountCents || 0))),
+      merchant: transactionData.merchant || 'Unknown Merchant',
+      alternativeEnvelopes: envelopes.filter(e => e.id !== targetEnvelope.id).map(e => ({
+        ...e,
+        availableBalance: toDollars(e.balanceCents || 0)
+      })),
+      canAfford: (targetEnvelope.balanceCents || 0) >= Math.abs(Number(transactionData.amountCents || 0)),
     });
   } catch (error: any) {
     if (error instanceof z.ZodError) {
@@ -285,6 +355,313 @@ router.post('/explain-routing', async (req: any, res) => {
     
     logger.error({ err: error }, 'Error explaining routing');
     res.status(500).json({ error: 'Failed to process routing explanation' });
+  }
+});
+
+/**
+ * AI-powered envelope setup for new users
+ */
+router.post('/setup-envelopes', async (req: any, res) => {
+  try {
+    if (!isAIEnabled()) {
+      return res.status(503).json({ error: 'AI service not available' });
+    }
+
+    const { totalBudget, goals, lifestyle } = req.body;
+    
+    if (!totalBudget || totalBudget <= 0) {
+      return res.status(400).json({ error: 'Valid total budget required' });
+    }
+
+    // Check current envelope count
+    const existingCount = await db.envelope.count({ where: { userId: req.user.id } });
+    if (existingCount >= 8) {
+      return res.status(400).json({ error: 'Maximum 8 envelopes allowed' });
+    }
+
+    const systemPrompt = `You are a financial advisor setting up envelope budgets. The user has $${totalBudget} to allocate across envelopes.
+
+USER PROFILE:
+- Total Budget: $${totalBudget}
+- Goals: ${goals || 'Not specified'}
+- Lifestyle: ${lifestyle || 'Not specified'}
+- Current Envelopes: ${existingCount}
+- Max Envelopes: 8
+
+Create an optimal envelope structure. Consider:
+1. Essential categories (housing, utilities, groceries, transportation)
+2. Lifestyle categories (dining, entertainment)
+3. Savings/emergency fund
+4. User's specific goals
+
+Return JSON with "envelopes" array, each containing:
+- "name": clear category name
+- "percentage": % of total budget (all must sum to 100)
+- "description": why this amount/category
+- "icon": one of [cart, utensils, home, car, fuel, shield, heart, bank, gift, phone]
+- "color": one of [blue, green, amber, red, purple, teal, pink, gray]
+
+Also include "rationale" explaining the allocation strategy.`;
+
+    const result = await chatJSON({
+      system: systemPrompt,
+      user: `Set up my envelopes with $${totalBudget} budget. Goals: ${goals || 'general budgeting'}. Lifestyle: ${lifestyle || 'moderate'}`,
+      schemaName: 'envelopeSetup',
+      temperature: 0.3,
+      validate: (obj: any) => {
+        if (obj?.envelopes && Array.isArray(obj.envelopes) && obj.envelopes.length > 0) {
+          const totalPercentage = obj.envelopes.reduce((sum: number, env: any) => sum + (env.percentage || 0), 0);
+          if (Math.abs(totalPercentage - 100) < 5) { // Allow 5% tolerance
+            return obj;
+          }
+        }
+        
+        // Fallback envelope structure
+        return {
+          envelopes: [
+            { name: 'Groceries', percentage: 25, description: 'Food and household essentials', icon: 'cart', color: 'green' },
+            { name: 'Bills', percentage: 30, description: 'Utilities and fixed expenses', icon: 'home', color: 'blue' },
+            { name: 'Dining', percentage: 15, description: 'Restaurants and takeout', icon: 'utensils', color: 'amber' },
+            { name: 'Gas', percentage: 10, description: 'Transportation fuel', icon: 'fuel', color: 'teal' },
+            { name: 'Emergency', percentage: 20, description: 'Emergency savings buffer', icon: 'shield', color: 'red' }
+          ],
+          rationale: 'Balanced allocation focusing on essentials with emergency savings'
+        };
+      },
+    });
+
+    res.json({
+      proposedEnvelopes: result.envelopes.map((env: any) => ({
+        ...env,
+        allocatedAmount: Math.round((totalBudget * env.percentage) / 100 * 100) / 100
+      })),
+      rationale: result.rationale,
+      totalBudget,
+      needsApproval: true
+    });
+  } catch (error: any) {
+    logger.error({ err: error }, 'Error in AI envelope setup');
+    res.status(500).json({ error: 'Failed to generate envelope setup' });
+  }
+});
+
+/**
+ * Execute AI-suggested actions (transfers, envelope creation)
+ */
+router.post('/execute-action', async (req: any, res) => {
+  try {
+    const { actionType, params, approved } = req.body;
+    
+    if (!approved) {
+      return res.status(400).json({ error: 'Action not approved' });
+    }
+
+    switch (actionType) {
+      case 'transfer': {
+        const { fromEnvelope, toEnvelope, amount } = params;
+        const amountCents = Math.round(amount * 100);
+
+        const [fromEnv, toEnv] = await Promise.all([
+          db.envelope.findFirst({ where: { userId: req.user.id, name: fromEnvelope } }),
+          db.envelope.findFirst({ where: { userId: req.user.id, name: toEnvelope } })
+        ]);
+
+        if (!fromEnv || !toEnv) {
+          return res.status(404).json({ error: 'Envelope not found' });
+        }
+
+        if (fromEnv.balanceCents < amountCents) {
+          return res.status(400).json({ error: 'Insufficient funds' });
+        }
+
+        const transfer = await db.$transaction(async (tx) => {
+          await tx.envelope.update({
+            where: { id: fromEnv.id },
+            data: { balanceCents: { decrement: amountCents } }
+          });
+          
+          await tx.envelope.update({
+            where: { id: toEnv.id },
+            data: { balanceCents: { increment: amountCents } }
+          });
+          
+          return tx.transfer.create({
+            data: {
+              userId: req.user.id,
+              fromId: fromEnv.id,
+              toId: toEnv.id,
+              amountCents,
+              note: `AI Coach suggestion: Move $${amount} from ${fromEnvelope} to ${toEnvelope}`
+            }
+          });
+        });
+
+        res.json({ success: true, transfer, message: `Transferred $${amount} from ${fromEnvelope} to ${toEnvelope}` });
+        break;
+      }
+
+      case 'create_envelope': {
+        const { name, initialAmount, icon, color } = params;
+        const amountCents = Math.round((initialAmount || 0) * 100);
+
+        const envelopeCount = await db.envelope.count({ where: { userId: req.user.id } });
+        if (envelopeCount >= 8) {
+          return res.status(400).json({ error: 'Maximum 8 envelopes allowed' });
+        }
+
+        const envelope = await db.envelope.create({
+          data: {
+            userId: req.user.id,
+            name,
+            balanceCents: amountCents,
+            icon: icon || 'dots',
+            color: color || 'gray',
+            order: envelopeCount + 1
+          }
+        });
+
+        res.json({ success: true, envelope, message: `Created ${name} envelope with $${initialAmount || 0}` });
+        break;
+      }
+
+      case 'create_envelopes_batch': {
+        const { envelopes, totalBudget } = params;
+        const envelopeCount = await db.envelope.count({ where: { userId: req.user.id } });
+        
+        if (envelopeCount + envelopes.length > 8) {
+          return res.status(400).json({ error: 'Would exceed maximum 8 envelopes' });
+        }
+
+        const created = await db.$transaction(async (tx) => {
+          const results = [];
+          for (let i = 0; i < envelopes.length; i++) {
+            const env = envelopes[i];
+            const allocatedAmount = Math.round((totalBudget * env.percentage) / 100 * 100);
+            
+            const envelope = await tx.envelope.create({
+              data: {
+                userId: req.user.id,
+                name: env.name,
+                balanceCents: allocatedAmount,
+                icon: env.icon || 'dots',
+                color: env.color || 'gray',
+                order: envelopeCount + i + 1
+              }
+            });
+            results.push(envelope);
+          }
+          return results;
+        });
+
+        res.json({ 
+          success: true, 
+          envelopes: created, 
+          message: `Created ${created.length} envelopes with total budget $${totalBudget}` 
+        });
+        break;
+      }
+
+      default:
+        res.status(400).json({ error: 'Unknown action type' });
+    }
+  } catch (error: any) {
+    logger.error({ err: error }, 'Error executing AI action');
+    res.status(500).json({ error: 'Failed to execute action' });
+  }
+});
+
+/**
+ * Get pending transactions for approval workflow
+ */
+router.get('/pending-approvals', async (req: any, res) => {
+  try {
+    const pendingTransactions = await db.transaction.findMany({
+      where: { 
+        userId: req.user.id, 
+        status: 'PENDING' 
+      },
+      include: {
+        envelope: { select: { id: true, name: true, icon: true, color: true } }
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 10
+    });
+
+    // Get alternative envelopes for each transaction
+    const allEnvelopes = await db.envelope.findMany({
+      where: { userId: req.user.id, isActive: true },
+      select: { id: true, name: true, icon: true, color: true, balanceCents: true }
+    });
+
+    const pendingWithAlternatives = pendingTransactions.map(tx => ({
+      ...tx,
+      amount: toDollars(Math.abs(tx.amountCents)),
+      assignedEnvelope: tx.envelope,
+      alternativeEnvelopes: allEnvelopes.filter(env => env.id !== tx.envelopeId)
+    }));
+
+    res.json({ pendingTransactions: pendingWithAlternatives });
+  } catch (error: any) {
+    logger.error({ err: error }, 'Error fetching pending approvals');
+    res.status(500).json({ error: 'Failed to fetch pending transactions' });
+  }
+});
+
+/**
+ * Approve or reassign pending transaction
+ */
+router.post('/approve-transaction/:id', async (req: any, res) => {
+  try {
+    const transactionId = parseInt(req.params.id);
+    const { approved, newEnvelopeId } = req.body;
+
+    const transaction = await db.transaction.findFirst({
+      where: { id: transactionId, userId: req.user.id, status: 'PENDING' },
+      include: { envelope: true }
+    });
+
+    if (!transaction) {
+      return res.status(404).json({ error: 'Pending transaction not found' });
+    }
+
+    const targetEnvelopeId = approved ? transaction.envelopeId : newEnvelopeId;
+    
+    if (!targetEnvelopeId) {
+      return res.status(400).json({ error: 'Target envelope required' });
+    }
+
+    const updatedTransaction = await db.$transaction(async (tx) => {
+      // Update transaction status and envelope if reassigned
+      const updated = await tx.transaction.update({
+        where: { id: transactionId },
+        data: { 
+          status: 'SETTLED',
+          envelopeId: targetEnvelopeId,
+          reason: approved ? transaction.reason : 'User reassigned category'
+        },
+        include: { envelope: { select: { id: true, name: true, icon: true, color: true } } }
+      });
+
+      // Deduct from envelope balance
+      await tx.envelope.update({
+        where: { id: targetEnvelopeId },
+        data: { 
+          balanceCents: { decrement: Math.abs(transaction.amountCents) },
+          spentThisMonth: { increment: Math.abs(transaction.amountCents) }
+        }
+      });
+
+      return updated;
+    });
+
+    res.json({ 
+      success: true, 
+      transaction: updatedTransaction,
+      message: approved ? 'Transaction approved' : 'Transaction reassigned and approved'
+    });
+  } catch (error: any) {
+    logger.error({ err: error }, 'Error approving transaction');
+    res.status(500).json({ error: 'Failed to approve transaction' });
   }
 });
 

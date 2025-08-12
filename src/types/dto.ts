@@ -1,4 +1,3 @@
-
 import { z } from 'zod';
 
 // Common schemas
@@ -97,11 +96,28 @@ export const AICoachRequestSchema = z.object({
 
 export const RoutingExplanationRequestSchema = z.object({
   transactionData: z.object({
-    amountCents: z.number(),
+    amountCents: z.number().optional(),
     merchant: z.string().optional(),
     mcc: z.string().optional(),
     location: z.string().optional(),
   }),
+});
+
+export const EnvelopeSetupRequestSchema = z.object({
+  totalBudget: z.number().positive(),
+  goals: z.string().optional(),
+  lifestyle: z.string().optional(),
+});
+
+export const AIActionExecutionSchema = z.object({
+  actionType: z.enum(['transfer', 'create_envelope', 'create_envelopes_batch']),
+  params: z.record(z.any()),
+  approved: z.boolean(),
+});
+
+export const TransactionApprovalSchema = z.object({
+  approved: z.boolean(),
+  newEnvelopeId: z.number().optional(),
 });
 
 // Type exports
@@ -117,3 +133,6 @@ export type UpdateRoutingConfigDTO = z.infer<typeof UpdateRoutingConfigSchema>;
 export type AICoachRequestDTO = z.infer<typeof AICoachRequestSchema>;
 export type RoutingExplanationRequestDTO = z.infer<typeof RoutingExplanationRequestSchema>;
 export type PaginationDTO = z.infer<typeof PaginationSchema>;
+export type EnvelopeSetupRequestDTO = z.infer<typeof EnvelopeSetupRequestSchema>;
+export type AIActionExecutionDTO = z.infer<typeof AIActionExecutionSchema>;
+export type TransactionApprovalDTO = z.infer<typeof TransactionApprovalSchema>;
