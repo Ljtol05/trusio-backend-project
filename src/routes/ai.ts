@@ -86,8 +86,8 @@ router.post('/explain-routing', async (req: any, res) => {
     }
     
     // Get user's routing rules for context
-    const rules = await db.routingRule.findMany({
-      where: { userId: req.user.id, isActive: true },
+    const rules = await db.rule.findMany({
+      where: { userId: req.user.id, enabled: true },
       include: { envelope: { select: { name: true } } },
       orderBy: { priority: 'asc' },
     });
