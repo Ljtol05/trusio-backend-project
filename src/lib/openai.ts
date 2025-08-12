@@ -89,7 +89,7 @@ export async function openaiPing(model = MODELS.primary) {
   try {
     const payload: OpenAI.Chat.Completions.ChatCompletionCreateParams = {
       model,
-      messages: [{ role: "user", content: 'reply with {"ok":true}' }],
+      messages: [{ role: "user", content: 'Reply with JSON format: {"ok":true}' }],
       response_format: { type: "json_object" },
       // don't set temperature here
     };
