@@ -1,78 +1,78 @@
-
 import { Router } from 'express';
 import { z } from 'zod';
 import { db } from '../lib/db.js';
 import { logger } from '../lib/logger.js';
 import { requireAuth } from './auth.js';
 import { chatJSON, isAIEnabled } from '../lib/openai.js';
-import { AICoachRequestSchema, RoutingExplanationRequestSchema } from '../types/dto.js';
+import {
+  AICoachRequestSchema,
+  RoutingExplanationRequestSchema,
+} from '../types/dto.js';
 
 const router = Router();
 
-// Health check endpoint (no auth required for testing)
-router.get('/health', async (req, res) => {
+/**
+ * Health check (no auth) – pings OpenAI with a tiny JSON response.
+ */
+router.get('/health', async (_req, res) => {
   try {
     const { openaiPing } = await import('../lib/openai.js');
     const result = await openaiPing();
-    
-    res.json({
-      openai: result,
-      timestamp: new Date().toISOString(),
-    });
+    res.json({ openai: result, timestamp: new Date().toISOString() });
   } catch (error) {
-    res.status(500).json({
-      error: 'OpenAI health check failed',
-      details: error instanceof Error ? error.message : 'Unknown error'
-    });
+    res
+      .status(500)
+      .json({ error: 'OpenAI health check failed', details: String((error as any)?.message ?? error) });
   }
 });
 
-// Simple test endpoint (no auth required for testing)
+/**
+ * Simple test (no auth) – calls chatJSON and expects a JSON object back.
+ */
 router.post('/test', async (req, res) => {
   try {
-    const { prompt = "Say hello in JSON format" } = req.body;
-    
+    const { prompt = 'Say hello in JSON format' } = req.body ?? {};
     const result = await chatJSON({
       user: prompt,
-      schemaName: "testResponse",
-      temperature: 0.1
+      schemaName: 'testResponse',
+      temperature: 0.1,
     });
-    
-    res.json({
-      success: true,
-      result,
-      timestamp: new Date().toISOString(),
-    });
+    res.json({ success: true, result, timestamp: new Date().toISOString() });
   } catch (error: any) {
-    if (error.code === 'NO_KEY') {
+    if (error?.code === 'NO_KEY') {
       return res.status(503).json({
         error: 'OpenAI API key not configured',
-        message: 'Please set OPENAI_API_KEY in Replit Secrets'
+        message: 'Please set OPENAI_API_KEY in Replit Secrets',
       });
     }
-    
-    res.status(500).json({
-      error: 'OpenAI test failed',
-      details: error.message || 'Unknown error'
-    });
+    res
+      .status(500)
+      .json({ error: 'OpenAI test failed', details: error?.message ?? 'Unknown error' });
   }
 });
 
 router.use(requireAuth);
 
-// AI coach endpoint
+/**
+ * Helper: cents → "12.34"
+ */
+const toDollars = (cents: number | null | undefined) =>
+  typeof cents === 'number' ? (cents / 100).toFixed(2) : '0.00';
+
+/**
+ * AI budgeting coach
+ */
 router.post('/coach', async (req: any, res) => {
   try {
     if (!isAIEnabled()) {
-      return res.status(503).json({
-        error: 'AI service not available',
-        message: 'OpenAI API key not configured'
-      });
+      return res
+        .status(503)
+        .json({ error: 'AI service not available', message: 'OpenAI API key not configured' });
     }
 
     const { question, context } = AICoachRequestSchema.parse(req.body);
 
-    // Get envelopes with correct field names
+    // Envelopes (valid fields per Prisma schema)
     const envelopes = await db.envelope.findMany({
       where: { userId: req.user.id },
       select: {
@@ -84,12 +84,7 @@ router.post('/coach', async (req: any, res) => {
       },
     });
 
-    // Helper to convert cents to dollars
-    const toDollars = (cents: number | null) =>
-      typeof cents === "number" ? (cents / 100).toFixed(2) : "0.00";
-
-    // Context for envelopes
-    const envelopeContext = envelopes.map(e => ({
+    const envelopeContext = envelopes.map((e) => ({
       name: e.name,
       icon: e.icon,
       color: e.color,
@@ -97,34 +92,42 @@ router.post('/coach', async (req: any, res) => {
       spentThisMonth: toDollars(e.spentThisMonth),
     }));
 
-    // Get recent transactions with correct field names
+    // Get recent transactions for context
     const recentTransactions = await db.transaction.findMany({
-      where: { userId: req.user.id },
+      where: { userId: req. user.id },
       take: 5,
-      orderBy: { createdAt: "desc" },
-      select: { amountCents: true, description: true, merchantName: true },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        amountCents: true,
+        merchant: true,
+        mcc: true,
+        location: true,
+      },
     });
 
     const txContext = recentTransactions.map(t => ({
       amount: toDollars(t.amountCents),
-      description: t.description,
-      merchant: t.merchantName,
+      merchant: t.merchant,
+      mcc: t.mcc,
+      location: t.location,
     }));
 
     const systemPrompt = `You are a helpful financial coach for an envelope budgeting app.
 The user has these envelopes: ${JSON.stringify(envelopeContext, null, 2)}
 Recent transactions: ${JSON.stringify(txContext, null, 2)}
+${context ? `User-provided context: ${JSON.stringify(context, null, 2)}` : ''}
 
-Provide helpful, actionable advice about budgeting and spending habits. Keep responses concise and practical.`;
+Provide practical, actionable advice about budgeting and spending habits. Keep responses concise. Return JSON only.`;
 
     const result = await chatJSON({
       system: systemPrompt,
       user: question,
-      schemaName: "coachResponse",
+      schemaName: 'coachResponse',
       validate: (obj: any) => {
-        if (obj && typeof obj.advice === "string") return obj;
-        if (obj && typeof obj.response === "string") return { advice: obj.response };
-        throw new Error("Invalid response format");
+        // Accept either { advice } or { response } and normalize
+        if (obj && typeof obj.advice === 'string') return obj;
+        if (obj && typeof obj.response === 'string') return { advice: obj.response };
+        throw new Error('Invalid response format');
       },
     });
 
@@ -133,45 +136,44 @@ Provide helpful, actionable advice about budgeting and spending habits. Keep res
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: 'Validation failed', details: error.errors });
     }
-    logger.error(error, 'Error in AI coach');
+    logger.error({ err: error }, 'Error in AI coach');
     res.status(500).json({ error: 'AI service unavailable' });
   }
 });
 
-// Auto-routing explanation endpoint
+/**
+ * Auto-routing explanation
+ */
 router.post('/explain-routing', async (req: any, res) => {
   try {
     if (!isAIEnabled()) {
-      return res.status(503).json({
-        error: 'AI service not available',
-        message: 'OpenAI API key not configured'
-      });
+      return res
+        .status(503)
+        .json({ error: 'AI service not available', message: 'OpenAI API key not configured' });
     }
 
     const { transactionData } = RoutingExplanationRequestSchema.parse(req.body);
 
-    // Get user's routing rules for context
+    // Rules and envelopes for the current user
     const rules = await db.rule.findMany({
       where: { userId: req.user.id, enabled: true },
       orderBy: { priority: 'asc' },
-      include: { envelope: true }
+      include: { envelope: true },
     });
 
-    // Get user's envelopes
     const envelopes = await db.envelope.findMany({
-      where: { userId: req.user.id, isActive: true }
+      where: { userId: req.user.id, isActive: true },
     });
 
     if (envelopes.length === 0) {
       return res.status(404).json({ error: 'No active envelopes found' });
     }
 
-    // Find the best matching rule or use default routing logic
-    let matchedRule = null;
-    let targetEnvelope = null;
+    // Match rule
+    let matchedRule: any = null;
+    let targetEnvelope: any = null;
     let reason = 'Default routing - no specific rule matched';
 
-    // Check rules in priority order
     for (const rule of rules) {
       let matches = true;
 
@@ -179,36 +181,46 @@ router.post('/explain-routing', async (req: any, res) => {
         matches = false;
       }
 
-      if (rule.merchant && transactionData.merchant &&
-          !transactionData.merchant.toLowerCase().includes(rule.merchant.toLowerCase())) {
+      if (
+        rule.merchant &&
+        transactionData.merchant &&
+        !transactionData.merchant.toLowerCase().includes(rule.merchant.toLowerCase())
+      ) {
         matches = false;
       }
 
-      if (rule.geofence && transactionData.location &&
-          !transactionData.location.toLowerCase().includes(rule.geofence.toLowerCase())) {
+      if (
+        rule.geofence &&
+        transactionData.location &&
+        !transactionData.location.toLowerCase().includes(rule.geofence.toLowerCase())
+      ) {
         matches = false;
       }
 
       if (matches && rule.envelope) {
         matchedRule = rule;
         targetEnvelope = rule.envelope;
-        reason = `Matched rule: ${rule.mcc ? `MCC ${rule.mcc}` : ''}${rule.merchant ? ` Merchant "${rule.merchant}"` : ''}${rule.geofence ? ` Location "${rule.geofence}"` : ''}`;
+        reason = `Matched rule: ${[
+          rule.mcc ? `MCC ${rule.mcc}` : '',
+          rule.merchant ? `Merchant "${rule.merchant}"` : '',
+          rule.geofence ? `Location "${rule.geofence}"` : '',
+        ]
+          .filter(Boolean)
+          .join(' ')}`;
         break;
       }
     }
 
-    // If no rule matched, use the first available envelope
     if (!targetEnvelope) {
       targetEnvelope = envelopes[0];
       reason = 'No matching rule found, using default envelope';
     }
 
-    // Create AI explanation
     const systemPrompt = `You are a financial advisor explaining why a transaction was routed to a specific envelope in a budgeting app.
 
 Transaction details:
 - Merchant: ${transactionData.merchant || 'Unknown'}
-- Amount: $${Math.abs(transactionData.amountCents) / 100}
+- Amount: $${Math.abs(Number(transactionData.amountCents || 0)) / 100}
 - MCC: ${transactionData.mcc || 'Unknown'}
 - Location: ${transactionData.location || 'Unknown'}
 
@@ -217,19 +229,30 @@ Routing result:
 - Rule matched: ${matchedRule ? 'Yes' : 'No'}
 - Reason: ${reason}
 
-Available rules: ${rules.map(r => `Priority ${r.priority}: ${r.mcc ? `MCC ${r.mcc}` : ''}${r.merchant ? ` "${r.merchant}"` : ''}${r.geofence ? ` at "${r.geofence}"` : ''} → ${r.envelope?.name || 'Unknown'}`).join(', ')}
+Available rules: ${rules
+      .map(
+        (r) =>
+          `Priority ${r.priority}: ${[
+            r.mcc ? `MCC ${r.mcc}` : '',
+            r.merchant ? `"${r.merchant}"` : '',
+            r.geofence ? `at "${r.geofence}"` : '',
+          ]
+            .filter(Boolean)
+            .join(' ')} → ${r.envelope?.name || 'Unknown'}`
+      )
+      .join(', ')}
 
-Provide a brief, friendly explanation (2-3 sentences) of why this transaction was routed to this envelope.`;
+Provide a brief, friendly explanation (2–3 sentences). Return JSON only.`;
 
     const result = await chatJSON({
       system: systemPrompt,
       user: 'Please explain this routing decision.',
-      schemaName: "explanationResponse",
+      schemaName: 'explanationResponse',
       validate: (obj: any) => {
         if (obj && typeof obj.explanation === 'string') return obj;
         if (obj && typeof obj.response === 'string') return { explanation: obj.response };
         throw new Error('Invalid response format');
-      }
+      },
     });
 
     res.json({
@@ -242,7 +265,7 @@ Provide a brief, friendly explanation (2-3 sentences) of why this transaction wa
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: 'Validation failed', details: error.errors });
     }
-    logger.error(error, 'Error explaining routing');
+    logger.error({ err: error }, 'Error explaining routing');
     res.status(500).json({ error: 'AI service unavailable' });
   }
 });
