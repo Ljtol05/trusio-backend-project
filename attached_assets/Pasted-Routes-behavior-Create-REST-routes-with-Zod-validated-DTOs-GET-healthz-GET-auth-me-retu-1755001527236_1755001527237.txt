@@ -1,0 +1,61 @@
+Routes & behavior
+Create REST routes with Zod-validated DTOs:
+	•	GET /healthz
+	•	GET /auth/me → returns the stub user { id, email } (use userId=1 style until real auth)
+	•	Envelopes
+	•	GET /envelopes → list with { id, name, balanceCents, spentThisMonth, icon, color, order }
+	•	POST /envelopes (name, startingBalanceCents)
+	•	PATCH /envelopes/:id
+	•	DELETE /envelopes/:id
+	•	Transfers
+	•	POST /transfers → { fromId?, toId?, amountCents, note? } (moving money adjusts balances; create Transfer row)
+	•	Transactions
+	•	GET /transactions?month=YYYY-MM&envelopeId=&merchant=
+	•	POST /transactions/import → array of raw items { merchant, mcc?, amountCents, postedAt, location? } → persist and auto-route using rules + spend mode; set reason
+	•	Rules
+	•	GET /rules, POST /rules, PATCH /rules/:id, DELETE /rules/:id, and POST /rules/reorder for drag-reorder
+	•	Cards
+	•	GET /cards (category cards)
+	•	POST /cards to create a new category card for an envelope (virtual only for MVP)
+	•	POST /cards/:id/wallet add/remove to wallet (boolean)
+	•	Routing / Spend mode
+	•	GET /routing/config → current RoutingConfig
+	•	PATCH /routing/config → update spendMode, lockedEnvelopeId, confidence, useGeneralPool, buffer
+	•	POST /routing/preview → input { merchant, mcc?, amountCents, location? } → returns { envelopeId, reason, confidence }
+	•	POST /routing/commit → same input + commit transaction into chosen envelope
+	•	Events (SSE)
+	•	GET /events → push { type: "balances", totalAvailableCents, perEnvelope: [...] } on changes (e.g., transfer/import)
+	•	AI
+	•	POST /ai/coach → body { goal?: string, constraints?: string[], months?: number } → returns suggested envelope allocations, monthly plan, risk notes.
+	•	POST /ai/explain-route → body { merchant, mcc?, amountCents, location? } → returns a friendly explanation for “reason chips”.
+
+OpenAI usage
+	•	Put SDK wrapper in /src/lib/openai.ts.
+	•	Default model: gpt-4o-mini for cost-effective structured text.
+	•	Use JSON-style structured output (Zod inference) for coach and explain-route.
+
+Validation & DTOs
+Create Zod DTOs in /src/types/dto.ts for:
+	•	EnvelopeDTO, TransferDTO, RuleDTO, RoutingConfigDTO, TransactionDTO, and request bodies for each route.
+
+Server
+	•	server.ts sets up Express, JSON, CORS, /healthz, mounts all routers under /api.
+	•	Add error middleware that returns Zod issues cleanly.
+	•	Export OpenAPI file (openapi.yaml) from the Zod schemas if feasible (optional nice-to-have).
+
+Scripts
+	•	npm run prisma:generate
+	•	npm run prisma:migrate -- --name init
+	•	npm run prisma:seed
+	•	npm run dev (ts-node-dev or nodemon + tsconfig)
+	•	npm run build → emits /dist
+	•	npm run start → node dist
+
+Deliverables
+	•	Full code for all routes, lib files, Prisma schema and seed.
+	•	README with:
+	•	how to run locally (DATABASE_URL="file:./dev.db" and PRISMA_DB_PROVIDER="sqlite"),
+	•	how to flip to Postgres in prod,
+	•	how to set OPENAI_API_KEY,
+	•	curl examples for the main endpoints,
+	•	note where to plug webhooks when I integrate Plaid/issuer later.
