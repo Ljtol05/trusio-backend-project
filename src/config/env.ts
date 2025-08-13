@@ -6,6 +6,16 @@ const envSchema = z.object({
   PORT: z.string().default('5000').transform(Number),
   DATABASE_URL: z.string().optional(),
   
+  // Auth
+  JWT_SECRET: z.string().optional().default('fallback-jwt-secret-change-in-production'),
+  
+  // Email (optional for production)
+  SMTP_HOST: z.string().optional(),
+  SMTP_PORT: z.string().optional().transform(Number),
+  SMTP_USER: z.string().optional(),
+  SMTP_PASS: z.string().optional(),
+  FROM_EMAIL: z.string().optional(),
+  
   // OpenAI
   OPENAI_API_KEY: z.string().optional().default(''),
   OPENAI_PROJECT_ID: z.string().optional().default(''), 

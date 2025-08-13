@@ -1,4 +1,3 @@
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -10,17 +9,22 @@ datasource db {
 
 model User {
   id        Int      @id @default(autoincrement())
-  email     String?  @unique
+  email     String   @unique
   name      String?
+  password  String?
+  emailVerified Boolean @default(false)
+  kycApproved Boolean @default(false)
+  verificationCode String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  envelopes      Envelope[]
-  transactions   Transaction[]
-  transfers      Transfer[]
-  rules          Rule[]
-  cards          Card[]
-  routingConfig  RoutingConfig?
+  // Relations
+  envelopes    Envelope[]
+  transactions Transaction[]
+  transfers    Transfer[]
+  rules        Rule[]
+  cards        Card[]
+  routingConfig RoutingConfig?
   memories       UserMemory[]
 
   @@map("users")

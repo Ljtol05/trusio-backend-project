@@ -1,4 +1,3 @@
-
 import { logger } from './logger.js';
 
 export type KycStatus = 'not_started' | 'pending' | 'approved' | 'rejected';
@@ -42,7 +41,7 @@ export function generateProviderRef(): string {
 export function startKyc(userId: string, data: KycFormData): KycStatusResponse {
   const providerRef = generateProviderRef();
   const now = new Date();
-  
+
   const session: KycSession = {
     status: 'pending',
     providerRef,
@@ -63,7 +62,7 @@ export function startKyc(userId: string, data: KycFormData): KycStatusResponse {
 
 export function getKycStatus(userId: string): KycStatusResponse {
   const session = kycSessions.get(userId);
-  
+
   if (!session) {
     return { status: 'not_started' };
   }
@@ -81,7 +80,7 @@ export function updateKycStatusByRef(
   reason?: string
 ): boolean {
   const userId = providerRefToUserId.get(providerRef);
-  
+
   if (!userId) {
     logger.warn({ providerRef }, 'KYC webhook received for unknown providerRef');
     return false;
@@ -102,6 +101,16 @@ export function updateKycStatusByRef(
   logger.info({ userId, providerRef, decision, reason }, 'KYC status updated via webhook');
   return true;
 }
+
+export const getKycStatusByRef = (providerRef: string): (KycStatusResponse & { userId: string }) | null => {
+  for (const [userId, status] of kycSessions.entries()) {
+    if (status.providerRef === providerRef) {
+      return { ...status, userId };
+    }
+  }
+  return null;
+};
+
 
 // Optional: cleanup old sessions (can be called periodically)
 export function cleanupOldSessions(maxAgeHours: number = 24): number {

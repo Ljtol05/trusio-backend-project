@@ -57,6 +57,12 @@ router.post('/start', requireAuth, async (req, res) => {
       });
     }
 
+    // Set KYC status to pending in database
+    await db.user.update({
+      where: { id: req.user.id },
+      data: { kycApproved: false },
+    });
+
     const result = startKyc(req.user.id, validatedData);
     
     res.status(201).json(result);
@@ -99,6 +105,18 @@ router.post('/webhooks/kyc', async (req, res) => {
       return res.status(404).json({ 
         error: 'Provider reference not found' 
       });
+    }
+
+    // Update user's KYC approval status in database
+    if (payload.decision === 'approved') {
+      // Find user by provider reference and update their KYC status
+      const kycStatus = getKycStatusByRef(payload.providerRef);
+      if (kycStatus?.userId) {
+        await db.user.update({
+          where: { id: parseInt(kycStatus.userId) },
+          data: { kycApproved: true },
+        });
+      }
     }
     
     res.json({ ok: true });
