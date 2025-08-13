@@ -1,102 +1,50 @@
 
 import { Router } from 'express';
-import { z } from 'zod';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import { z } from 'zod';
 import { db } from '../lib/db.js';
-import { logger } from '../lib/logger.js';
-import { sendVerificationEmail } from '../lib/email.js';
 import { env } from '../config/env.js';
+import { sendVerificationEmail } from '../lib/email.js';
+import { logger } from '../lib/logger.js';
 
 const router = Router();
 
 // Validation schemas
-const RegisterSchema = z.object({
-  name: z.string().min(1).max(100),
-  email: z.string().email(),
-  password: z.string().min(8),
+const registerSchema = z.object({
+  name: z.string().min(1, 'Name is required'),
+  email: z.string().email('Invalid email'),
+  password: z.string().min(6, 'Password must be at least 6 characters'),
 });
 
-const LoginSchema = z.object({
-  email: z.string().email(),
-  password: z.string(),
+const loginSchema = z.object({
+  email: z.string().email('Invalid email'),
+  password: z.string().min(1, 'Password is required'),
 });
 
-const VerifyEmailSchema = z.object({
-  email: z.string().email(),
-  code: z.string().length(6),
+const verifyEmailSchema = z.object({
+  email: z.string().email('Invalid email'),
+  code: z.string().length(6, 'Verification code must be 6 digits'),
 });
 
-const ResendVerificationSchema = z.object({
-  email: z.string().email(),
+const resendVerificationSchema = z.object({
+  email: z.string().email('Invalid email'),
 });
-
-// Generate JWT token
-const generateToken = (userId: number) => {
-  return jwt.sign({ userId }, env.JWT_SECRET || 'fallback-secret', {
-    expiresIn: '7d',
-  });
-};
 
 // Generate 6-digit verification code
-const generateVerificationCode = () => {
+function generateVerificationCode(): string {
   return Math.floor(100000 + Math.random() * 900000).toString();
-};
+}
 
-// Replit Auth middleware (existing)
-export const requireAuth = async (req: any, res: any, next: any) => {
-  try {
-    const userId = req.headers['x-replit-user-id'];
-    const userName = req.headers['x-replit-user-name'];
-    const userEmail = req.headers['x-replit-user-name'] + '@replit.com';
-
-    if (!userId) {
-      // Check for JWT token as fallback
-      const token = req.headers.authorization?.replace('Bearer ', '');
-      if (token) {
-        try {
-          const decoded = jwt.verify(token, env.JWT_SECRET || 'fallback-secret') as any;
-          const user = await db.user.findUnique({ where: { id: decoded.userId } });
-          if (user) {
-            req.user = { id: user.id };
-            return next();
-          }
-        } catch (jwtError) {
-          return res.status(401).json({ error: 'Invalid token' });
-        }
-      }
-      return res.status(401).json({ error: 'Authentication required' });
-    }
-
-    // Find or create user (Replit auth)
-    let user = await db.user.findFirst({
-      where: { email: userEmail },
-    });
-
-    if (!user) {
-      user = await db.user.create({
-        data: {
-          email: userEmail,
-          name: userName,
-          emailVerified: true, // Replit auth users are pre-verified
-          kycApproved: false,
-        },
-      });
-      logger.info({ userId: user.id, email: userEmail }, 'Created new user');
-    }
-
-    req.user = { id: user.id };
-    next();
-  } catch (error) {
-    logger.error(error, 'Auth middleware error');
-    res.status(500).json({ error: 'Authentication failed' });
-  }
-};
+// Generate JWT token
+function generateToken(userId: number): string {
+  return jwt.sign({ userId }, env.JWT_SECRET, { expiresIn: '7d' });
+}
 
 // POST /api/auth/register
 router.post('/register', async (req, res) => {
   try {
-    const { name, email, password } = RegisterSchema.parse(req.body);
+    const { name, email, password } = registerSchema.parse(req.body);
 
     // Check if user already exists
     const existingUser = await db.user.findUnique({ where: { email } });
@@ -111,13 +59,12 @@ router.post('/register', async (req, res) => {
     const verificationCode = generateVerificationCode();
 
     // Create user
-    const user = await db.user.create({
+    await db.user.create({
       data: {
         name,
         email,
         password: hashedPassword,
         emailVerified: false,
-        kycApproved: false,
         verificationCode,
       },
     });
@@ -125,13 +72,13 @@ router.post('/register', async (req, res) => {
     // Send verification email
     await sendVerificationEmail(email, verificationCode);
 
-    logger.info({ userId: user.id, email }, 'User registered successfully');
+    logger.info({ email }, 'User registered, verification email sent');
     res.status(201).json({ message: 'Verification email sent.' });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ error: 'Validation failed', details: error.errors });
+      return res.status(400).json({ error: error.errors[0].message });
     }
-    logger.error({ error }, 'Registration error');
+    logger.error(error, 'Registration error');
     res.status(500).json({ error: 'Registration failed' });
   }
 });
@@ -139,17 +86,20 @@ router.post('/register', async (req, res) => {
 // POST /api/auth/verify-email
 router.post('/verify-email', async (req, res) => {
   try {
-    const { email, code } = VerifyEmailSchema.parse(req.body);
+    const { email, code } = verifyEmailSchema.parse(req.body);
 
+    // Find user
     const user = await db.user.findUnique({ where: { email } });
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
 
+    // Check if already verified
     if (user.emailVerified) {
       return res.status(400).json({ error: 'Email already verified' });
     }
 
+    // Check verification code
     if (user.verificationCode !== code) {
       return res.status(400).json({ error: 'Invalid verification code' });
     }
@@ -172,17 +122,17 @@ router.post('/verify-email', async (req, res) => {
       token,
       user: {
         id: user.id,
-        name: user.name,
         email: user.email,
+        name: user.name,
         emailVerified: true,
         kycApproved: user.kycApproved,
       }
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ error: 'Validation failed', details: error.errors });
+      return res.status(400).json({ error: error.errors[0].message });
     }
-    logger.error({ error }, 'Email verification error');
+    logger.error(error, 'Email verification error');
     res.status(500).json({ error: 'Email verification failed' });
   }
 });
@@ -190,13 +140,15 @@ router.post('/verify-email', async (req, res) => {
 // POST /api/auth/resend-verification
 router.post('/resend-verification', async (req, res) => {
   try {
-    const { email } = ResendVerificationSchema.parse(req.body);
+    const { email } = resendVerificationSchema.parse(req.body);
 
+    // Find user
     const user = await db.user.findUnique({ where: { email } });
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
 
+    // Check if already verified
     if (user.emailVerified) {
       return res.status(400).json({ error: 'Email already verified' });
     }
@@ -213,90 +165,97 @@ router.post('/resend-verification', async (req, res) => {
     // Send verification email
     await sendVerificationEmail(email, verificationCode);
 
-    logger.info({ userId: user.id, email }, 'Verification code resent');
+    logger.info({ email }, 'Verification email resent');
     res.json({ message: 'Verification email resent.' });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ error: 'Validation failed', details: error.errors });
+      return res.status(400).json({ error: error.errors[0].message });
     }
-    logger.error({ error }, 'Resend verification error');
-    res.status(500).json({ error: 'Failed to resend verification' });
+    logger.error(error, 'Resend verification error');
+    res.status(500).json({ error: 'Failed to resend verification email' });
   }
 });
 
 // POST /api/auth/login
 router.post('/login', async (req, res) => {
   try {
-    const { email, password } = LoginSchema.parse(req.body);
+    const { email, password } = loginSchema.parse(req.body);
 
+    // Find user
     const user = await db.user.findUnique({ where: { email } });
     if (!user || !user.password) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    // Verify password
-    const isValidPassword = await bcrypt.compare(password, user.password);
-    if (!isValidPassword) {
+    // Check password
+    const validPassword = await bcrypt.compare(password, user.password);
+    if (!validPassword) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    // Check email verification
+    // Check if email is verified
     if (!user.emailVerified) {
-      return res.status(403).json({ error: 'Please verify your email.' });
-    }
-
-    // Check KYC approval
-    if (!user.kycApproved) {
-      return res.status(403).json({ error: 'Please complete KYC.' });
+      return res.status(401).json({ error: 'Please verify your email first' });
     }
 
     // Generate token
     const token = generateToken(user.id);
 
-    logger.info({ userId: user.id, email }, 'User logged in successfully');
+    logger.info({ userId: user.id, email }, 'User logged in');
     res.json({
-      message: 'Login successful',
       token,
       user: {
         id: user.id,
-        name: user.name,
         email: user.email,
+        name: user.name,
         emailVerified: user.emailVerified,
         kycApproved: user.kycApproved,
       }
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ error: 'Validation failed', details: error.errors });
+      return res.status(400).json({ error: error.errors[0].message });
     }
-    logger.error({ error }, 'Login error');
+    logger.error(error, 'Login error');
     res.status(500).json({ error: 'Login failed' });
   }
 });
 
-// GET /api/auth/me - Get current user
-router.get('/me', requireAuth, async (req: any, res) => {
-  try {
-    const user = await db.user.findUnique({
-      where: { id: req.user.id },
-      select: { 
-        id: true, 
-        email: true, 
-        name: true, 
-        emailVerified: true, 
-        kycApproved: true 
-      },
-    });
+// Middleware to verify JWT token
+export const authenticateToken = async (req: any, res: any, next: any) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
 
+  if (!token) {
+    return res.status(401).json({ error: 'Access token required' });
+  }
+
+  try {
+    const decoded = jwt.verify(token, env.JWT_SECRET) as { userId: number };
+    const user = await db.user.findUnique({ where: { id: decoded.userId } });
+    
     if (!user) {
-      return res.status(404).json({ error: 'User not found' });
+      return res.status(401).json({ error: 'Invalid token' });
     }
 
-    res.json({ user });
+    req.user = user;
+    next();
   } catch (error) {
-    logger.error(error, 'Error fetching user');
-    res.status(500).json({ error: 'Failed to fetch user' });
+    return res.status(403).json({ error: 'Invalid or expired token' });
   }
+};
+
+// GET /api/auth/me
+router.get('/me', authenticateToken, async (req: any, res) => {
+  res.json({
+    user: {
+      id: req.user.id,
+      email: req.user.email,
+      name: req.user.name,
+      emailVerified: req.user.emailVerified,
+      kycApproved: req.user.kycApproved,
+    }
+  });
 });
 
 export default router;
