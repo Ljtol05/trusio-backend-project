@@ -15,6 +15,7 @@ import routingRoutes from './routes/routing.js';
 import aiRoutes from './routes/ai.js';
 import eventRoutes from './routes/events.js';
 import webhookRoutes from './routes/webhooks.js';
+import kycRoutes from './routes/kyc.js';
 
 const app = express();
 
@@ -44,7 +45,8 @@ app.get('/healthz', async (_req, res) => {
     timestamp: new Date().toISOString(),
     services: {
       database: 'ok',
-      openai: 'checking...'
+      openai: 'checking...',
+      kyc: 'ok'
     }
   };
 
@@ -71,6 +73,7 @@ app.use('/api/routing', routingRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/events', eventRoutes);
 app.use('/api/webhooks', webhookRoutes);
+app.use('/api/kyc', kycRoutes);
 
 // 404 handler
 app.use((req, res) => {
