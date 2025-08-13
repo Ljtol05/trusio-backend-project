@@ -1,0 +1,25 @@
+Context: We have added a KYC flow in the frontend (see src/types/kyc.ts, src/lib/kyc.ts, src/hooks/useKyc.ts, src/routes/KycGuard.tsx, and src/screens/auth/KycScreen.tsx). The frontend posts user identity data to /api/kyc/start, polls /api/kyc/status, and expects a webhook endpoint to update the KYC status. Our backend is a Node + TypeScript service using Express and Prisma, with routes in src/routes and the server entrypoint in src/server.ts. We already use Zod for validation elsewhere.
+
+Tasks:
+	1.	Create KYC state management:
+	•	Add a new module (e.g. src/lib/kycStore.ts or src/services/kyc.ts) that maintains an in‑memory map of { userId → { status: 'pending' | 'approved' | 'rejected' | 'not_started'; providerRef: string; reason?: string } }.
+	•	Expose functions startKyc(userId: string, data: KycFormData): KycStatusResponse, getKycStatus(userId: string): KycStatusResponse, and updateKycStatusByRef(providerRef: string, decision: 'approved' | 'rejected', reason?: string).
+	•	Never persist or log PII; store only the providerRef and status.
+	2.	Add a KYC routes file (src/routes/kyc.ts):
+	•	Export an Express Router with endpoints:
+	•	POST /api/kyc/start: protected by existing auth middleware. Validate the body with Zod (legalFirstName, legalLastName, dob (YYYY‑MM‑DD), ssnLast4 (4 digits), addressLine1, optional addressLine2, city, state, postalCode). Generate a providerRef (e.g. kyc_${Date.now()}_${Math.random().toString(36).slice(2)}), call startKyc, and respond with { status: 'pending', providerRef } (HTTP 201).
+	•	GET /api/kyc/status: protected by auth middleware. Return the current status for req.user.id using getKycStatus. If no session exists, respond with { status: 'not_started' }.
+	•	POST /api/webhooks/kyc: unauthenticated endpoint to receive callbacks from the KYC provider. Validate { providerRef: string; decision: 'approved' | 'rejected'; reason?: string } with Zod. Call updateKycStatusByRef and respond with { ok: true }.
+	3.	Integrate the routes:
+	•	Register the new router in src/server.ts or the central router aggregator (e.g. src/routes/routing.ts), using the existing pattern for other route files. Ensure the prefix /api is respected.
+	•	Optionally, extend src/routes/webhooks.ts if that’s where webhook endpoints live, but keep the KYC webhook separate if you prefer.
+	4.	Define shared types:
+	•	If needed, add src/types/kyc.ts on the backend mirroring the KycStatus and KycFormData interfaces used in the frontend, so type imports remain consistent.
+	5.	Validation and error handling:
+	•	Use Zod for request validation and return meaningful HTTP status codes (400 on invalid input, 401/403 on unauthenticated access, 404 if providerRef not found).
+	•	Hook into existing error‑handling middleware if present.
+	6.	Webhooks and polling:
+	•	The frontend polls /api/kyc/status every few seconds and updates the UI based on status. The webhook ensures the backend can update statuses asynchronously.
+	•	For now, an in‑memory store is fine. Later, refactor kycStore to use Prisma (e.g. a KycSession table) to persist across restarts.
+
+Goal: After implementing these steps, the frontend KYC form should submit data, display “pending,” and update to “approved” or “rejected” when your new webhook endpoint receives a callback.
