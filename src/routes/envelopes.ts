@@ -2,11 +2,11 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { db } from '../lib/db.js';
 import { logger } from '../lib/logger.js';
-import { requireAuth } from './auth.js';
+import { authenticateToken } from './auth.js';
 import { CreateEnvelopeSchema, UpdateEnvelopeSchema } from '../types/dto.js';
 
 const router = Router();
-router.use(requireAuth);
+router.use(authenticateToken);
 
 // Get all envelopes
 router.get('/', async (req: any, res) => {
