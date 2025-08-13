@@ -7,7 +7,7 @@ import { authenticateToken } from './auth.js';
 import { CreateCardSchema, UpdateCardSchema } from '../types/dto.js';
 
 const router = Router();
-router.use(requireAuth);
+router.use(authenticateToken);
 
 // Get all cards
 router.get('/', async (req: any, res) => {

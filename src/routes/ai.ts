@@ -51,7 +51,7 @@ router.post('/test', async (req, res) => {
   }
 });
 
-router.use(requireAuth);
+router.use(authenticateToken);
 
 /**
  * Helper: cents → "12.34"
@@ -145,7 +145,7 @@ router.post('/coach', async (req: any, res) => {
           parseFloat(env.spentThisMonth) > parseFloat(max.spentThisMonth) ? env : max
         )
       : { name: 'No envelopes', spentThisMonth: '0.00', balanceCents: 0, balance: '0.00' };
-    
+
     const lowestBalanceEnv = envelopeContext.length > 0 
       ? envelopeContext.reduce((min, env) => 
           env.balanceCents < min.balanceCents ? env : min
@@ -174,7 +174,7 @@ router.post('/coach', async (req: any, res) => {
 
         // Adjust for specific problems and personality
         let groceries, bills, dining, emergency, misc;
-        
+
         if (fixedExpenses > 0) {
           bills = fixedExpenses;
           const remaining = needs - bills;
@@ -233,7 +233,7 @@ router.post('/coach', async (req: any, res) => {
       } else {
         personalizedResponse += "I'd love to create a personalized budget for you! To give you specific dollar amounts for each envelope, could you tell me your monthly take-home income? ";
         personalizedResponse += "I'll use proven budgeting principles to create the perfect envelope system for your situation.";
-        
+
         suggestedEnvelopes = [
           { name: 'Groceries', amount: 300, icon: 'cart', color: 'green' },
           { name: 'Bills', amount: 800, icon: 'home', color: 'blue' },
@@ -383,9 +383,9 @@ Be conversational and reference their actual envelope names. Match your tone to 
         }];
       } else if (questionLower.includes('car') || questionLower.includes('repair') || questionLower.includes('emergency')) {
         // Handle emergency/repair questions with real envelope analysis
-        const fundingSources = envelopeContext.filter(env => env.balanceCents > 5000).sort((a, b) => b.balanceCents - a.balanceCents);
         const neededAmount = 800; // Default repair amount
-
+        const fundingSources = envelopeContext.filter(env => env.balanceCents > 5000).sort((a, b) => b.balanceCents - a.balanceCents);
+        
         if (fundingSources.length > 0) {
           const primarySource = fundingSources[0];
           const canCoverAmount = Math.min(neededAmount, primarySource.balanceCents / 100 * 0.4);
@@ -412,32 +412,32 @@ Be conversational and reference their actual envelope names. Match your tone to 
           env.name.toLowerCase().includes('grocery') || 
           env.name.toLowerCase().includes('groceries')
         );
-        
+
         const currentDiningSpending = parseFloat(diningEnv?.spentThisMonth || '0');
         const currentDiningBalance = parseFloat(diningEnv?.balance || '0');
         const currentGrocerySpending = parseFloat(groceryEnv?.spentThisMonth || '0');
-        
+
         const totalFoodSpending = currentDiningSpending + currentGrocerySpending;
         const suggestedFoodBudget = Math.max(avgBalance * 1.5, 250); // 1.5x average for total food
         const suggestedDiningLimit = suggestedFoodBudget * 0.3; // 30% for dining out
         const suggestedGroceryBudget = suggestedFoodBudget * 0.7; // 70% for groceries
 
         contextualAdvice = `Food spending analysis: Total $${totalFoodSpending.toFixed(2)} this month (Dining: $${currentDiningSpending.toFixed(2)}, Groceries: $${currentGrocerySpending.toFixed(2)}). `;
-        
+
         if (totalFoodSpending > suggestedFoodBudget) {
           contextualAdvice += `You're over budget by $${(totalFoodSpending - suggestedFoodBudget).toFixed(2)}. `;
         }
-        
+
         contextualAdvice += `Recommended split: $${suggestedGroceryBudget.toFixed(0)} groceries, $${suggestedDiningLimit.toFixed(0)} dining. `;
-        
+
         if (currentDiningSpending > suggestedDiningLimit) {
           const overspend = currentDiningSpending - suggestedDiningLimit;
           contextualAdvice += `Try meal prep 4x/week to save ~$${overspend.toFixed(0)}/month. `;
-          
+
           if (currentDiningBalance > 50) {
             const transferAmount = Math.min(currentDiningBalance * 0.4, overspend);
             contextualAdvice += `Consider moving $${transferAmount.toFixed(0)} from ${diningEnv?.name || 'dining'} to ${groceryEnv?.name || lowestBalanceEnv.name} for meal ingredients.`;
-            
+
             suggestedActions = [{
               type: 'transfer',
               description: `Move excess dining budget to groceries for meal prep`,
@@ -452,7 +452,7 @@ Be conversational and reference their actual envelope names. Match your tone to 
         } else {
           contextualAdvice += `Good job staying within dining budget! `;
         }
-        
+
         contextualAdvice += `Weekly targets: $${(suggestedGroceryBudget / 4).toFixed(0)} groceries, $${(suggestedDiningLimit / 4).toFixed(0)} dining.`;
       } else if (questionLower.includes('vacation') || questionLower.includes('save') || questionLower.includes('trip')) {
         // Handle vacation/savings questions

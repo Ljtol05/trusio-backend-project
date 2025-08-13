@@ -6,7 +6,7 @@ import { authenticateToken } from './auth.js';
 import { CreateTransferSchema, PaginationSchema } from '../types/dto.js';
 
 const router = Router();
-router.use(requireAuth);
+router.use(authenticateToken);
 
 // Get all transfers
 router.get('/', async (req: any, res) => {
