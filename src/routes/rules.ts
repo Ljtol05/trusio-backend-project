@@ -3,10 +3,10 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { db } from '../lib/db.js';
 import { logger } from '../lib/logger.js';
-import { requireAuth } from './auth.js';
+import { authenticateToken } from './auth.js';
 
 const router = Router();
-router.use(requireAuth);
+router.use(authenticateToken);
 
 // Validation schemas
 const CreateRuleSchema = z.object({
