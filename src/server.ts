@@ -3,6 +3,7 @@ import cors from 'cors';
 import { db } from './lib/db.js';
 import { logger } from './lib/logger.js';
 import { env } from './config/env.js';
+import { authenticateToken } from './middleware/auth.js'; // Assuming authenticateToken is in this file
 
 // Import routes
 import authRoutes from './routes/auth.js';
@@ -52,17 +53,20 @@ app.get('/healthz', (_req, res) => {
 });
 
 // API routes
+// Public routes (no authentication required)
 app.use('/api/auth', authRoutes);
-app.use('/api/envelopes', envelopeRoutes);
-app.use('/api/transfers', transferRoutes);
-app.use('/api/transactions', transactionRoutes);
-app.use('/api/rules', ruleRoutes);
-app.use('/api/cards', cardRoutes);
-app.use('/api/routing', routingRoutes);
-app.use('/api/ai', aiRoutes);
-app.use('/api/events', eventRoutes);
 app.use('/api/webhooks', webhookRoutes);
-app.use('/api/kyc', kycRoutes);
+
+// Protected routes (authentication required)
+app.use('/api/envelopes', authenticateToken, envelopeRoutes);
+app.use('/api/transactions', authenticateToken, transactionRoutes);
+app.use('/api/transfers', authenticateToken, transferRoutes);
+app.use('/api/rules', authenticateToken, ruleRoutes); // Corrected rulesRoutes to ruleRoutes
+app.use('/api/routing', authenticateToken, routingRoutes);
+app.use('/api/cards', authenticateToken, cardRoutes);
+app.use('/api/ai', authenticateToken, aiRoutes);
+app.use('/api/kyc', authenticateToken, kycRoutes);
+app.use('/api/events', authenticateToken, eventRoutes);
 
 // 404 handler
 app.use((req, res) => {
@@ -71,11 +75,27 @@ app.use((req, res) => {
 
 // Error handler
 app.use((error: any, req: any, res: any, next: any) => {
-  logger.error(error, 'Unhandled error');
-  res.status(500).json({ 
-    error: 'Internal server error',
-    message: env.NODE_ENV === 'development' ? error.message : undefined,
-  });
+  // Add more specific error logging for authentication issues
+  if (error.name === 'UnauthorizedError' || error.statusCode === 401) {
+    logger.warn({ error: error.message, ip: req.ip, url: req.url }, 'Authentication Error');
+  } else if (error.name === 'ForbiddenError' || error.statusCode === 403) {
+    logger.warn({ error: error.message, ip: req.ip, url: req.url }, 'Authorization Error');
+  } else {
+    logger.error(error, 'Unhandled error');
+  }
+
+  // Send appropriate status code based on error type
+  if (error.statusCode) {
+    res.status(error.statusCode).json({
+      error: 'API Error',
+      message: env.NODE_ENV === 'development' ? error.message : undefined,
+    });
+  } else {
+    res.status(500).json({
+      error: 'Internal server error',
+      message: env.NODE_ENV === 'development' ? error.message : undefined,
+    });
+  }
 });
 
 // Start server
@@ -87,7 +107,7 @@ const startServer = async () => {
 
     const server = app.listen(env.PORT, '0.0.0.0', () => {
       // Auto-detect Replit external URL
-      const replitUrl = process.env.REPLIT_DEV_DOMAIN 
+      const replitUrl = process.env.REPLIT_DEV_DOMAIN
         ? `https://${process.env.REPLIT_DEV_DOMAIN}`
         : `http://localhost:${env.PORT}`;
 

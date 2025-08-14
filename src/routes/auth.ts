@@ -260,11 +260,16 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
+    // Generate token for authenticated API access even if verification incomplete
+    const token = generateToken(user.id);
+
     // Progressive verification - check what step user needs to complete
     if (!user.emailVerified) {
-      return res.status(403).json({ 
+      return res.status(200).json({ 
         message: 'Please verify your email first.',
+        token,
         verificationStep: 'email',
+        nextStep: 'email',
         user: {
           id: user.id,
           email: user.email,
@@ -278,9 +283,11 @@ router.post('/login', async (req, res) => {
     }
     
     if (!user.phoneVerified) {
-      return res.status(403).json({ 
+      return res.status(200).json({ 
         message: 'Please verify your phone number.',
+        token,
         verificationStep: 'phone',
+        nextStep: 'phone',
         user: {
           id: user.id,
           email: user.email,
@@ -294,9 +301,11 @@ router.post('/login', async (req, res) => {
     }
 
     if (!user.kycApproved) {
-      return res.status(403).json({ 
+      return res.status(200).json({ 
         message: 'Please complete KYC verification.',
+        token,
         verificationStep: 'kyc',
+        nextStep: 'kyc',
         user: {
           id: user.id,
           email: user.email,
@@ -309,12 +318,12 @@ router.post('/login', async (req, res) => {
       });
     }
 
-    // Generate token
-    const token = generateToken(user.id);
-
-    logger.info({ userId: user.id, email }, 'User logged in');
+    // User is fully verified
+    logger.info({ userId: user.id, email }, 'User logged in successfully');
     res.json({
       token,
+      message: 'Login successful',
+      verificationStep: 'complete',
       user: {
         id: user.id,
         email: user.email,
@@ -340,6 +349,7 @@ export const authenticateToken = async (req: any, res: any, next: any) => {
   const token = authHeader && authHeader.split(' ')[1];
 
   if (!token) {
+    logger.warn({ url: req.url }, 'No token provided');
     return res.status(401).json({ error: 'Access token required' });
   }
 
@@ -348,12 +358,14 @@ export const authenticateToken = async (req: any, res: any, next: any) => {
     const user = await db.user.findUnique({ where: { id: decoded.userId } });
     
     if (!user) {
+      logger.warn({ userId: decoded.userId }, 'User not found for token');
       return res.status(401).json({ error: 'Invalid token' });
     }
 
     req.user = user;
     next();
   } catch (error) {
+    logger.error({ error: error.message }, 'Token verification failed');
     return res.status(403).json({ error: 'Invalid or expired token' });
   }
 };
