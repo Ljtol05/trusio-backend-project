@@ -13,6 +13,9 @@ model User {
   password  String   // Add password field for authentication
   name      String?
   emailVerified Boolean @default(false)
+  phone     String?
+  phoneVerified Boolean @default(false)
+  phoneVerificationCode String?
   kycApproved Boolean @default(false)
   verificationCode String?
   createdAt DateTime @default(now())

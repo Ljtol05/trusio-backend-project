@@ -31,6 +31,19 @@ const resendVerificationSchema = z.object({
   email: z.string().email('Invalid email'),
 });
 
+const startPhoneVerificationSchema = z.object({
+  phone: z.string().regex(/^\+?[\d\s\-\(\)]+$/, 'Invalid phone number format'),
+});
+
+const verifyPhoneSchema = z.object({
+  phone: z.string().regex(/^\+?[\d\s\-\(\)]+$/, 'Invalid phone number format'),
+  code: z.string().length(6, 'Verification code must be 6 digits'),
+});
+
+const resendPhoneCodeSchema = z.object({
+  phone: z.string().regex(/^\+?[\d\s\-\(\)]+$/, 'Invalid phone number format'),
+});
+
 // Generate 6-digit verification code
 function generateVerificationCode(): string {
   return Math.floor(100000 + Math.random() * 900000).toString();
@@ -39,6 +52,19 @@ function generateVerificationCode(): string {
 // Generate JWT token
 function generateToken(userId: number): string {
   return jwt.sign({ userId }, env.JWT_SECRET, { expiresIn: '7d' });
+}
+
+// Send phone verification SMS
+async function sendPhoneVerificationSMS(phone: string, code: string): Promise<void> {
+  // In development: log to console for easy testing
+  if (process.env.NODE_ENV === 'development') {
+    console.log(`\n📱 SMS VERIFICATION for ${phone}: ${code}\n`);
+    return;
+  }
+
+  // In production: integrate with actual SMS service (Twilio, etc.)
+  // For now, just log as we don't have SMS configured
+  console.log(`SMS verification would be sent to ${phone} with code ${code}`);
 }
 
 // POST /api/auth/register
@@ -73,7 +99,16 @@ router.post('/register', async (req, res) => {
     await sendVerificationEmail(email, verificationCode);
 
     logger.info({ email }, 'User registered, verification email sent');
-    res.status(201).json({ message: 'Verification email sent.' });
+    res.status(201).json({ 
+      message: 'Verification email sent.',
+      user: {
+        email,
+        name,
+        emailVerified: false,
+        phoneVerified: false,
+        kycApproved: false
+      }
+    });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: error.errors[0].message });
@@ -125,7 +160,9 @@ router.post('/verify-email', async (req, res) => {
         id: user.id,
         email: user.email,
         name: user.name,
+        phone: user.phone,
         emailVerified: true,
+        phoneVerified: user.phoneVerified,
         kycApproved: user.kycApproved,
       }
     });
@@ -215,7 +252,9 @@ router.post('/login', async (req, res) => {
         id: user.id,
         email: user.email,
         name: user.name,
+        phone: user.phone,
         emailVerified: user.emailVerified,
+        phoneVerified: user.phoneVerified,
         kycApproved: user.kycApproved,
       }
     });
@@ -259,10 +298,158 @@ router.get('/me', authenticateToken, async (req: any, res) => {
       id: req.user.id,
       email: req.user.email,
       name: req.user.name,
+      phone: req.user.phone,
       emailVerified: req.user.emailVerified,
+      phoneVerified: req.user.phoneVerified,
       kycApproved: req.user.kycApproved,
     }
   });
+});
+
+// POST /api/auth/start-phone-verification
+router.post('/start-phone-verification', authenticateToken, async (req: any, res) => {
+  try {
+    const { phone } = startPhoneVerificationSchema.parse(req.body);
+
+    // Check if phone is already verified by another user
+    const existingUser = await db.user.findFirst({ 
+      where: { 
+        phone,
+        phoneVerified: true,
+        id: { not: req.user.id }
+      }
+    });
+    
+    if (existingUser) {
+      return res.status(400).json({ error: 'Phone number already verified by another user' });
+    }
+
+    // Generate verification code
+    const verificationCode = generateVerificationCode();
+
+    // Update user with phone and verification code
+    await db.user.update({
+      where: { id: req.user.id },
+      data: {
+        phone,
+        phoneVerified: false,
+        phoneVerificationCode: verificationCode,
+      },
+    });
+
+    // Send SMS verification
+    await sendPhoneVerificationSMS(phone, verificationCode);
+
+    logger.info({ userId: req.user.id, phone }, 'Phone verification SMS sent');
+    res.json({ message: 'Phone verification code sent.' });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: error.errors[0].message });
+    }
+    logger.error(error, 'Start phone verification error');
+    res.status(500).json({ error: 'Failed to start phone verification' });
+  }
+});
+
+// POST /api/auth/verify-phone
+router.post('/verify-phone', authenticateToken, async (req: any, res) => {
+  try {
+    const { phone, code } = verifyPhoneSchema.parse(req.body);
+
+    // Find user
+    const user = await db.user.findUnique({ where: { id: req.user.id } });
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Check if phone matches
+    if (user.phone !== phone) {
+      return res.status(400).json({ error: 'Phone number does not match' });
+    }
+
+    // Check if already verified
+    if (user.phoneVerified) {
+      return res.status(400).json({ error: 'Phone already verified' });
+    }
+
+    // Check verification code
+    if (user.phoneVerificationCode !== code) {
+      return res.status(400).json({ error: 'Invalid verification code' });
+    }
+
+    // Update user
+    const updatedUser = await db.user.update({
+      where: { id: user.id },
+      data: {
+        phoneVerified: true,
+        phoneVerificationCode: null,
+      },
+    });
+
+    logger.info({ userId: user.id, phone }, 'Phone verified successfully');
+    res.json({ 
+      message: 'Phone verified.',
+      user: {
+        id: updatedUser.id,
+        email: updatedUser.email,
+        name: updatedUser.name,
+        phone: updatedUser.phone,
+        emailVerified: updatedUser.emailVerified,
+        phoneVerified: updatedUser.phoneVerified,
+        kycApproved: updatedUser.kycApproved,
+      }
+    });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: error.errors[0].message });
+    }
+    logger.error(error, 'Phone verification error');
+    res.status(500).json({ error: 'Phone verification failed' });
+  }
+});
+
+// POST /api/auth/resend-phone-code
+router.post('/resend-phone-code', authenticateToken, async (req: any, res) => {
+  try {
+    const { phone } = resendPhoneCodeSchema.parse(req.body);
+
+    // Find user
+    const user = await db.user.findUnique({ where: { id: req.user.id } });
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Check if phone matches
+    if (user.phone !== phone) {
+      return res.status(400).json({ error: 'Phone number does not match' });
+    }
+
+    // Check if already verified
+    if (user.phoneVerified) {
+      return res.status(400).json({ error: 'Phone already verified' });
+    }
+
+    // Generate new verification code
+    const verificationCode = generateVerificationCode();
+
+    // Update user with new code
+    await db.user.update({
+      where: { id: user.id },
+      data: { phoneVerificationCode: verificationCode },
+    });
+
+    // Send SMS verification
+    await sendPhoneVerificationSMS(phone, verificationCode);
+
+    logger.info({ userId: req.user.id, phone }, 'Phone verification code resent');
+    res.json({ message: 'Phone verification code resent.' });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: error.errors[0].message });
+    }
+    logger.error(error, 'Resend phone code error');
+    res.status(500).json({ error: 'Failed to resend phone verification code' });
+  }
 });
 
 export default router;
