@@ -34,9 +34,10 @@ app.use(cors({
       'https://localhost:8080',
     ];
     
-    // Check for Replit domains
+    // Check for Replit domains (more comprehensive)
     if (origin.match(/^https:\/\/.*\.replit\.dev$/) || 
-        origin.match(/^https:\/\/.*\.replit\.co$/)) {
+        origin.match(/^https:\/\/.*\.replit\.co$/) ||
+        origin.match(/^https:\/\/.*\.repl\.co$/)) {
       return callback(null, true);
     }
     
@@ -45,11 +46,14 @@ app.use(cors({
       return callback(null, true);
     }
     
-    // For development, allow any localhost origin
-    if (origin.match(/^https?:\/\/localhost:\d+$/)) {
+    // For development, allow any localhost origin and any Replit subdomain
+    if (origin.match(/^https?:\/\/localhost:\d+$/) ||
+        origin.match(/^https:\/\/[a-zA-Z0-9-]+\.replit\.(dev|co)$/)) {
       return callback(null, true);
     }
     
+    // Log the origin for debugging
+    console.log('CORS rejected origin:', origin);
     callback(new Error('Not allowed by CORS'));
   },
   credentials: true,
@@ -136,6 +140,8 @@ const startServer = async () => {
         host: '0.0.0.0',
         env: env.NODE_ENV,
         aiEnabled: !!env.OPENAI_API_KEY,
+        url: `http://0.0.0.0:${env.PORT}`,
+        corsEnabled: true,
       }, 'Server started successfully');
     });
 
