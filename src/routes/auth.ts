@@ -57,22 +57,33 @@ function generateToken(userId: number): string {
 // Send phone verification SMS
 async function sendPhoneVerificationSMS(phone: string, code: string): Promise<void> {
   // In development: log to console for easy testing
-  if (process.env.NODE_ENV === 'development') {
+  if (process.env.NODE_ENV === 'development' && !process.env.TWILIO_ACCOUNT_SID) {
     console.log(`\n📱 SMS VERIFICATION for ${phone}: ${code}\n`);
     return;
   }
 
-  // In production: integrate with actual SMS service (Twilio, etc.)
-  // Example with Twilio (install: npm install twilio)
-  // const twilio = require('twilio');
-  // const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
-  // await client.messages.create({
-  //   body: `Your verification code is: ${code}`,
-  //   from: process.env.TWILIO_PHONE_NUMBER,
-  //   to: phone
-  // });
-  
-  console.log(`SMS verification would be sent to ${phone} with code ${code}`);
+  // Production or forced SMS mode with Twilio
+  try {
+    if (!process.env.TWILIO_ACCOUNT_SID || !process.env.TWILIO_AUTH_TOKEN || !process.env.TWILIO_PHONE_NUMBER) {
+      console.log(`SMS verification would be sent to ${phone} with code ${code}`);
+      return;
+    }
+
+    const twilio = require('twilio');
+    const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+    
+    await client.messages.create({
+      body: `Your verification code is: ${code}. This code will expire in 10 minutes.`,
+      from: process.env.TWILIO_PHONE_NUMBER,
+      to: phone
+    });
+
+    logger.info({ phone }, 'SMS verification sent successfully');
+  } catch (error) {
+    logger.error({ error, phone }, 'Failed to send SMS verification');
+    // Fallback to console in case of error
+    console.log(`\n📱 FALLBACK SMS VERIFICATION for ${phone}: ${code}\n`);
+  }
 }
 
 // POST /api/auth/register
