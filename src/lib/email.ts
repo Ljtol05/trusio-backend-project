@@ -4,33 +4,50 @@ import nodemailer from 'nodemailer';
 
 // Create email transporter for production
 const createTransporter = () => {
-  if (process.env.NODE_ENV === 'production' || process.env.SMTP_HOST) {
+  if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASS) {
+    return null;
+  }
+
+  try {
     return nodemailer.createTransporter({
-      host: process.env.SMTP_HOST || 'smtp.gmail.com',
+      host: process.env.SMTP_HOST,
       port: parseInt(process.env.SMTP_PORT || '587'),
-      secure: false, // true for 465, false for other ports
+      secure: process.env.SMTP_PORT === '465', // true for 465, false for other ports
       auth: {
         user: process.env.SMTP_USER,
         pass: process.env.SMTP_PASS,
       },
+      // Add timeout and connection settings
+      connectionTimeout: 10000, // 10 seconds
+      greetingTimeout: 5000, // 5 seconds
+      socketTimeout: 10000, // 10 seconds
     });
+  } catch (error) {
+    logger.error({ error }, 'Failed to create email transporter');
+    return null;
   }
-  return null;
 };
 
 export async function sendVerificationEmail(email: string, code: string): Promise<void> {
-  // In development: log to console for easy testing
+  // In development: log to console for easy testing unless SMTP is explicitly configured
   if (process.env.NODE_ENV === 'development' && !process.env.SMTP_HOST) {
-    console.log(`\n🔐 VERIFICATION for ${email}: ${code}\n`);
+    console.log(`\n🔐 DEV VERIFICATION for ${email}: ${code}\n`);
     return;
   }
 
-  // Production or forced email mode
+  // Check if we have minimum SMTP configuration
+  if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASS) {
+    console.log(`\n🔐 FALLBACK VERIFICATION for ${email}: ${code}\n`);
+    logger.warn({ email }, 'SMTP not configured, using console fallback');
+    return;
+  }
+
+  // Production or forced email mode with proper SMTP config
   try {
     const transporter = createTransporter();
 
     if (!transporter) {
-      console.log(`Email verification would be sent to ${email} with code ${code}`);
+      console.log(`\n🔐 NO TRANSPORTER VERIFICATION for ${email}: ${code}\n`);
       return;
     }
 
@@ -53,15 +70,13 @@ export async function sendVerificationEmail(email: string, code: string): Promis
     };
 
     await transporter.sendMail(mailOptions);
-    logger.info({ email }, 'Verification email sent successfully');
+    logger.info({ email }, 'Verification email sent successfully via SMTP');
     return;
   } catch (error) {
-    logger.error({ error, email }, 'Failed to send verification email');
+    logger.error({ error: error.message || error, email }, 'Failed to send verification email via SMTP');
     // Fallback to console in case of error
-    console.log(`\n🔐 FALLBACK VERIFICATION for ${email}: ${code}\n`);
+    console.log(`\n🔐 SMTP ERROR FALLBACK for ${email}: ${code}\n`);
+    console.log(`SMTP Error: ${error.message || 'Unknown error'}`);
     return;
   }
-
-  // Development mode fallback when no SMTP configured
-  console.log(`\n🔐 DEV VERIFICATION for ${email}: ${code}\n`);
 }
