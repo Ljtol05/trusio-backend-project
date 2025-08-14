@@ -1,8 +1,9 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { logger } from '../lib/logger.js';
-import { startKyc, getKycStatus, updateKycStatusByRef } from '../lib/kycStore.js';
+import { startKyc, getKycStatus, updateKycStatusByRef, getKycStatusByRef } from '../lib/kycStore.js';
 import { authenticateToken } from './auth.js';
+import { db } from '../lib/db.js';
 
 const router = Router();
 

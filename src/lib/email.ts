@@ -4,18 +4,18 @@ import nodemailer from 'nodemailer';
 
 // Create email transporter for production
 const createTransporter = () => {
-  if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASS) {
+  if (!env.SMTP_HOST || !env.SMTP_USER || !env.SMTP_PASS) {
     return null;
   }
 
   try {
     return nodemailer.createTransporter({
-      host: process.env.SMTP_HOST,
-      port: parseInt(process.env.SMTP_PORT || '587'),
-      secure: process.env.SMTP_PORT === '465', // true for 465, false for other ports
+      host: env.SMTP_HOST,
+      port: parseInt(env.SMTP_PORT || '587'),
+      secure: env.SMTP_PORT === '465', // true for 465, false for other ports
       auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS,
+        user: env.SMTP_USER,
+        pass: env.SMTP_PASS,
       },
       // Add timeout and connection settings
       connectionTimeout: 10000, // 10 seconds
@@ -30,13 +30,13 @@ const createTransporter = () => {
 
 export async function sendVerificationEmail(email: string, code: string): Promise<void> {
   // In development: log to console for easy testing unless SMTP is explicitly configured
-  if (process.env.NODE_ENV === 'development' && !process.env.SMTP_HOST) {
+  if (env.NODE_ENV === 'development' && !env.SMTP_HOST) {
     console.log(`\n🔐 DEV VERIFICATION for ${email}: ${code}\n`);
     return;
   }
 
   // Check if we have minimum SMTP configuration
-  if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASS) {
+  if (!env.SMTP_HOST || !env.SMTP_USER || !env.SMTP_PASS) {
     console.log(`\n🔐 FALLBACK VERIFICATION for ${email}: ${code}\n`);
     logger.warn({ email }, 'SMTP not configured, using console fallback');
     return;
@@ -52,7 +52,7 @@ export async function sendVerificationEmail(email: string, code: string): Promis
     }
 
     const mailOptions = {
-      from: process.env.SMTP_FROM || process.env.SMTP_USER,
+      from: env.SMTP_FROM || env.SMTP_USER,
       to: email,
       subject: 'Email Verification - Your App Name',
       html: `

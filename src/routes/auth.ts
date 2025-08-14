@@ -165,13 +165,14 @@ router.post('/verify-email', async (req, res) => {
       },
     });
 
-    // Generate auth token
+    // Generate auth token for authenticated API access
     const token = generateToken(user.id);
 
     logger.info({ userId: user.id, email }, 'Email verified successfully');
     res.json({ 
-      message: 'Email verified.',
+      message: 'Email verified. Please verify your phone number.',
       token,
+      nextStep: 'phone',
       user: {
         id: user.id,
         email: user.email,
@@ -248,14 +249,53 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    // Check if email is verified
+    // Progressive verification - check what step user needs to complete
     if (!user.emailVerified) {
-      return res.status(403).json({ message: 'Please verify your email.' });
+      return res.status(403).json({ 
+        message: 'Please verify your email first.',
+        verificationStep: 'email',
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          phone: user.phone,
+          emailVerified: user.emailVerified,
+          phoneVerified: user.phoneVerified,
+          kycApproved: user.kycApproved,
+        }
+      });
+    }
+    
+    if (!user.phoneVerified) {
+      return res.status(403).json({ 
+        message: 'Please verify your phone number.',
+        verificationStep: 'phone',
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          phone: user.phone,
+          emailVerified: user.emailVerified,
+          phoneVerified: user.phoneVerified,
+          kycApproved: user.kycApproved,
+        }
+      });
     }
 
-    // Check if KYC is approved
     if (!user.kycApproved) {
-      return res.status(403).json({ message: 'Please complete KYC.' });
+      return res.status(403).json({ 
+        message: 'Please complete KYC verification.',
+        verificationStep: 'kyc',
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          phone: user.phone,
+          emailVerified: user.emailVerified,
+          phoneVerified: user.phoneVerified,
+          kycApproved: user.kycApproved,
+        }
+      });
     }
 
     // Generate token
@@ -404,7 +444,8 @@ router.post('/verify-phone', authenticateToken, async (req: any, res) => {
 
     logger.info({ userId: user.id, phone }, 'Phone verified successfully');
     res.json({ 
-      message: 'Phone verified.',
+      message: 'Phone verified. Please complete KYC verification.',
+      nextStep: 'kyc',
       user: {
         id: updatedUser.id,
         email: updatedUser.email,
