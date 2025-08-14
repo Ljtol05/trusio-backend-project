@@ -19,8 +19,8 @@ const envSchema = z.object({
   // OpenAI
   OPENAI_API_KEY: z.string().optional().default(''),
   OPENAI_PROJECT_ID: z.string().optional().default(''), 
-  OPENAI_MODEL_PRIMARY: z.string().default('gpt-4.1-mini'),
-  OPENAI_MODEL_FALLBACK: z.string().default('gpt-5-nano'),
+  OPENAI_MODEL_PRIMARY: z.string().default('gpt-4o-mini'),
+  OPENAI_MODEL_FALLBACK: z.string().default('gpt-3.5-turbo'),
   
   //timeouts/retries
   OPENAI_TIMEOUT_MS: z.string().default('60000').transform(Number),
