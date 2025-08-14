@@ -1,0 +1,85 @@
+We are aligning the backend with a frontend change where the client automatically uses the current browser origin in dev (Replit or localhost) and calls **relative** API paths like `/api/...` (no hardcoded host). Replit manages CORS for us, so do NOT hardcode any origins or domains in server code. Make the backend origin‑agnostic and confirm all endpoints live under `/api`.
+
+### What to implement / verify
+
+1) General server hygiene
+   - Ensure we use JSON body parsing and sane defaults:
+     ```ts
+     app.use(express.json({ limit: "1mb" }));
+     app.use(express.urlencoded({ extended: false }));
+     ```
+   - Do NOT embed any absolute URLs or hostnames in redirects or responses.
+   - Add a lightweight health endpoint:
+     ```ts
+     app.get("/healthz", (_req, res) => res.json({ ok: true }));
+     ```
+   - Keep the default handler for unknown routes under `/` responding JSON 404:
+     `{ error: "Endpoint not found" }`
+
+2) Route mounting under `/api` (single entry point)
+   - Confirm all feature routers mount under `/api`, e.g.:
+     ```ts
+     app.use("/api/auth", authRouter);
+     app.use("/api/kyc", kycRouter);
+     app.use("/api/webhooks", webhooksRouter);
+     // (existing) envelopes/cards/transfers/etc also under /api
+     ```
+   - Support `OPTIONS` automatically (Express handles this; no custom CORS logic needed since Replit manages CORS).
+
+3) Auth + registration flow (to match the new frontend screens)
+   - In `src/routes/auth.ts` add/verify:
+     - `POST /api/auth/register` → accepts `{ name, email, password }`
+       * Hash password (bcrypt).
+       * Create user with `emailVerified:false`, `kycApproved:false`.
+       * Generate a 6‑digit numeric `verificationCode`.
+       * Store it and trigger an email (see 4).
+       * Return `201 { message: "Verification email sent." }`
+     - `POST /api/auth/verify-email` → `{ email, code }`
+       * If code matches, set `emailVerified:true`, clear the code, and return a short‑lived JWT or session token in the JSON body.
+     - `POST /api/auth/resend-verification` → `{ email }`
+       * Generate + store a new code and re‑send email.
+     - `POST /api/auth/login` → `{ email, password }`
+       * Block if `emailVerified:false` with `403 { message: "Please verify your email." }`
+       * Block if `kycApproved:false` with `403 { message: "Please complete KYC." }`
+       * On success return JWT in JSON body.
+   - All routes must return JSON only (no redirects).
+
+4) Email service for verification (dev‑friendly)
+   - Create `src/lib/email.ts` with `sendVerificationEmail(email, code)` that:
+     * In development: logs a clear line `VERIFICATION for ${email}: ${code}` to the console so we can copy/paste the code during manual testing.
+     * Keep the function shape so we can later swap to a real SMTP/ESP.
+   - No credentials hardcoding; pull from `process.env` if present, otherwise fall back to console logging.
+
+5) KYC flow alignment (already implemented earlier)
+   - `POST /api/kyc/start` sets/keeps `kycApproved:false` and returns pending.
+   - `GET /api/kyc/status` returns `{ status: 'not_started'|'pending'|'approved'|'rejected', reason? }`.
+   - `POST /api/webhooks/kyc` updates the user to `kycApproved:true` or `rejected`, then returns `{ ok:true }`.
+
+6) Tokens & security
+   - Use JWT in the `Authorization: Bearer` header (frontend stores it in memory or localStorage).
+   - Add minimal error normalization middleware so every failure returns JSON with an `error` or `message` field and a proper status code.
+   - No absolute domain in cookies; for dev we’re not using cookies, only Bearer tokens.
+
+7) Prisma model changes (if not present)
+   - In `User` model add:
+     ```
+     emailVerified Boolean @default(false)
+     kycApproved   Boolean @default(false)
+     verificationCode String?
+     ```
+   - Add migration scripts and run them.
+
+8) Quick self‑tests (document in console output or README)
+   - `curl -i https://<this-replit-host>/healthz` → `{ ok: true }`
+   - `curl -i -X POST https://<host>/api/auth/register -H "Content-Type: application/json" -d '{"name":"A","email":"a@ex.com","password":"secret"}'`
+     → `201` and “Verification email sent.”
+   - `curl -i -X POST https://<host>/api/auth/verify-email -H "Content-Type: application/json" -d '{"email":"a@ex.com","code":"123456"}'`
+     → `200` and returns `{ token: "..." }`
+   - `curl -i https://<host>/api/kyc/status -H "Authorization: Bearer <token>"` → pending/not_started
+   - `curl -i -X POST https://<host>/api/webhooks/kyc -H "Content-Type: application/json" -d '{"providerRef":"test","decision":"approved"}'` (or whatever your kycStore expects) → `{ ok:true }`, then status shows `approved`.
+
+### Acceptance criteria
+- No hostnames or origins are hardcoded anywhere; the backend responds equally well on any `.replit.dev` subdomain or localhost.
+- All API routes are under `/api/...` so the frontend can call relative paths with `window.location.origin`.
+- Registration → verify email → KYC → login flow is possible via the endpoints above.
+- Clean JSON errors and logs that make debugging easy in Replit.
