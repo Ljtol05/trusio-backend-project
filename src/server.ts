@@ -1,8 +1,8 @@
 import express from 'express';
 import cors from 'cors';
-import { env } from './config/env.js';
-import { logger } from './lib/logger.js';
 import { db } from './lib/db.js';
+import { logger } from './lib/logger.js';
+import { env } from './config/env.js';
 
 // Import routes
 import authRoutes from './routes/auth.js';
@@ -19,14 +19,18 @@ import kycRoutes from './routes/kyc.js';
 
 const app = express();
 
-// Middleware - Origin-agnostic CORS (Replit manages CORS for us)
+// CORS configuration to allow requests from frontend
 app.use(cors({
-  origin: true, // Allow all origins since Replit handles CORS
+  origin: [
+    'http://localhost:5173', // Vite dev server
+    'https://localhost:5173',
+    /^https:\/\/.*\.replit\.dev$/, // Any replit.dev domain
+    /^https:\/\/.*\.repl\.co$/, // Any repl.co domain
+  ],
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Origin', 'X-Requested-With'],
-  exposedHeaders: ['Content-Range', 'X-Content-Range'],
-  optionsSuccessStatus: 200
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  exposedHeaders: ['Authorization']
 }));
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: false }));
