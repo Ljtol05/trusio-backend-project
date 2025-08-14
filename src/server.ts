@@ -82,14 +82,27 @@ const startServer = async () => {
     logger.info('Database connected successfully');
 
     const server = app.listen(env.PORT, '0.0.0.0', () => {
+      // Auto-detect Replit external URL
+      const replitUrl = process.env.REPLIT_DEV_DOMAIN 
+        ? `https://${process.env.REPLIT_DEV_DOMAIN}`
+        : `http://localhost:${env.PORT}`;
+
       logger.info({
         port: env.PORT,
         host: '0.0.0.0',
         env: env.NODE_ENV,
         aiEnabled: !!env.OPENAI_API_KEY,
-        url: `http://0.0.0.0:${env.PORT}`,
+        internalUrl: `http://0.0.0.0:${env.PORT}`,
+        externalUrl: replitUrl,
         corsEnabled: true,
       }, 'Server started successfully');
+
+      // Display the URL prominently for easy copying
+      console.log('\n🚀 API Server Ready!');
+      console.log(`📡 External URL: ${replitUrl}`);
+      console.log(`🔗 Health Check: ${replitUrl}/healthz`);
+      console.log(`🔐 Auth Endpoints: ${replitUrl}/api/auth/*`);
+      console.log('\n');
     });
 
     // Graceful shutdown
