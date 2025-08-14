@@ -14,7 +14,7 @@ const envSchema = z.object({
   SMTP_PORT: z.string().optional().transform(Number),
   SMTP_USER: z.string().optional(),
   SMTP_PASS: z.string().optional(),
-  FROM_EMAIL: z.string().optional(),
+  SMTP_FROM: z.string().optional(),
   
   // OpenAI
   OPENAI_API_KEY: z.string().optional().default(''),
