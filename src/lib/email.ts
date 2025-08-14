@@ -1,4 +1,3 @@
-
 import { env } from '../config/env.js';
 import { logger } from './logger.js';
 import nodemailer from 'nodemailer';
@@ -29,7 +28,7 @@ export async function sendVerificationEmail(email: string, code: string): Promis
   // Production or forced email mode
   try {
     const transporter = createTransporter();
-    
+
     if (!transporter) {
       console.log(`Email verification would be sent to ${email} with code ${code}`);
       return;
@@ -55,9 +54,14 @@ export async function sendVerificationEmail(email: string, code: string): Promis
 
     await transporter.sendMail(mailOptions);
     logger.info({ email }, 'Verification email sent successfully');
+    return;
   } catch (error) {
     logger.error({ error, email }, 'Failed to send verification email');
     // Fallback to console in case of error
     console.log(`\n🔐 FALLBACK VERIFICATION for ${email}: ${code}\n`);
+    return;
   }
+
+  // Development mode fallback when no SMTP configured
+  console.log(`\n🔐 DEV VERIFICATION for ${email}: ${code}\n`);
 }

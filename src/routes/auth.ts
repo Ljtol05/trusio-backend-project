@@ -56,18 +56,9 @@ function generateToken(userId: number): string {
 
 // Send phone verification SMS
 async function sendPhoneVerificationSMS(phone: string, code: string): Promise<void> {
-  // In development: log to console for easy testing
-  if (process.env.NODE_ENV === 'development' && !process.env.TWILIO_ACCOUNT_SID) {
-    console.log(`\n📱 SMS VERIFICATION for ${phone}: ${code}\n`);
-    return;
-  }
-
-  // Production or forced SMS mode with Twilio
-  try {
-    if (!process.env.TWILIO_ACCOUNT_SID || !process.env.TWILIO_AUTH_TOKEN || !process.env.TWILIO_PHONE_NUMBER) {
-      console.log(`SMS verification would be sent to ${phone} with code ${code}`);
-      return;
-    }
+  // Always try to send real SMS if Twilio is configured
+  if (process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_PHONE_NUMBER) {
+    try {
 
     const twilio = require('twilio');
     const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
@@ -79,11 +70,17 @@ async function sendPhoneVerificationSMS(phone: string, code: string): Promise<vo
     });
 
     logger.info({ phone }, 'SMS verification sent successfully');
-  } catch (error) {
-    logger.error({ error, phone }, 'Failed to send SMS verification');
-    // Fallback to console in case of error
-    console.log(`\n📱 FALLBACK SMS VERIFICATION for ${phone}: ${code}\n`);
+      return;
+    } catch (error) {
+      logger.error({ error, phone }, 'Failed to send SMS verification');
+      // Fallback to console in case of error
+      console.log(`\n📱 FALLBACK SMS VERIFICATION for ${phone}: ${code}\n`);
+      return;
+    }
   }
+
+  // Development mode fallback when no Twilio configured
+  console.log(`\n📱 DEV SMS VERIFICATION for ${phone}: ${code}\n`);
 }
 
 // POST /api/auth/register
