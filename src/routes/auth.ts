@@ -195,7 +195,12 @@ router.post('/login', async (req, res) => {
 
     // Check if email is verified
     if (!user.emailVerified) {
-      return res.status(401).json({ error: 'Please verify your email first' });
+      return res.status(403).json({ message: 'Please verify your email.' });
+    }
+
+    // Check if KYC is approved
+    if (!user.kycApproved) {
+      return res.status(403).json({ message: 'Please complete KYC.' });
     }
 
     // Generate token

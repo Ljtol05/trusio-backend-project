@@ -32,7 +32,7 @@ interface KycSession {
 const kycSessions = new Map<string, KycSession>();
 
 // Provider ref -> userId mapping for webhook lookups
-const providerRefToUserId = new Map<string, string>();
+export const providerRefToUserId = new Map<string, string>();
 
 export function generateProviderRef(): string {
   return `kyc_${Date.now()}_${Math.random().toString(36).slice(2)}`;

@@ -5,6 +5,7 @@ import { logger } from '../lib/logger.js';
 import { broadcastUpdate } from './events.js';
 import { findBestEnvelope } from './routing.js';
 import { authenticateToken } from './auth.js';
+import { updateKycStatusByRef, providerRefToUserId } from '../lib/kycStore.js';
 
 const router = Router();
 
@@ -155,6 +156,43 @@ router.post('/transactions', authenticateToken, async (req, res) => {
 // Health check for webhook endpoint
 router.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// POST /api/webhooks/kyc - Handle KYC webhook from provider
+router.post('/kyc', async (req, res) => {
+  try {
+    const { providerRef, decision, reason } = webhookPayloadSchema.parse(req.body);
+
+    const success = updateKycStatusByRef(providerRef, decision, reason);
+
+    if (!success) {
+      return res.status(404).json({ error: 'KYC session not found' });
+    }
+
+    // Update user in database if approved
+    if (decision === 'approved') {
+      const userId = providerRefToUserId.get(providerRef);
+      if (userId) {
+        await db.user.update({
+          where: { id: parseInt(userId) },
+          data: { kycApproved: true },
+        });
+      }
+    }
+
+    logger.info({ providerRef, decision }, 'KYC webhook processed');
+    res.json({ ok: true });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({
+        error: 'Invalid webhook payload',
+        details: error.errors,
+      });
+    }
+
+    logger.error({ error }, 'Error processing KYC webhook');
+    res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
 export default router;

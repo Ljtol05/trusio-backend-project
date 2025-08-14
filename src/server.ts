@@ -19,51 +19,17 @@ import kycRoutes from './routes/kyc.js';
 
 const app = express();
 
-// Middleware
+// Middleware - Origin-agnostic CORS (Replit manages CORS for us)
 app.use(cors({
-  origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) return callback(null, true);
-    
-    const allowedOrigins = [
-      'http://localhost:5173',
-      'http://localhost:3000',
-      'http://localhost:8080',
-      'https://localhost:5173',
-      'https://localhost:3000',
-      'https://localhost:8080',
-    ];
-    
-    // Check for Replit domains (more comprehensive)
-    if (origin.match(/^https:\/\/.*\.replit\.dev$/) || 
-        origin.match(/^https:\/\/.*\.replit\.co$/) ||
-        origin.match(/^https:\/\/.*\.repl\.co$/)) {
-      return callback(null, true);
-    }
-    
-    // Check allowed origins
-    if (allowedOrigins.includes(origin)) {
-      return callback(null, true);
-    }
-    
-    // For development, allow any localhost origin and any Replit subdomain
-    if (origin.match(/^https?:\/\/localhost:\d+$/) ||
-        origin.match(/^https:\/\/[a-zA-Z0-9-]+\.replit\.(dev|co)$/)) {
-      return callback(null, true);
-    }
-    
-    // Log the origin for debugging
-    console.log('CORS rejected origin:', origin);
-    callback(new Error('Not allowed by CORS'));
-  },
+  origin: true, // Allow all origins since Replit handles CORS
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Origin', 'X-Requested-With'],
   exposedHeaders: ['Content-Range', 'X-Content-Range'],
   optionsSuccessStatus: 200
 }));
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ extended: false }));
 
 // Request logging
 app.use((req, res, next) => {
@@ -77,27 +43,8 @@ app.use((req, res, next) => {
 });
 
 // Health check
-app.get('/healthz', async (_req, res) => {
-  const health = {
-    status: 'ok',
-    timestamp: new Date().toISOString(),
-    services: {
-      database: 'ok',
-      openai: 'checking...',
-      kyc: 'ok'
-    }
-  };
-
-  // Quick OpenAI health check (non-blocking)
-  try {
-    const { openaiPing } = await import('./lib/openai.js');
-    const pingResult = await openaiPing();
-    health.services.openai = pingResult.ok ? 'ok' : `error: ${pingResult.reason}`;
-  } catch (error) {
-    health.services.openai = 'error: unavailable';
-  }
-
-  res.json(health);
+app.get('/healthz', (_req, res) => {
+  res.json({ ok: true });
 });
 
 // API routes
