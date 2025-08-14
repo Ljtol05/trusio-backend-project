@@ -1,8 +1,8 @@
-
 import { Router } from 'express';
 import { z } from 'zod';
 import { logger } from '../lib/logger.js';
 import { startKyc, getKycStatus, updateKycStatusByRef } from '../lib/kycStore.js';
+import { authenticateToken } from './auth.js';
 
 const router = Router();
 
@@ -25,32 +25,22 @@ const webhookPayloadSchema = z.object({
   reason: z.string().optional(),
 });
 
-// Middleware to require authentication (assuming you have this pattern)
-const requireAuth = (req: any, res: any, next: any) => {
-  // This should match your existing auth middleware pattern
-  // For now, we'll create a stub user if one doesn't exist
-  if (!req.user) {
-    req.user = { id: '1' }; // Default user for MVP
-  }
-  next();
-};
-
 // POST /api/kyc/start - Start KYC process
-router.post('/start', requireAuth, async (req, res) => {
+router.post('/start', authenticateToken, async (req, res) => {
   try {
     const validatedData = kycFormSchema.parse(req.body);
-    
+
     // Validate DOB is not in the future and person is at least 18
     const dob = new Date(validatedData.dob);
     const now = new Date();
     const age = now.getFullYear() - dob.getFullYear();
-    
+
     if (dob > now) {
       return res.status(400).json({ 
         error: 'Date of birth cannot be in the future' 
       });
     }
-    
+
     if (age < 18) {
       return res.status(400).json({ 
         error: 'Must be at least 18 years old' 
@@ -64,7 +54,7 @@ router.post('/start', requireAuth, async (req, res) => {
     });
 
     const result = startKyc(req.user.id, validatedData);
-    
+
     res.status(201).json(result);
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -73,14 +63,14 @@ router.post('/start', requireAuth, async (req, res) => {
         details: error.errors,
       });
     }
-    
+
     logger.error({ error, userId: req.user?.id }, 'Error starting KYC process');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
 
 // GET /api/kyc/status - Get current KYC status
-router.get('/status', requireAuth, (req, res) => {
+router.get('/status', authenticateToken, (req, res) => {
   try {
     const status = getKycStatus(req.user.id);
     res.json(status);
@@ -94,13 +84,13 @@ router.get('/status', requireAuth, (req, res) => {
 router.post('/webhooks/kyc', async (req, res) => {
   try {
     const payload = webhookPayloadSchema.parse(req.body);
-    
+
     const updated = updateKycStatusByRef(
       payload.providerRef,
       payload.decision,
       payload.reason
     );
-    
+
     if (!updated) {
       return res.status(404).json({ 
         error: 'Provider reference not found' 
@@ -118,7 +108,7 @@ router.post('/webhooks/kyc', async (req, res) => {
         });
       }
     }
-    
+
     res.json({ ok: true });
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -127,7 +117,7 @@ router.post('/webhooks/kyc', async (req, res) => {
         details: error.errors,
       });
     }
-    
+
     logger.error({ error }, 'Error processing KYC webhook');
     res.status(500).json({ error: 'Internal server error' });
   }
