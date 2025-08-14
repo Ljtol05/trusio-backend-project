@@ -3,7 +3,7 @@ import cors from 'cors';
 import { db } from './lib/db.js';
 import { logger } from './lib/logger.js';
 import { env } from './config/env.js';
-import { authenticateToken } from './middleware/auth.js'; // Assuming authenticateToken is in this file
+import { authenticateToken } from './routes/auth.js';
 
 // Import routes
 import authRoutes from './routes/auth.js';
