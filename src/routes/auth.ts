@@ -86,6 +86,7 @@ router.post('/register', async (req, res) => {
 // POST /api/auth/verify-email
 router.post('/verify-email', async (req, res) => {
   try {
+    logger.debug({ body: req.body }, 'Verify email request received');
     const { email, code } = verifyEmailSchema.parse(req.body);
 
     // Find user
@@ -130,7 +131,8 @@ router.post('/verify-email', async (req, res) => {
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ error: error.errors[0].message });
+      logger.error({ zodErrors: error.errors, requestBody: req.body }, 'Validation failed for verify-email');
+      return res.status(400).json({ error: error.errors[0].message, details: error.errors });
     }
     logger.error(error, 'Email verification error');
     res.status(500).json({ error: 'Email verification failed' });
