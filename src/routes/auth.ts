@@ -12,10 +12,18 @@ const router = Router();
 
 // Validation schemas
 const registerSchema = z.object({
-  name: z.string().min(1, 'Name is required'),
+  name: z.string().min(1, 'Name is required').optional(),
+  firstName: z.string().min(1, 'First name is required').optional(),
+  lastName: z.string().min(1, 'Last name is required').optional(),
   email: z.string().email('Invalid email'),
   password: z.string().min(6, 'Password must be at least 6 characters'),
-});
+}).refine(
+  (data) => data.name || (data.firstName && data.lastName),
+  {
+    message: "Either 'name' or both 'firstName' and 'lastName' are required",
+    path: ["name"]
+  }
+);
 
 const loginSchema = z.object({
   email: z.string().email('Invalid email'),
@@ -86,7 +94,10 @@ async function sendPhoneVerificationSMS(phone: string, code: string): Promise<vo
 // POST /api/auth/register
 router.post('/register', async (req, res) => {
   try {
-    const { name, email, password } = registerSchema.parse(req.body);
+    const { name, firstName, lastName, email, password } = registerSchema.parse(req.body);
+
+    // Combine firstName and lastName if provided, otherwise use name
+    const fullName = name || `${firstName} ${lastName}`.trim();
 
     // Check if user already exists
     const existingUser = await db.user.findUnique({ where: { email } });
@@ -103,7 +114,7 @@ router.post('/register', async (req, res) => {
     // Create user
     await db.user.create({
       data: {
-        name,
+        name: fullName,
         email,
         password: hashedPassword,
         emailVerified: false,
@@ -119,7 +130,7 @@ router.post('/register', async (req, res) => {
       message: 'Verification email sent.',
       user: {
         email,
-        name,
+        name: fullName,
         emailVerified: false,
         phoneVerified: false,
         kycApproved: false
