@@ -1,0 +1,25 @@
+Project goal: Implement a production-ready email verification system using the Resend API in my Replit project.
+Technologies: Node.js/Express backend, Prisma (or chosen DB) for persistence, bcryptjs for hashing codes.
+
+What I need you to do:
+	1.	Install dependencies:
+	•	Add the official Resend client library (npm i resend) and any other packages necessary for code hashing (e.g. bcryptjs) and validation (zod).
+	2.	Configure environment variables:
+	•	Use Replit’s Secrets to store RESEND_API_KEY (obtained from my Resend dashboard) and MAIL_FROM, which should be a “friendly name verified@mydomain.com”. Note that Resend requires sending from a domain that has been verified ￼.
+	•	Create any additional environment variables you need (e.g. code expiry duration).
+	3.	Domain verification:
+	•	Write a note in the README that the user must verify their sending domain in Resend’s dashboard (adding the provided DKIM/SPF TXT records). Resend will reject emails if the from domain hasn’t been verified ￼.
+	4.	Create verification routes:
+	•	Implement /send-email-code: accept an email address, validate it, generate a 6‑digit numeric code, hash it with bcrypt, store it alongside an expiration timestamp in the database, and send it via Resend.
+	•	Implement /verify-email-code: accept the email and code, fetch the record, check expiry, compare the code using bcrypt, and mark the user as verified if it matches.
+	•	Add rate limiting (e.g. max 5 requests/hour per IP) to prevent abuse.
+	5.	Use Resend API:
+	•	Instantiate const resend = new Resend(process.env.RESEND_API_KEY).
+	•	Call await resend.emails.send({ from: process.env.MAIL_FROM, to: [email], subject: 'Your verification code', html: generateEmailHtml(code) }).
+	6.	Email template and styling:
+	•	Create a helper generateEmailHtml(code) that returns a well‑structured HTML string. Include inline CSS for styling (fonts, colors, spacing). Keep the design simple (e.g. centered container with your logo, a heading, the code in bold, and a footnote about its 10‑minute expiry).
+	•	Optionally, demonstrate how to use React Email with Tailwind and Resend’s react parameter for more complex templates (e.g. import components like <Html>, <Head>, <Body>, <Section>, and <Text>). This method lets you define responsive layouts and classes for colors and spacing ￼.
+	7.	Testing:
+	•	Include a script or endpoint to send a test email to delivered@resend.dev and log the API response.
+	8.	Error handling:
+	•	Handle and log Resend API errors gracefully, returning appropriate HTTP responses.
