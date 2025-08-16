@@ -8,29 +8,24 @@ datasource db {
 }
 
 model User {
-  id        Int      @id @default(autoincrement())
-  email     String   @unique
-  password  String   // Add password field for authentication
-  name      String?
-  emailVerified Boolean @default(false)
-  phone     String?
-  phoneVerified Boolean @default(false)
-  phoneVerificationCode String?
-  kycApproved Boolean @default(false)
-  verificationCode String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                       Int           @id @default(autoincrement())
+  name                     String
+  email                    String        @unique
+  password                 String?
+  emailVerified            Boolean       @default(false)
+  verificationCode         String?
+  phoneVerified            Boolean       @default(false)
+  phone                    String?
+  phoneVerificationCode    String?
+  kycApproved              Boolean       @default(false)
+  kycData                  Json?
+  createdAt                DateTime      @default(now())
+  updatedAt                DateTime      @updatedAt
 
-  // Relations
-  envelopes    Envelope[]
-  transactions Transaction[]
-  transfers    Transfer[]
-  rules        Rule[]
-  cards        Card[]
-  routingConfig RoutingConfig?
-  memories       UserMemory[]
-
-  @@map("users")
+  envelopes                Envelope[]
+  cards                    Card[]
+  transactions             Transaction[]
+  transfers                Transfer[]
 }
 
 model Envelope {
@@ -165,4 +160,12 @@ model UserMemory {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("user_memories")
+}
+
+model VerificationCode {
+  id                       Int           @id @default(autoincrement())
+  email                    String        @unique
+  codeHash                 String
+  expiresAt                DateTime
+  createdAt                DateTime      @default(now())
 }

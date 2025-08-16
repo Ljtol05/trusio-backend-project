@@ -1,82 +1,46 @@
+
+import { Resend } from 'resend';
+import { render } from '@react-email/render';
 import { env } from '../config/env.js';
 import { logger } from './logger.js';
-import nodemailer from 'nodemailer';
+import { VerificationEmail } from '../emails/VerificationEmail.js';
 
-// Create email transporter for production
-const createTransporter = () => {
-  if (!env.SMTP_HOST || !env.SMTP_USER || !env.SMTP_PASS) {
-    return null;
-  }
-
-  try {
-    return nodemailer.createTransporter({
-      host: env.SMTP_HOST,
-      port: parseInt(env.SMTP_PORT || '587'),
-      secure: env.SMTP_PORT === '465', // true for 465, false for other ports
-      auth: {
-        user: env.SMTP_USER,
-        pass: env.SMTP_PASS,
-      },
-      // Add timeout and connection settings
-      connectionTimeout: 10000, // 10 seconds
-      greetingTimeout: 5000, // 5 seconds
-      socketTimeout: 10000, // 10 seconds
-    });
-  } catch (error) {
-    logger.error({ error }, 'Failed to create email transporter');
-    return null;
-  }
-};
+// Initialize Resend
+const resend = env.RESEND_API_KEY ? new Resend(env.RESEND_API_KEY) : null;
 
 export async function sendVerificationEmail(email: string, code: string): Promise<void> {
-  // In development: log to console for easy testing unless SMTP is explicitly configured
-  if (env.NODE_ENV === 'development' && !env.SMTP_HOST) {
+  // Development mode fallback when no Resend API key configured
+  if (env.NODE_ENV === 'development' && !env.RESEND_API_KEY) {
     console.log(`\n🔐 DEV VERIFICATION for ${email}: ${code}\n`);
     return;
   }
 
-  // Check if we have minimum SMTP configuration
-  if (!env.SMTP_HOST || !env.SMTP_USER || !env.SMTP_PASS) {
+  // Check if we have Resend API key
+  if (!env.RESEND_API_KEY || !resend) {
     console.log(`\n🔐 FALLBACK VERIFICATION for ${email}: ${code}\n`);
-    logger.warn({ email }, 'SMTP not configured, using console fallback');
+    logger.warn({ email }, 'RESEND_API_KEY not configured, using console fallback');
     return;
   }
 
-  // Production or forced email mode with proper SMTP config
   try {
-    const transporter = createTransporter();
+    // Render the React email component
+    const reactEmail = VerificationEmail({ code });
+    
+    // Send using Resend with React component
+    await resend.emails.send({
+      from: env.MAIL_FROM || 'Verify <verify@owllocate.it.com>',
+      to: [email],
+      subject: 'Your verification code',
+      react: reactEmail,
+    });
 
-    if (!transporter) {
-      console.log(`\n🔐 NO TRANSPORTER VERIFICATION for ${email}: ${code}\n`);
-      return;
-    }
-
-    const mailOptions = {
-      from: env.SMTP_FROM || env.SMTP_USER,
-      to: email,
-      subject: 'Email Verification - Your App Name',
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2>Email Verification</h2>
-          <p>Your verification code is:</p>
-          <h1 style="background: #f0f0f0; padding: 20px; text-align: center; letter-spacing: 5px; color: #333;">
-            ${code}
-          </h1>
-          <p>This code will expire in 10 minutes.</p>
-          <p>If you didn't request this verification, please ignore this email.</p>
-        </div>
-      `,
-      text: `Your verification code is: ${code}. This code will expire in 10 minutes.`,
-    };
-
-    await transporter.sendMail(mailOptions);
-    logger.info({ email }, 'Verification email sent successfully via SMTP');
+    logger.info({ email }, 'Verification email sent successfully via Resend');
     return;
-  } catch (error) {
-    logger.error({ error: error.message || error, email }, 'Failed to send verification email via SMTP');
+  } catch (error: any) {
+    logger.error({ error: error.message || error, email }, 'Failed to send verification email via Resend');
     // Fallback to console in case of error
-    console.log(`\n🔐 SMTP ERROR FALLBACK for ${email}: ${code}\n`);
-    console.log(`SMTP Error: ${error.message || 'Unknown error'}`);
+    console.log(`\n🔐 RESEND ERROR FALLBACK for ${email}: ${code}\n`);
+    console.log(`Resend Error: ${error.message || 'Unknown error'}`);
     return;
   }
 }

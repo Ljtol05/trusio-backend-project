@@ -7,6 +7,7 @@ import { authenticateToken } from './routes/auth.js';
 
 // Import routes
 import authRoutes from './routes/auth.js';
+import verifyEmailRoutes from './routes/verify-email.js';
 import envelopeRoutes from './routes/envelopes.js';
 import transferRoutes from './routes/transfers.js';
 import transactionRoutes from './routes/transactions.js';
@@ -55,6 +56,7 @@ app.get('/healthz', (_req, res) => {
 // API routes
 // Public routes (no authentication required)
 app.use('/api/auth', authRoutes);
+app.use(verifyEmailRoutes);
 app.use('/api/webhooks', webhookRoutes);
 
 // Protected routes (authentication required)
