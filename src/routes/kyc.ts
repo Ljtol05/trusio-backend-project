@@ -1,3 +1,4 @@
+
 import { Router } from 'express';
 import { z } from 'zod';
 import { logger } from '../lib/logger.js';
@@ -54,7 +55,7 @@ router.post('/start', authenticateToken, async (req, res) => {
       data: { kycApproved: false },
     });
 
-    const result = startKyc(req.user.id, validatedData);
+    const result = startKyc(req.user.id.toString(), validatedData);
 
     res.status(201).json(result);
   } catch (error) {
@@ -73,7 +74,7 @@ router.post('/start', authenticateToken, async (req, res) => {
 // GET /api/kyc/status - Get current KYC status
 router.get('/status', authenticateToken, (req, res) => {
   try {
-    const status = getKycStatus(req.user.id);
+    const status = getKycStatus(req.user.id.toString());
     res.json(status);
   } catch (error) {
     logger.error({ error, userId: req.user?.id }, 'Error getting KYC status');

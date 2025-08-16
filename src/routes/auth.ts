@@ -65,19 +65,18 @@ function generateToken(userId: number): string {
 // Send phone verification SMS
 async function sendPhoneVerificationSMS(phone: string, code: string): Promise<void> {
   // Always try to send real SMS if Twilio is configured
-  if (process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_PHONE_NUMBER) {
+  if (env.TWILIO_ACCOUNT_SID && env.TWILIO_AUTH_TOKEN && env.TWILIO_PHONE_NUMBER) {
     try {
+      const twilio = require('twilio');
+      const client = twilio(env.TWILIO_ACCOUNT_SID, env.TWILIO_AUTH_TOKEN);
+      
+      await client.messages.create({
+        body: `Your verification code is: ${code}. This code will expire in 10 minutes.`,
+        from: env.TWILIO_PHONE_NUMBER,
+        to: phone
+      });
 
-    const twilio = require('twilio');
-    const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
-    
-    await client.messages.create({
-      body: `Your verification code is: ${code}. This code will expire in 10 minutes.`,
-      from: process.env.TWILIO_PHONE_NUMBER,
-      to: phone
-    });
-
-    logger.info({ phone }, 'SMS verification sent successfully');
+      logger.info({ phone }, 'SMS verification sent successfully');
       return;
     } catch (error) {
       logger.error({ error, phone }, 'Failed to send SMS verification');
@@ -110,6 +109,8 @@ router.post('/register', async (req, res) => {
 
     // Generate verification code
     const verificationCode = generateVerificationCode();
+    const codeHash = await bcrypt.hash(verificationCode, 10);
+    const ttl = Number(env.VERIFICATION_CODE_TTL);
 
     // Create user
     await db.user.create({
@@ -118,7 +119,16 @@ router.post('/register', async (req, res) => {
         email,
         password: hashedPassword,
         emailVerified: false,
-        verificationCode,
+      },
+    });
+
+    // Store verification code in VerificationCode table
+    await db.verificationCode.deleteMany({ where: { email } });
+    await db.verificationCode.create({
+      data: {
+        email,
+        codeHash,
+        expiresAt: new Date(Date.now() + ttl),
       },
     });
 
@@ -162,19 +172,25 @@ router.post('/verify-email', async (req, res) => {
       return res.status(400).json({ error: 'Email already verified' });
     }
 
-    // Check verification code
-    if (user.verificationCode !== code) {
+    // Check verification code in VerificationCode table
+    const verificationRecord = await db.verificationCode.findUnique({ where: { email } });
+    if (!verificationRecord || Date.now() > verificationRecord.expiresAt.getTime()) {
+      return res.status(400).json({ error: 'Verification code expired or not found' });
+    }
+
+    // Verify the code
+    const isValidCode = await bcrypt.compare(code, verificationRecord.codeHash);
+    if (!isValidCode) {
       return res.status(400).json({ error: 'Invalid verification code' });
     }
 
-    // Update user
+    // Update user and clean up verification code
     await db.user.update({
       where: { id: user.id },
-      data: {
-        emailVerified: true,
-        verificationCode: null,
-      },
+      data: { emailVerified: true },
     });
+    
+    await db.verificationCode.delete({ where: { email } });
 
     // Generate auth token for authenticated API access
     const token = generateToken(user.id);
@@ -222,11 +238,17 @@ router.post('/resend-verification', async (req, res) => {
 
     // Generate new verification code
     const verificationCode = generateVerificationCode();
+    const codeHash = await bcrypt.hash(verificationCode, 10);
+    const ttl = Number(env.VERIFICATION_CODE_TTL);
 
-    // Update user with new code
-    await db.user.update({
-      where: { id: user.id },
-      data: { verificationCode },
+    // Update verification code
+    await db.verificationCode.deleteMany({ where: { email } });
+    await db.verificationCode.create({
+      data: {
+        email,
+        codeHash,
+        expiresAt: new Date(Date.now() + ttl),
+      },
     });
 
     // Send verification email

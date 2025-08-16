@@ -22,6 +22,11 @@ const envSchema = z.object({
   //timeouts/retries
   OPENAI_TIMEOUT_MS: z.string().default('60000').transform(Number),
   OPENAI_MAX_RETRIES: z.string().default('3').transform(Number),
+
+  // Twilio
+  TWILIO_ACCOUNT_SID: z.string().optional(),
+  TWILIO_AUTH_TOKEN: z.string().optional(),
+  TWILIO_PHONE_NUMBER: z.string().optional(),
 });
 
 export const env = envSchema.parse(process.env);

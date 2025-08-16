@@ -56,7 +56,6 @@ app.get('/healthz', (_req, res) => {
 // API routes
 // Public routes (no authentication required)
 app.use('/api/auth', authRoutes);
-app.use(verifyEmailRoutes);
 app.use('/api/webhooks', webhookRoutes);
 
 // Protected routes (authentication required)
@@ -66,8 +65,8 @@ app.use('/api/transfers', authenticateToken, transferRoutes);
 app.use('/api/rules', authenticateToken, ruleRoutes); // Corrected rulesRoutes to ruleRoutes
 app.use('/api/routing', authenticateToken, routingRoutes);
 app.use('/api/cards', authenticateToken, cardRoutes);
-app.use('/api/ai', authenticateToken, aiRoutes);
 app.use('/api/kyc', authenticateToken, kycRoutes);
+app.use('/api/ai', authenticateToken, aiRoutes);
 app.use('/api/events', authenticateToken, eventRoutes);
 
 // 404 handler
