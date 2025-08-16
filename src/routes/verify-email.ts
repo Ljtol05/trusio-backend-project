@@ -20,7 +20,7 @@ router.post('/api/send-verification-code', async (req, res) => {
     const { email } = SendSchema.parse(req.body);
     const code = Math.floor(100000 + Math.random() * 900000).toString();
     const hash = await bcrypt.hash(code, 10);
-    const ttl = Number(env.VERIFICATION_CODE_TTL ?? 10 * 60 * 1000); // 10 minutes default
+    const ttl = Number(env.VERIFICATION_CODE_TTL ?? 5 * 60 * 1000); // 5 minutes default
     
     // Delete existing codes for this email
     await db.verificationCode.deleteMany({ where: { email } });

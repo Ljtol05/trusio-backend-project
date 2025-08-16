@@ -18,7 +18,7 @@ model User {
   phone                    String?
   phoneVerificationCode    String?
   kycApproved              Boolean       @default(false)
-  kycData                  Json?
+  kycData                  String?       // Changed from Json to String for SQLite
   createdAt                DateTime      @default(now())
   updatedAt                DateTime      @updatedAt
 
@@ -26,6 +26,9 @@ model User {
   cards                    Card[]
   transactions             Transaction[]
   transfers                Transfer[]
+  rules                    Rule[]
+  routingConfig            RoutingConfig?
+  userMemories             UserMemory[]
 }
 
 model Envelope {
