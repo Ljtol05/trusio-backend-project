@@ -8,6 +8,7 @@ async function main() {
     where: { email: 'demo@envelopes.app' },
     update: {},
     create: { 
+      name: 'Demo User',
       email: 'demo@envelopes.app',
       password: 'demo123' // Simple demo password
     },
