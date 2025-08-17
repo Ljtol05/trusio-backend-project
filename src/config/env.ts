@@ -6,12 +6,12 @@ const envSchema = z.object({
   DATABASE_URL: z.string().optional(),
 
   // Auth
-  JWT_SECRET: z.string().optional().default('fallback-jwt-secret-change-in-production'),
+  JWT_SECRET: z.string().min(1).default('fallback-jwt-secret-change-in-production'),
 
   // Email Configuration (Resend)
   RESEND_API_KEY: z.string().optional(),
-  MAIL_FROM: z.string().optional(),
-  VERIFICATION_CODE_TTL: z.string().optional(),
+  MAIL_FROM: z.string().optional().default('Verify <verify@owllocate.it.com>'),
+  VERIFICATION_CODE_TTL: z.string().default('600000'),
 
   // OpenAI
   OPENAI_API_KEY: z.string().optional().default(''),
@@ -29,7 +29,18 @@ const envSchema = z.object({
   TWILIO_PHONE_NUMBER: z.string().optional(),
 });
 
-export const env = envSchema.parse(process.env);
+// Parse environment variables and log what we're getting
+const rawEnv = {
+  ...process.env,
+  // Ensure we're reading from the actual environment
+  RESEND_API_KEY: process.env.RESEND_API_KEY,
+  TWILIO_ACCOUNT_SID: process.env.TWILIO_ACCOUNT_SID,
+  TWILIO_AUTH_TOKEN: process.env.TWILIO_AUTH_TOKEN,
+  TWILIO_PHONE_NUMBER: process.env.TWILIO_PHONE_NUMBER,
+  MAIL_FROM: process.env.MAIL_FROM,
+};
+
+export const env = envSchema.parse(rawEnv);
 
 if (!env.OPENAI_API_KEY) {
   // Don't throw on boot (so /healthz still works), but log a clear hint

@@ -9,6 +9,13 @@ import { VerificationEmail } from '../emails/VerificationEmail.js';
 const resend = env.RESEND_API_KEY ? new Resend(env.RESEND_API_KEY) : null;
 
 export async function sendVerificationEmail(email: string, code: string): Promise<void> {
+  // Log the API key status for debugging
+  logger.debug({ 
+    hasApiKey: !!env.RESEND_API_KEY, 
+    apiKeyPrefix: env.RESEND_API_KEY ? env.RESEND_API_KEY.substring(0, 5) + '...' : 'none',
+    email 
+  }, 'Attempting to send verification email');
+
   // Development mode fallback when no Resend API key configured
   if (env.NODE_ENV === 'development' && !env.RESEND_API_KEY) {
     console.log(`\n🔐 DEV VERIFICATION for ${email}: ${code}\n`);
@@ -18,7 +25,7 @@ export async function sendVerificationEmail(email: string, code: string): Promis
   // Check if we have Resend API key
   if (!env.RESEND_API_KEY || !resend) {
     console.log(`\n🔐 FALLBACK VERIFICATION for ${email}: ${code}\n`);
-    logger.warn({ email }, 'RESEND_API_KEY not configured, using console fallback');
+    logger.warn({ email, hasApiKey: !!env.RESEND_API_KEY }, 'RESEND_API_KEY not configured, using console fallback');
     return;
   }
 

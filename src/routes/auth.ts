@@ -64,9 +64,23 @@ function generateToken(userId: number): string {
 
 // Send phone verification SMS
 async function sendPhoneVerificationSMS(phone: string, code: string): Promise<void> {
+  // Log Twilio configuration status for debugging
+  logger.debug({ 
+    hasAccountSid: !!env.TWILIO_ACCOUNT_SID,
+    accountSidPrefix: env.TWILIO_ACCOUNT_SID ? env.TWILIO_ACCOUNT_SID.substring(0, 5) + '...' : 'none',
+    hasAuthToken: !!env.TWILIO_AUTH_TOKEN,
+    hasPhoneNumber: !!env.TWILIO_PHONE_NUMBER,
+    phone 
+  }, 'Attempting to send SMS verification');
+
   // Always try to send real SMS if Twilio is configured
   if (env.TWILIO_ACCOUNT_SID && env.TWILIO_AUTH_TOKEN && env.TWILIO_PHONE_NUMBER) {
     try {
+      // Validate Account SID format
+      if (!env.TWILIO_ACCOUNT_SID.startsWith('AC')) {
+        throw new Error(`Invalid Twilio Account SID format. Expected to start with 'AC', got: ${env.TWILIO_ACCOUNT_SID.substring(0, 2)}...`);
+      }
+
       // Dynamic import for Twilio using ES modules
       const { default: twilio } = await import('twilio');
       const client = twilio(env.TWILIO_ACCOUNT_SID, env.TWILIO_AUTH_TOKEN);
@@ -83,7 +97,8 @@ async function sendPhoneVerificationSMS(phone: string, code: string): Promise<vo
       logger.error({ 
         error: error.message || error, 
         phone,
-        twilioError: error.code || 'unknown'
+        twilioError: error.code || 'unknown',
+        accountSidFormat: env.TWILIO_ACCOUNT_SID ? env.TWILIO_ACCOUNT_SID.substring(0, 5) : 'none'
       }, 'Failed to send SMS verification');
       
       // Fallback to console in case of error
