@@ -205,6 +205,7 @@ router.post('/verify-email', async (req, res) => {
     res.json({ 
       message: 'Email verified. Please verify your phone number.',
       token,
+      verificationStep: 'phone',
       nextStep: 'phone',
       user: {
         id: user.id,
@@ -499,6 +500,7 @@ router.post('/verify-phone', authenticateToken, async (req: any, res) => {
     logger.info({ userId: user.id, phone }, 'Phone verified successfully');
     res.json({ 
       message: 'Phone verified. Please complete KYC verification.',
+      verificationStep: 'kyc',
       nextStep: 'kyc',
       user: {
         id: updatedUser.id,
