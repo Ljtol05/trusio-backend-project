@@ -26,6 +26,16 @@ export const VerificationEmail = ({ code }: VerificationEmailProps) => (
         overflow: 'hidden'
       }}>
         <Section style={{ backgroundColor: '#1e293b', padding: '32px 40px', textAlign: 'center' }}>
+          <img 
+            src="https://owl-light-logo.png" 
+            alt="OwlLocate" 
+            width="60" 
+            height="60" 
+            style={{ 
+              margin: '0 auto 16px auto',
+              display: 'block'
+            }} 
+          />
           <Heading style={{ 
             color: '#ffffff', 
             fontSize: '24px', 
