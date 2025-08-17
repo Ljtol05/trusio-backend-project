@@ -9,24 +9,16 @@ import { VerificationEmail } from '../emails/VerificationEmail.js';
 const resend = env.RESEND_API_KEY ? new Resend(env.RESEND_API_KEY) : null;
 
 export async function sendVerificationEmail(email: string, code: string): Promise<void> {
-  // Log the API key status for debugging
   logger.debug({ 
     hasApiKey: !!env.RESEND_API_KEY, 
-    apiKeyPrefix: env.RESEND_API_KEY ? env.RESEND_API_KEY.substring(0, 5) + '...' : 'none',
     email 
-  }, 'Attempting to send verification email');
+  }, 'Sending verification email via Resend');
 
-  // Development mode fallback when no Resend API key configured
-  if (env.NODE_ENV === 'development' && !env.RESEND_API_KEY) {
-    console.log(`\n🔐 DEV VERIFICATION for ${email}: ${code}\n`);
-    return;
-  }
-
-  // Check if we have Resend API key
+  // Require Resend API key - no fallbacks
   if (!env.RESEND_API_KEY || !resend) {
-    console.log(`\n🔐 FALLBACK VERIFICATION for ${email}: ${code}\n`);
-    logger.warn({ email, hasApiKey: !!env.RESEND_API_KEY }, 'RESEND_API_KEY not configured, using console fallback');
-    return;
+    const error = 'RESEND_API_KEY is required for email verification';
+    logger.error({ email }, error);
+    throw new Error(error);
   }
 
   try {
@@ -35,9 +27,9 @@ export async function sendVerificationEmail(email: string, code: string): Promis
     
     // Send using Resend with React component
     const result = await resend.emails.send({
-      from: env.MAIL_FROM || 'Verify <verify@owllocate.it.com>',
+      from: env.MAIL_FROM || 'OwlLocate Security <noreply@owllocate.it>',
       to: [email],
-      subject: 'Your verification code',
+      subject: 'Complete your account verification',
       react: reactEmail,
     });
 
@@ -46,7 +38,6 @@ export async function sendVerificationEmail(email: string, code: string): Promis
     }
 
     logger.info({ email, messageId: result.data?.id }, 'Verification email sent successfully via Resend');
-    return;
   } catch (error: any) {
     logger.error({ 
       error: error.message || error, 
@@ -54,9 +45,6 @@ export async function sendVerificationEmail(email: string, code: string): Promis
       stack: error.stack 
     }, 'Failed to send verification email via Resend');
     
-    // Fallback to console in case of error
-    console.log(`\n🔐 RESEND ERROR FALLBACK for ${email}: ${code}\n`);
-    console.log(`Resend Error: ${error.message || 'Unknown error'}`);
-    return;
+    throw new Error(`Failed to send verification email: ${error.message || 'Unknown error'}`);
   }
 }
