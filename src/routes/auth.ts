@@ -67,7 +67,8 @@ async function sendPhoneVerificationSMS(phone: string, code: string): Promise<vo
   // Always try to send real SMS if Twilio is configured
   if (env.TWILIO_ACCOUNT_SID && env.TWILIO_AUTH_TOKEN && env.TWILIO_PHONE_NUMBER) {
     try {
-      const twilio = require('twilio');
+      // Dynamic import for Twilio using ES modules
+      const { default: twilio } = await import('twilio');
       const client = twilio(env.TWILIO_ACCOUNT_SID, env.TWILIO_AUTH_TOKEN);
       
       const message = await client.messages.create({
