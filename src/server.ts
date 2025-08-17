@@ -30,8 +30,14 @@ app.use(cors({
     /^https:\/\/.*\.repl\.co$/, // Any repl.co domain
   ],
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'x-replit-user-id'],
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: [
+    'Content-Type',
+    'Authorization', 
+    'Accept',
+    'x-replit-user-id',
+    'x-replit-user-name'
+  ],
   exposedHeaders: ['Authorization']
 }));
 app.use(express.json({ limit: '1mb' }));
