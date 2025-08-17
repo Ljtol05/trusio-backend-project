@@ -70,18 +70,24 @@ async function sendPhoneVerificationSMS(phone: string, code: string): Promise<vo
       const twilio = require('twilio');
       const client = twilio(env.TWILIO_ACCOUNT_SID, env.TWILIO_AUTH_TOKEN);
       
-      await client.messages.create({
+      const message = await client.messages.create({
         body: `Your verification code is: ${code}. This code will expire in 10 minutes.`,
         from: env.TWILIO_PHONE_NUMBER,
         to: phone
       });
 
-      logger.info({ phone }, 'SMS verification sent successfully');
+      logger.info({ phone, messageSid: message.sid }, 'SMS verification sent successfully');
       return;
-    } catch (error) {
-      logger.error({ error, phone }, 'Failed to send SMS verification');
+    } catch (error: any) {
+      logger.error({ 
+        error: error.message || error, 
+        phone,
+        twilioError: error.code || 'unknown'
+      }, 'Failed to send SMS verification');
+      
       // Fallback to console in case of error
-      console.log(`\n📱 FALLBACK SMS VERIFICATION for ${phone}: ${code}\n`);
+      console.log(`\n📱 TWILIO ERROR FALLBACK for ${phone}: ${code}\n`);
+      console.log(`Twilio Error: ${error.message || 'Unknown error'}`);
       return;
     }
   }
@@ -371,7 +377,10 @@ export const authenticateToken = async (req: any, res: any, next: any) => {
   const token = authHeader && authHeader.split(' ')[1];
 
   if (!token) {
-    logger.warn({ url: req.url }, 'No token provided');
+    // Only log warnings for non-auth endpoints to reduce noise
+    if (!req.url.includes('/auth/me')) {
+      logger.warn({ url: req.url }, 'No token provided');
+    }
     return res.status(401).json({ error: 'Access token required' });
   }
 

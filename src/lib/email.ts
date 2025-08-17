@@ -27,17 +27,26 @@ export async function sendVerificationEmail(email: string, code: string): Promis
     const reactEmail = VerificationEmail({ code });
     
     // Send using Resend with React component
-    await resend.emails.send({
+    const result = await resend.emails.send({
       from: env.MAIL_FROM || 'Verify <verify@owllocate.it.com>',
       to: [email],
       subject: 'Your verification code',
       react: reactEmail,
     });
 
-    logger.info({ email }, 'Verification email sent successfully via Resend');
+    if (result.error) {
+      throw new Error(result.error.message || 'Resend API error');
+    }
+
+    logger.info({ email, messageId: result.data?.id }, 'Verification email sent successfully via Resend');
     return;
   } catch (error: any) {
-    logger.error({ error: error.message || error, email }, 'Failed to send verification email via Resend');
+    logger.error({ 
+      error: error.message || error, 
+      email, 
+      stack: error.stack 
+    }, 'Failed to send verification email via Resend');
+    
     // Fallback to console in case of error
     console.log(`\n🔐 RESEND ERROR FALLBACK for ${email}: ${code}\n`);
     console.log(`Resend Error: ${error.message || 'Unknown error'}`);

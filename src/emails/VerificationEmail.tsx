@@ -1,4 +1,5 @@
 
+import React from 'react';
 import { Html, Head, Body, Container, Text } from '@react-email/components';
 
 interface VerificationEmailProps {
