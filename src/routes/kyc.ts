@@ -57,6 +57,18 @@ router.post('/start', authenticateToken, async (req, res) => {
 
     const result = startKyc(req.user.id.toString(), validatedData);
 
+    // Auto-approve after 3 seconds for development
+    setTimeout(async () => {
+      const updated = updateKycStatusByRef(result.providerRef!, 'approved', 'Auto-approved for development');
+      if (updated) {
+        await db.user.update({
+          where: { id: req.user.id },
+          data: { kycApproved: true },
+        });
+        logger.info({ userId: req.user.id, providerRef: result.providerRef }, 'KYC auto-approved for development');
+      }
+    }, 3000);
+
     res.status(201).json(result);
   } catch (error) {
     if (error instanceof z.ZodError) {

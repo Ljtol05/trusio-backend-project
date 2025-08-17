@@ -52,6 +52,16 @@ const resendPhoneCodeSchema = z.object({
   phone: z.string().regex(/^\+?[\d\s\-\(\)]+$/, 'Invalid phone number format'),
 });
 
+const forgotPasswordSchema = z.object({
+  email: z.string().email('Invalid email'),
+});
+
+const resetPasswordSchema = z.object({
+  email: z.string().email('Invalid email'),
+  code: z.string().length(6, 'Reset code must be 6 digits'),
+  newPassword: z.string().min(6, 'Password must be at least 6 characters'),
+});
+
 // Generate 6-digit verification code
 function generateVerificationCode(): string {
   return Math.floor(100000 + Math.random() * 900000).toString();
@@ -614,6 +624,91 @@ router.post('/resend-phone-code', authenticateToken, async (req: any, res) => {
     }
     logger.error(error, 'Resend phone code error');
     res.status(500).json({ error: 'Failed to resend phone verification code' });
+  }
+});
+
+// POST /api/auth/forgot-password
+router.post('/forgot-password', async (req, res) => {
+  try {
+    const { email } = forgotPasswordSchema.parse(req.body);
+
+    // Find user
+    const user = await db.user.findUnique({ where: { email } });
+    if (!user) {
+      // Don't reveal if user exists or not for security
+      return res.json({ message: 'If an account with this email exists, a password reset code has been sent.' });
+    }
+
+    // Generate reset code
+    const resetCode = generateVerificationCode();
+    const codeHash = await bcrypt.hash(resetCode, 10);
+    const ttl = Number(env.VERIFICATION_CODE_TTL);
+
+    // Store reset code (reuse VerificationCode table)
+    await db.verificationCode.deleteMany({ where: { email } });
+    await db.verificationCode.create({
+      data: {
+        email,
+        codeHash,
+        expiresAt: new Date(Date.now() + ttl),
+      },
+    });
+
+    // Send reset email
+    await sendVerificationEmail(email, resetCode, 'password_reset');
+
+    logger.info({ email }, 'Password reset code sent');
+    res.json({ message: 'If an account with this email exists, a password reset code has been sent.' });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: error.errors[0].message });
+    }
+    logger.error(error, 'Forgot password error');
+    res.status(500).json({ error: 'Failed to process password reset request' });
+  }
+});
+
+// POST /api/auth/reset-password
+router.post('/reset-password', async (req, res) => {
+  try {
+    const { email, code, newPassword } = resetPasswordSchema.parse(req.body);
+
+    // Find user
+    const user = await db.user.findUnique({ where: { email } });
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Check reset code
+    const verificationRecord = await db.verificationCode.findUnique({ where: { email } });
+    if (!verificationRecord || Date.now() > verificationRecord.expiresAt.getTime()) {
+      return res.status(400).json({ error: 'Reset code expired or not found' });
+    }
+
+    // Verify the code
+    const isValidCode = await bcrypt.compare(code, verificationRecord.codeHash);
+    if (!isValidCode) {
+      return res.status(400).json({ error: 'Invalid reset code' });
+    }
+
+    // Update password
+    const hashedPassword = await bcrypt.hash(newPassword, 12);
+    await db.user.update({
+      where: { id: user.id },
+      data: { password: hashedPassword },
+    });
+
+    // Clean up verification code
+    await db.verificationCode.delete({ where: { email } });
+
+    logger.info({ userId: user.id, email }, 'Password reset successfully');
+    res.json({ message: 'Password reset successfully. You can now log in with your new password.' });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: error.errors[0].message });
+    }
+    logger.error(error, 'Reset password error');
+    res.status(500).json({ error: 'Failed to reset password' });
   }
 });
 
