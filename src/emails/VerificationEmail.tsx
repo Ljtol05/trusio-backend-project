@@ -32,16 +32,21 @@ export const VerificationEmail = ({ verificationCode, isPasswordReset = false }:
           overflow: 'hidden'
         }}>
           <Section style={{ backgroundColor: '#1e293b', padding: '32px 40px', textAlign: 'center' }}>
-            <img 
-              src="https://owl-light-logo.png" 
-              alt="OwlLocate" 
-              width="60" 
-              height="60" 
-              style={{ 
-                margin: '0 auto 16px auto',
-                display: 'block'
-              }} 
-            />
+            <div style={{
+              width: '60px',
+              height: '60px',
+              backgroundColor: '#3b82f6',
+              borderRadius: '50%',
+              margin: '0 auto 16px auto',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '24px',
+              fontWeight: 'bold',
+              color: 'white'
+            }}>
+              🦉
+            </div>
             <Heading style={{ 
               color: '#ffffff', 
               fontSize: '24px', 
