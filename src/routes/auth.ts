@@ -62,19 +62,18 @@ function generateToken(userId: number): string {
   return jwt.sign({ userId }, env.JWT_SECRET, { expiresIn: '7d' });
 }
 
-// Send phone verification SMS
-async function sendPhoneVerificationSMS(phone: string, code: string): Promise<void> {
+// Send phone verification using Twilio Verify API
+async function sendPhoneVerificationSMS(phone: string): Promise<string | null> {
   // Log Twilio configuration status for debugging
   logger.debug({ 
     hasAccountSid: !!env.TWILIO_ACCOUNT_SID,
-    accountSidPrefix: env.TWILIO_ACCOUNT_SID ? env.TWILIO_ACCOUNT_SID.substring(0, 5) + '...' : 'none',
     hasAuthToken: !!env.TWILIO_AUTH_TOKEN,
-    hasPhoneNumber: !!env.TWILIO_PHONE_NUMBER,
+    hasVerifyServiceSid: !!env.TWILIO_VERIFY_SERVICE_SID,
     phone 
-  }, 'Attempting to send SMS verification');
+  }, 'Attempting to send SMS verification via Twilio Verify API');
 
   // Always try to send real SMS if Twilio is configured
-  if (env.TWILIO_ACCOUNT_SID && env.TWILIO_AUTH_TOKEN && env.TWILIO_PHONE_NUMBER) {
+  if (env.TWILIO_ACCOUNT_SID && env.TWILIO_AUTH_TOKEN && env.TWILIO_VERIFY_SERVICE_SID) {
     try {
       // Validate Account SID format
       if (!env.TWILIO_ACCOUNT_SID.startsWith('AC')) {
@@ -85,31 +84,64 @@ async function sendPhoneVerificationSMS(phone: string, code: string): Promise<vo
       const { default: twilio } = await import('twilio');
       const client = twilio(env.TWILIO_ACCOUNT_SID, env.TWILIO_AUTH_TOKEN);
       
-      const message = await client.messages.create({
-        body: `Your verification code is: ${code}. This code will expire in 10 minutes.`,
-        from: env.TWILIO_PHONE_NUMBER,
-        to: phone
-      });
+      const verification = await client.verify.v2.services(env.TWILIO_VERIFY_SERVICE_SID)
+        .verifications
+        .create({ to: phone, channel: 'sms' });
 
-      logger.info({ phone, messageSid: message.sid }, 'SMS verification sent successfully');
-      return;
+      logger.info({ phone, verificationSid: verification.sid }, 'SMS verification sent successfully via Twilio Verify API');
+      return verification.sid;
     } catch (error: any) {
       logger.error({ 
         error: error.message || error, 
         phone,
         twilioError: error.code || 'unknown',
         accountSidFormat: env.TWILIO_ACCOUNT_SID ? env.TWILIO_ACCOUNT_SID.substring(0, 5) : 'none'
-      }, 'Failed to send SMS verification');
+      }, 'Failed to send SMS verification via Twilio Verify API');
       
       // Fallback to console in case of error
-      console.log(`\n📱 TWILIO ERROR FALLBACK for ${phone}: ${code}\n`);
+      const fallbackCode = generateVerificationCode();
+      console.log(`\n📱 TWILIO ERROR FALLBACK for ${phone}: ${fallbackCode}\n`);
       console.log(`Twilio Error: ${error.message || 'Unknown error'}`);
-      return;
+      return fallbackCode;
     }
   }
 
   // Development mode fallback when no Twilio configured
-  console.log(`\n📱 DEV SMS VERIFICATION for ${phone}: ${code}\n`);
+  const fallbackCode = generateVerificationCode();
+  console.log(`\n📱 DEV SMS VERIFICATION for ${phone}: ${fallbackCode}\n`);
+  return fallbackCode;
+}
+
+// Verify phone code using Twilio Verify API
+async function verifyPhoneCode(phone: string, code: string): Promise<boolean> {
+  // Use Twilio Verify API if configured
+  if (env.TWILIO_ACCOUNT_SID && env.TWILIO_AUTH_TOKEN && env.TWILIO_VERIFY_SERVICE_SID) {
+    try {
+      const { default: twilio } = await import('twilio');
+      const client = twilio(env.TWILIO_ACCOUNT_SID, env.TWILIO_AUTH_TOKEN);
+      
+      const verificationCheck = await client.verify.v2.services(env.TWILIO_VERIFY_SERVICE_SID)
+        .verificationChecks
+        .create({ to: phone, code });
+
+      logger.info({ phone, status: verificationCheck.status }, 'Phone verification check completed');
+      return verificationCheck.status === 'approved';
+    } catch (error: any) {
+      logger.error({ 
+        error: error.message || error, 
+        phone,
+        twilioError: error.code || 'unknown'
+      }, 'Failed to verify phone code via Twilio Verify API');
+      
+      // In production, you might want to fail here instead of falling back
+      // For development, we'll fall back to stored code verification
+      return false;
+    }
+  }
+
+  // Development fallback - this should not be used in production
+  logger.warn({ phone }, 'Using development fallback for phone verification');
+  return false;
 }
 
 // POST /api/auth/register
@@ -451,21 +483,18 @@ router.post('/start-phone-verification', authenticateToken, async (req: any, res
       return res.status(400).json({ error: 'Phone number already verified by another user' });
     }
 
-    // Generate verification code
-    const verificationCode = generateVerificationCode();
+    // Send SMS verification using Twilio Verify API
+    const verificationResult = await sendPhoneVerificationSMS(phone);
 
-    // Update user with phone and verification code
+    // Update user with phone (no need to store verification code with Twilio Verify API)
     await db.user.update({
       where: { id: req.user.id },
       data: {
         phone,
         phoneVerified: false,
-        phoneVerificationCode: verificationCode,
+        phoneVerificationCode: verificationResult, // Store SID or fallback code for dev
       },
     });
-
-    // Send SMS verification
-    await sendPhoneVerificationSMS(phone, verificationCode);
 
     logger.info({ userId: req.user.id, phone }, 'Phone verification SMS sent');
     res.json({ message: 'Phone verification code sent.' });
@@ -499,8 +528,18 @@ router.post('/verify-phone', authenticateToken, async (req: any, res) => {
       return res.status(400).json({ error: 'Phone already verified' });
     }
 
-    // Check verification code
-    if (user.phoneVerificationCode !== code) {
+    // Verify code using Twilio Verify API or fallback
+    let isValidCode = false;
+    
+    if (env.TWILIO_ACCOUNT_SID && env.TWILIO_AUTH_TOKEN && env.TWILIO_VERIFY_SERVICE_SID) {
+      // Use Twilio Verify API
+      isValidCode = await verifyPhoneCode(phone, code);
+    } else {
+      // Development fallback - check stored code
+      isValidCode = user.phoneVerificationCode === code;
+    }
+
+    if (!isValidCode) {
       return res.status(400).json({ error: 'Invalid verification code' });
     }
 
@@ -558,17 +597,14 @@ router.post('/resend-phone-code', authenticateToken, async (req: any, res) => {
       return res.status(400).json({ error: 'Phone already verified' });
     }
 
-    // Generate new verification code
-    const verificationCode = generateVerificationCode();
+    // Send SMS verification using Twilio Verify API
+    const verificationResult = await sendPhoneVerificationSMS(phone);
 
-    // Update user with new code
+    // Update user with new verification SID or fallback code
     await db.user.update({
       where: { id: user.id },
-      data: { phoneVerificationCode: verificationCode },
+      data: { phoneVerificationCode: verificationResult },
     });
-
-    // Send SMS verification
-    await sendPhoneVerificationSMS(phone, verificationCode);
 
     logger.info({ userId: req.user.id, phone }, 'Phone verification code resent');
     res.json({ message: 'Phone verification code resent.' });
