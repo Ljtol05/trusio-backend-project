@@ -1,4 +1,3 @@
-
 import { nanoid } from 'nanoid';
 import { logger } from './logger.js';
 import { UpstreamError } from './errors.js';
@@ -17,7 +16,7 @@ export class GooglePlacesClient {
     reqId?: string
   ): Promise<AutocompleteResponse> {
     const startTime = Date.now();
-    
+
     try {
       const params = new URLSearchParams({
         input: query,
@@ -30,7 +29,7 @@ export class GooglePlacesClient {
       }
 
       const url = `https://maps.googleapis.com/maps/api/place/autocomplete/json?${params}`;
-      
+
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), this.timeoutMs);
 
@@ -83,7 +82,7 @@ export class GooglePlacesClient {
     reqId?: string
   ): Promise<PlaceDetails> {
     const startTime = Date.now();
-    
+
     try {
       const params = new URLSearchParams({
         place_id: placeId,
@@ -96,7 +95,7 @@ export class GooglePlacesClient {
       }
 
       const url = `https://maps.googleapis.com/maps/api/place/details/json?${params}`;
-      
+
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), this.timeoutMs);
 
@@ -139,7 +138,7 @@ export class GooglePlacesClient {
 
       for (const component of addressComponents) {
         const types = component.types;
-        
+
         if (types.includes('locality')) {
           city = component.long_name;
         } else if (types.includes('administrative_area_level_1')) {

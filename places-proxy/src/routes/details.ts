@@ -49,7 +49,7 @@ export async function detailsRoutes(
 
       if (cached) {
         const latencyMs = Date.now() - startTime;
-        logger.info('Details request served from cache', {
+        logger.info({
           reqId,
           method: request.method,
           path: request.url,
@@ -57,7 +57,7 @@ export async function detailsRoutes(
           latencyMs,
           cacheHit: true,
           ip,
-        });
+        }, 'Details request served from cache');
 
         reply.header('X-Cache', 'HIT');
         return cached;
@@ -75,7 +75,7 @@ export async function detailsRoutes(
       cache.set(cacheKey, result, 86400); // Use config value in real implementation
 
       const latencyMs = Date.now() - startTime;
-      logger.info('Details request completed', {
+      logger.info({
         reqId,
         method: request.method,
         path: request.url,
@@ -83,7 +83,7 @@ export async function detailsRoutes(
         latencyMs,
         cacheHit: false,
         ip,
-      });
+      }, 'Details request completed');
 
       reply.header('X-Cache', 'MISS');
       reply.header('X-Request-Id', reqId);
@@ -93,7 +93,7 @@ export async function detailsRoutes(
       const latencyMs = Date.now() - startTime;
 
       if (error instanceof AppError) {
-        logger.error('Details request failed', {
+        logger.error({
           reqId,
           method: request.method,
           path: request.url,
@@ -101,14 +101,14 @@ export async function detailsRoutes(
           latencyMs,
           errorCode: error.errorCode,
           ip,
-        });
+        }, 'Details request failed');
 
         reply.status(error.statusCode);
         reply.header('X-Request-Id', reqId);
         return toErrorResponse(error);
       }
 
-      logger.error('Unexpected details error', {
+      logger.error({
         reqId,
         method: request.method,
         path: request.url,
@@ -116,7 +116,7 @@ export async function detailsRoutes(
         latencyMs,
         errorCode: 'internal_error',
         ip,
-      });
+      }, 'Unexpected details error');
 
       reply.status(500);
       reply.header('X-Request-Id', reqId);
