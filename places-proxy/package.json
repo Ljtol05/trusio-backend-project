@@ -6,8 +6,8 @@
   "description": "Secure proxy service for Google Places API",
   "main": "dist/server.js",
   "scripts": {
-    "dev": "nodemon --exec ts-node-esm src/server.ts",
-    "dev:simple": "ts-node-esm src/server.ts",
+    "dev": "nodemon --exec \"node --loader ts-node/esm\" src/server.ts",
+    "dev:simple": "node --loader ts-node/esm src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
     "test": "vitest",
