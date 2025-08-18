@@ -1,8 +1,8 @@
 
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
-import { appConfig } from './config.js';
 import { logger } from './logger.js';
+import { appConfig } from './config.js';
 import { TTLCache } from './cache.js';
 import { RateLimiter } from './rateLimit.js';
 import { GooglePlacesClient } from './google.js';
