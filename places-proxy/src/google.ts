@@ -50,11 +50,11 @@ export class GooglePlacesClient {
       const data: GoogleAutocompleteResponse = await response.json();
       const latencyMs = Date.now() - startTime;
 
-      logger.debug('Google Autocomplete API response', {
+      logger.debug({
         reqId,
         upstreamStatus: response.status,
         latencyMs,
-      });
+      }, 'Google Autocomplete API response');
 
       if (data.status !== 'OK' && data.status !== 'ZERO_RESULTS') {
         throw new UpstreamError(`Google API error: ${data.status}`);
@@ -116,11 +116,11 @@ export class GooglePlacesClient {
       const data: GoogleDetailsResponse = await response.json();
       const latencyMs = Date.now() - startTime;
 
-      logger.debug('Google Details API response', {
+      logger.debug({
         reqId,
         upstreamStatus: response.status,
         latencyMs,
-      });
+      }, 'Google Details API response');
 
       if (data.status !== 'OK') {
         throw new UpstreamError(`Google API error: ${data.status}`);

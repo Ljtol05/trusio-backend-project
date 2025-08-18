@@ -1,4 +1,3 @@
-
 import type { FastifyInstance } from 'fastify';
 import { nanoid } from 'nanoid';
 import type { PlaceDetails } from '../types.js';
@@ -65,13 +64,13 @@ export async function detailsRoutes(
       }
 
       // Upstream call
-      logger.debug('Making upstream details request', { 
-        reqId, 
-        placeId: id 
-      });
+      logger.debug({
+        reqId,
+        placeId: id
+      }, 'Making upstream details request');
 
       const result = await googleClient.getDetails(id, sessionToken, reqId);
-      
+
       // Cache result
       cache.set(cacheKey, result, 86400); // Use config value in real implementation
 

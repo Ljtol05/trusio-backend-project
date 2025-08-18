@@ -67,12 +67,12 @@ async function createServer() {
 
   // Global error handler
   fastify.setErrorHandler(async (error, request, reply) => {
-    logger.error('Unhandled error', {
+    logger.error({
       errorMessage: error.message,
       stack: error.stack,
       method: request.method,
       url: request.url,
-    });
+    }, 'Unhandled error');
 
     reply.status(500).send({
       error: 'internal_error',
@@ -90,10 +90,10 @@ async function createServer() {
 
 async function start() {
   try {
-    logger.info('Starting places proxy server...', {
+    logger.info({
       port: appConfig.port,
       googleApiKeySet: !!appConfig.googlePlacesApiKey,
-    });
+    }, 'Starting places proxy server...');
 
     const server = await createServer();
     
@@ -102,11 +102,11 @@ async function start() {
       host: '0.0.0.0',
     });
 
-    logger.info('Places proxy server started successfully', {
+    logger.info({
       serverPort: appConfig.port,
       allowedOrigins: appConfig.allowedOrigins,
       softFailAutocomplete: appConfig.softFailAutocomplete,
-    });
+    }, 'Places proxy server started successfully');
 
     // Graceful shutdown
     const shutdown = async (signal: string) => {
@@ -115,7 +115,7 @@ async function start() {
         await server.close();
         process.exit(0);
       } catch (err) {
-        logger.error('Error during shutdown', { error: err });
+        logger.error({ error: err }, 'Error during shutdown');
         process.exit(1);
       }
     };
@@ -124,28 +124,28 @@ async function start() {
     process.on('SIGINT', () => shutdown('SIGINT'));
 
   } catch (error) {
-    logger.error('Failed to start server', { 
+    logger.error({ 
       error: error instanceof Error ? error.message : String(error),
       stack: error instanceof Error ? error.stack : undefined 
-    });
+    }, 'Failed to start server');
     process.exit(1);
   }
 }
 
 // Handle uncaught exceptions
 process.on('uncaughtException', (error) => {
-  logger.error('Uncaught exception', {
+  logger.error({
     error: error.message,
     stack: error.stack,
-  });
+  }, 'Uncaught exception');
   process.exit(1);
 });
 
 process.on('unhandledRejection', (reason, promise) => {
-  logger.error('Unhandled rejection', {
+  logger.error({
     reason: reason instanceof Error ? reason.message : String(reason),
     stack: reason instanceof Error ? reason.stack : undefined,
-  });
+  }, 'Unhandled rejection');
   process.exit(1);
 });
 

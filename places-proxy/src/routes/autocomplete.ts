@@ -1,4 +1,3 @@
-
 import type { FastifyInstance } from 'fastify';
 import { nanoid } from 'nanoid';
 import type { AutocompleteResponse } from '../types.js';
@@ -32,7 +31,7 @@ export async function autocompleteRoutes(
 
       // Validation
       const { q, sessionToken, limit: limitStr } = request.query;
-      
+
       if (!q || q.length < 3 || q.length > 120) {
         throw new ValidationError('Query must be between 3 and 120 characters');
       }
@@ -52,7 +51,7 @@ export async function autocompleteRoutes(
 
       if (cached) {
         const latencyMs = Date.now() - startTime;
-        logger.info('Autocomplete request served from cache', {
+        logger.info({
           reqId,
           method: request.method,
           path: request.url,
@@ -60,7 +59,7 @@ export async function autocompleteRoutes(
           latencyMs,
           cacheHit: true,
           ip,
-        });
+        }, 'Autocomplete request served from cache');
 
         reply.header('X-Cache', 'HIT');
         return cached;
@@ -68,18 +67,18 @@ export async function autocompleteRoutes(
 
       // Upstream call
       const truncatedQuery = q.length > 40 ? q.substring(0, 40) + '…' : q;
-      logger.debug('Making upstream autocomplete request', { 
-        reqId, 
-        query: truncatedQuery 
-      });
+      logger.debug({
+        reqId,
+        query: truncatedQuery
+      }, 'Making upstream autocomplete request');
 
       const result = await googleClient.autocomplete(q, sessionToken, limit, reqId);
-      
+
       // Cache result
       cache.set(cacheKey, result, 60); // Use config value in real implementation
 
       const latencyMs = Date.now() - startTime;
-      logger.info('Autocomplete request completed', {
+      logger.info({
         reqId,
         method: request.method,
         path: request.url,
@@ -87,7 +86,7 @@ export async function autocompleteRoutes(
         latencyMs,
         cacheHit: false,
         ip,
-      });
+      }, 'Autocomplete request completed');
 
       reply.header('X-Cache', 'MISS');
       reply.header('X-Request-Id', reqId);
@@ -98,7 +97,7 @@ export async function autocompleteRoutes(
 
       if (error instanceof AppError) {
         if (softFail && error.statusCode >= 500) {
-          logger.warn('Soft-failing autocomplete request', {
+          logger.warn({
             reqId,
             method: request.method,
             path: request.url,
@@ -106,14 +105,14 @@ export async function autocompleteRoutes(
             latencyMs,
             errorCode: error.errorCode,
             ip,
-          });
+          }, 'Soft-failing autocomplete request');
 
           reply.header('X-Soft-Fail', '1');
           reply.header('X-Request-Id', reqId);
           return { suggestions: [] };
         }
 
-        logger.error('Autocomplete request failed', {
+        logger.error({
           reqId,
           method: request.method,
           path: request.url,
@@ -121,14 +120,14 @@ export async function autocompleteRoutes(
           latencyMs,
           errorCode: error.errorCode,
           ip,
-        });
+        }, 'Autocomplete request failed');
 
         reply.status(error.statusCode);
         reply.header('X-Request-Id', reqId);
         return toErrorResponse(error);
       }
 
-      logger.error('Unexpected autocomplete error', {
+      logger.error({
         reqId,
         method: request.method,
         path: request.url,
@@ -136,7 +135,7 @@ export async function autocompleteRoutes(
         latencyMs,
         errorCode: 'internal_error',
         ip,
-      });
+      }, 'Unexpected autocomplete error');
 
       reply.status(500);
       reply.header('X-Request-Id', reqId);
