@@ -38,7 +38,7 @@ export const VerificationEmail = ({ verificationCode, isPasswordReset = false }:
             borderBottom: '1px solid #e1e5e9'
           }}>
             <img 
-              src="https://raw.githubusercontent.com/your-repo/main/owl-light-logo.png" 
+              src="https://i.postimg.cc/bJLTtgyn/Image.png" 
               alt="Owllocate" 
               style={{
                 width: '48px',
