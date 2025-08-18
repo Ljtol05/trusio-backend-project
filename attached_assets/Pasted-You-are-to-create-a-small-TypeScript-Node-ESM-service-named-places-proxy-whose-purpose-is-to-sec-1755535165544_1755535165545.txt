@@ -1,0 +1,116 @@
+You are to create a small TypeScript Node (ESM) service named `places-proxy` whose purpose is to securely proxy Google Places Autocomplete & Details to a front-end. Requirements:
+
+Tech Stack:
+- Node 20+, TypeScript
+- Lightweight framework: Express or fastify (prefer fastify for perf)
+- Use native fetch (Node 20 global) + AbortController
+- In-memory LRU cache (implement simple Map with eviction or use a tiny dependency like lru-cache)
+- No ORM needed
+- Provide npm scripts: dev, build, start
+- Output compiled JS to dist/
+
+Environment Variables:
+- GOOGLE_PLACES_API_KEY (required)
+- PORT (default 8787)
+- ALLOWED_ORIGINS (comma-separated)
+- CACHE_AC_TTL_SECONDS=60
+- CACHE_DETAILS_TTL_SECONDS=86400
+- CACHE_MAX_ITEMS=2000
+- RATE_LIMIT_GLOBAL_WINDOW_SECONDS=300
+- RATE_LIMIT_GLOBAL_MAX=300
+- RATE_LIMIT_IP_WINDOW_SECONDS=60
+- RATE_LIMIT_IP_MAX=30
+- SOFT_FAIL_AUTOCOMPLETE=true|false (default false)
+- LOG_LEVEL=info
+- REQUEST_TIMEOUT_MS=2500
+
+Endpoints (all under /v1):
+1. GET /v1/health
+   - Returns { status: "ok", uptimeSeconds, timestamp }
+
+2. GET /v1/places/autocomplete?q=...&sessionToken=...&limit=5
+   - Validate q (3–120 chars), limit (1–10), optional sessionToken (max 64 chars)
+   - Call Google Places Autocomplete endpoint:
+     https://maps.googleapis.com/maps/api/place/autocomplete/json?input=<q>&key=<API_KEY>&sessiontoken=<token>&types=address
+   - Normalize to: { suggestions: [ { id: place_id, description, primaryText, secondaryText } ] }
+   - Cache key: ac:{q}:{limit}
+   - TTL: CACHE_AC_TTL_SECONDS
+   - Rate limiting enforced before upstream call.
+   - On upstream failure:
+     * If SOFT_FAIL_AUTOCOMPLETE=true return { suggestions: [] } with HTTP 200 and header X-Soft-Fail: 1
+     * Else map errors: 400->400, 403/404->502 upstream_error, others->502 upstream_error
+
+3. GET /v1/places/details/:id?sessionToken=...
+   - Validate place id (non-empty <= 256 chars)
+   - Hit details endpoint:
+     https://maps.googleapis.com/maps/api/place/details/json?place_id=<id>&fields=address_component,geometry&key=<API_KEY>&sessiontoken=<token>
+   - Extract:
+     street_number + route => addressLine1
+     locality -> city
+     administrative_area_level_1 -> state
+     postal_code -> postalCode
+     geometry.location.lat/lng
+   - Response: { id, addressLine1, city, state, postalCode, lat, lng }
+   - Cache key: dt:{id} with TTL CACHE_DETAILS_TTL_SECONDS
+
+Shared Infrastructure:
+- Apply CORS: Only allow origins present in ALLOWED_ORIGINS. If empty, allow none (except during dev when ALLOWED_ORIGINS not set -> allow * and log WARN).
+- Rate limiting:
+  * Global counter in memory with sliding window
+  * Per-IP window buckets (simplified: store array of timestamps or rolling counter with reset)
+  * On limit exceed, return 429 { error: "rate_limited", retryAfterSeconds }
+- Logging:
+  * JSON lines: { level, ts, reqId, method, path, status, latencyMs, cacheHit (true/false), upstreamStatus?, errorCode? }
+  * Generate reqId (uuid or short nanoid)
+- Add response headers:
+  * X-Request-Id
+  * Cache indicators: X-Cache: HIT|MISS
+  * (Optional) X-Upstream-Latency
+
+Error Schema:
+- 4xx: { error: "bad_request", message }
+- 404: { error: "not_found", message }
+- 429: { error: "rate_limited", retryAfterSeconds }
+- 5xx upstream: { error: "upstream_error", message, retryable: true }
+
+Timeout Handling:
+- Abort upstream fetch after REQUEST_TIMEOUT_MS
+- Return 502 upstream_error with retryable true.
+
+Code Organization:
+- src/
+  - server.ts (bootstrap fastify)
+  - config.ts (env parsing + defaults)
+  - rateLimit.ts
+  - cache.ts (generic LRU with TTL)
+  - google.ts (upstream calls + normalization)
+  - routes/
+      autocomplete.ts
+      details.ts
+      health.ts
+  - logger.ts
+  - errors.ts (custom error classes & toResponse helper)
+  - types.ts
+
+Tests (Jest or Vitest):
+- Unit test google normalization
+- Unit test cache TTL eviction
+- Unit test rate limit logic
+- Integration test: autocomplete route (mock fetch)
+
+Build & Run:
+- npm run build -> tsc
+- npm start -> node dist/server.js
+- Include README with quick start, env var table, curl examples.
+
+Security:
+- Never log full API key
+- Redact `q` after 40 chars when logging (truncate with …)
+- Do not expose raw Google response by default
+
+Deliverables:
+- package.json with type: module and dependencies (fastify, lru-cache or own impl, dotenv, uuid/nanoid, typescript, ts-node-dev for dev)
+- tsconfig.json strict
+- README.md explaining deployment and front-end integration (use VITE_PLACES_PROXY_BASE on client)
+
+Please generate the full codebase with the above structure and reasonable implementation details. Ensure TypeScript types are explicit and no any leaks in core modules.
