@@ -2,7 +2,7 @@
 import { config } from 'dotenv';
 import type { Config } from './types.js';
 
-config({ path: '.env' });
+config({ path: './places-proxy/.env' });
 
 function parseBoolean(value: string | undefined, defaultValue: boolean): boolean {
   if (!value) return defaultValue;
