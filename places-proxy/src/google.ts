@@ -1,43 +1,47 @@
-import type { 
-  AutocompleteSuggestion, 
-  AutocompleteResponse, 
-  PlaceDetails, 
-  GoogleAutocompleteResponse, 
-  GoogleDetailsResponse 
+
+import type {
+  AutocompleteResponse,
+  PlaceDetails,
+  GoogleAutocompleteResponse,
+  GoogleDetailsResponse
 } from './types.js';
 import { UpstreamError } from './errors.js';
 import { logger } from './logger.js';
 
 export class GooglePlacesClient {
-  private baseUrl = 'https://maps.googleapis.com/maps/api/place';
-
-  constructor(private apiKey: string, private timeoutMs: number) {}
+  constructor(
+    private apiKey: string,
+    private timeoutMs: number
+  ) {}
 
   async autocomplete(
-    query: string, 
-    sessionToken?: string, 
+    query: string,
+    sessionToken?: string,
     limit: number = 5,
     reqId?: string
   ): Promise<AutocompleteResponse> {
-    const url = new URL(`${this.baseUrl}/autocomplete/json`);
-    url.searchParams.set('input', query);
-    url.searchParams.set('key', this.apiKey);
-    url.searchParams.set('types', 'address');
-    if (sessionToken) {
-      url.searchParams.set('sessiontoken', sessionToken);
-    }
-
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), this.timeoutMs);
+    const startTime = Date.now();
 
     try {
-      const startTime = Date.now();
+      const url = new URL('https://maps.googleapis.com/maps/api/place/autocomplete/json');
+      url.searchParams.set('input', query);
+      url.searchParams.set('key', this.apiKey);
+      url.searchParams.set('types', 'address');
+      
+      if (sessionToken) {
+        url.searchParams.set('sessiontoken', sessionToken);
+      }
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), this.timeoutMs);
+
       const response = await fetch(url.toString(), {
         signal: controller.signal,
       });
-      const latencyMs = Date.now() - startTime;
 
       clearTimeout(timeoutId);
+
+      const latencyMs = Date.now() - startTime;
 
       logger.debug('Google Autocomplete API response', {
         reqId,
@@ -46,10 +50,7 @@ export class GooglePlacesClient {
       });
 
       if (!response.ok) {
-        throw new UpstreamError(
-          `Google API returned ${response.status}`,
-          response.status >= 500
-        );
+        throw new UpstreamError(`Google API returned ${response.status}`);
       }
 
       const data: GoogleAutocompleteResponse = await response.json();
@@ -59,41 +60,46 @@ export class GooglePlacesClient {
       }
 
       return this.normalizeAutocompleteResponse(data, limit);
-    } catch (error: any) {
-      clearTimeout(timeoutId);
-
-      if (error.name === 'AbortError') {
-        throw new UpstreamError('Request timeout', true);
-      }
-
+    } catch (error) {
       if (error instanceof UpstreamError) {
         throw error;
       }
 
-      throw new UpstreamError(`Network error: ${error.message}`, true);
+      if (error instanceof Error && error.name === 'AbortError') {
+        throw new UpstreamError('Request timeout');
+      }
+
+      throw new UpstreamError('Network error');
     }
   }
 
-  async getDetails(placeId: string, sessionToken?: string, reqId?: string): Promise<PlaceDetails> {
-    const url = new URL(`${this.baseUrl}/details/json`);
-    url.searchParams.set('place_id', placeId);
-    url.searchParams.set('fields', 'address_component,geometry');
-    url.searchParams.set('key', this.apiKey);
-    if (sessionToken) {
-      url.searchParams.set('sessiontoken', sessionToken);
-    }
-
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), this.timeoutMs);
+  async getDetails(
+    placeId: string,
+    sessionToken?: string,
+    reqId?: string
+  ): Promise<PlaceDetails> {
+    const startTime = Date.now();
 
     try {
-      const startTime = Date.now();
+      const url = new URL('https://maps.googleapis.com/maps/api/place/details/json');
+      url.searchParams.set('place_id', placeId);
+      url.searchParams.set('key', this.apiKey);
+      url.searchParams.set('fields', 'place_id,address_components,geometry');
+      
+      if (sessionToken) {
+        url.searchParams.set('sessiontoken', sessionToken);
+      }
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), this.timeoutMs);
+
       const response = await fetch(url.toString(), {
         signal: controller.signal,
       });
-      const latencyMs = Date.now() - startTime;
 
       clearTimeout(timeoutId);
+
+      const latencyMs = Date.now() - startTime;
 
       logger.debug('Google Details API response', {
         reqId,
@@ -102,10 +108,7 @@ export class GooglePlacesClient {
       });
 
       if (!response.ok) {
-        throw new UpstreamError(
-          `Google API returned ${response.status}`,
-          response.status >= 500
-        );
+        throw new UpstreamError(`Google API returned ${response.status}`);
       }
 
       const data: GoogleDetailsResponse = await response.json();
@@ -114,173 +117,59 @@ export class GooglePlacesClient {
         throw new UpstreamError(`Google API status: ${data.status}`);
       }
 
-      return this.normalizeDetailsResponse(data, placeId);
-    } catch (error: any) {
-      clearTimeout(timeoutId);
-
-      if (error.name === 'AbortError') {
-        throw new UpstreamError('Request timeout', true);
-      }
-
+      return this.normalizeDetailsResponse(data);
+    } catch (error) {
       if (error instanceof UpstreamError) {
         throw error;
       }
 
-      throw new UpstreamError(`Network error: ${error.message}`, true);
+      if (error instanceof Error && error.name === 'AbortError') {
+        throw new UpstreamError('Request timeout');
+      }
+
+      throw new UpstreamError('Network error');
     }
   }
 
   private normalizeAutocompleteResponse(
-    data: GoogleAutocompleteResponse, 
+    response: GoogleAutocompleteResponse,
     limit: number
   ): AutocompleteResponse {
-    const suggestions: AutocompleteSuggestion[] = data.predictions
+    const suggestions = response.predictions
       .slice(0, limit)
       .map(prediction => ({
         id: prediction.place_id,
         description: prediction.description,
         primaryText: prediction.structured_formatting.main_text,
-        secondaryText: prediction.structured_formatting.secondary_text || '',
+        secondaryText: prediction.structured_formatting.secondary_text,
       }));
 
     return { suggestions };
   }
 
-  private normalizeDetailsResponse(data: GoogleDetailsResponse, placeId: string): PlaceDetails {
-    const { result } = data;
-    const components = result.address_components;
-
-    let streetNumber = '';
-    let route = '';
-    let locality = '';
-    let state = '';
-    let postalCode = '';
-
-    for (const component of components) {
-      const types = component.types;
-
-      if (types.includes('street_number')) {
-        streetNumber = component.long_name;
-      } else if (types.includes('route')) {
-        route = component.long_name;
-      } else if (types.includes('locality')) {
-        locality = component.long_name;
-      } else if (types.includes('administrative_area_level_1')) {
-        state = component.short_name;
-      } else if (types.includes('postal_code')) {
-        postalCode = component.long_name;
-      }
-    }
-
-    const addressLine1 = [streetNumber, route].filter(Boolean).join(' ');
-
-    return {
-      id: placeId,
-      addressLine1,
-      city: locality,
-      state,
-      postalCode,
-      lat: result.geometry.location.lat,
-      lng: result.geometry.location.lng,
-    };
-  }
-}
-import type { AutocompleteResponse, PlaceDetails, GoogleAutocompleteResponse, GoogleDetailsResponse } from './types.js';
-
-export class GooglePlacesClient {
-  constructor(
-    private apiKey: string,
-    private timeoutMs: number
-  ) {}
-
-  async autocomplete(query: string, sessionToken?: string, limit: number = 5): Promise<AutocompleteResponse> {
-    const url = new URL('https://maps.googleapis.com/maps/api/place/autocomplete/json');
-    url.searchParams.set('input', query);
-    url.searchParams.set('key', this.apiKey);
-    if (sessionToken) {
-      url.searchParams.set('sessiontoken', sessionToken);
-    }
-
-    const response = await fetch(url.toString(), {
-      signal: AbortSignal.timeout(this.timeoutMs),
-    });
-
-    if (!response.ok) {
-      throw new Error(`Google API error: ${response.status}`);
-    }
-
-    const data: GoogleAutocompleteResponse = await response.json();
-    
-    if (data.status !== 'OK') {
-      throw new Error(`Google API returned status: ${data.status}`);
-    }
-
-    return {
-      suggestions: data.predictions.slice(0, limit).map(prediction => ({
-        id: prediction.place_id,
-        description: prediction.description,
-        primaryText: prediction.structured_formatting.main_text,
-        secondaryText: prediction.structured_formatting.secondary_text,
-      })),
-    };
-  }
-
-  async getDetails(placeId: string, sessionToken?: string): Promise<PlaceDetails> {
-    const url = new URL('https://maps.googleapis.com/maps/api/place/details/json');
-    url.searchParams.set('place_id', placeId);
-    url.searchParams.set('key', this.apiKey);
-    url.searchParams.set('fields', 'place_id,address_components,geometry');
-    if (sessionToken) {
-      url.searchParams.set('sessiontoken', sessionToken);
-    }
-
-    const response = await fetch(url.toString(), {
-      signal: AbortSignal.timeout(this.timeoutMs),
-    });
-
-    if (!response.ok) {
-      throw new Error(`Google API error: ${response.status}`);
-    }
-
-    const data: GoogleDetailsResponse = await response.json();
-    
-    if (data.status !== 'OK') {
-      throw new Error(`Google API returned status: ${data.status}`);
-    }
-
-    const result = data.result;
+  private normalizeDetailsResponse(response: GoogleDetailsResponse): PlaceDetails {
+    const { result } = response;
     const addressComponents = result.address_components;
 
-    // Parse address components
-    let addressLine1 = '';
-    let city = '';
-    let state = '';
-    let postalCode = '';
+    const getComponent = (types: string[]) => {
+      const component = addressComponents.find(comp =>
+        comp.types.some(type => types.includes(type))
+      );
+      return component?.long_name || '';
+    };
 
-    for (const component of addressComponents) {
-      if (component.types.includes('street_number')) {
-        addressLine1 = component.long_name + ' ';
-      }
-      if (component.types.includes('route')) {
-        addressLine1 += component.long_name;
-      }
-      if (component.types.includes('locality')) {
-        city = component.long_name;
-      }
-      if (component.types.includes('administrative_area_level_1')) {
-        state = component.short_name;
-      }
-      if (component.types.includes('postal_code')) {
-        postalCode = component.long_name;
-      }
-    }
+    const streetNumber = getComponent(['street_number']);
+    const route = getComponent(['route']);
+    const addressLine1 = streetNumber && route 
+      ? `${streetNumber} ${route}` 
+      : getComponent(['street_address']) || route || streetNumber;
 
     return {
       id: result.place_id,
-      addressLine1: addressLine1.trim(),
-      city,
-      state,
-      postalCode,
+      addressLine1,
+      city: getComponent(['locality', 'sublocality']),
+      state: getComponent(['administrative_area_level_1']),
+      postalCode: getComponent(['postal_code']),
       lat: result.geometry.location.lat,
       lng: result.geometry.location.lng,
     };

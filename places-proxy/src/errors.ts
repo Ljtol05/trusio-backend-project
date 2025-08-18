@@ -1,4 +1,3 @@
-
 import type { ErrorResponse } from './types.js';
 
 export class AppError extends Error {
@@ -53,24 +52,4 @@ export function toErrorResponse(error: AppError): ErrorResponse {
   }
 
   return response;
-}
-export class ValidationError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'ValidationError';
-  }
-}
-
-export class RateLimitError extends Error {
-  constructor(message: string, public retryAfterSeconds?: number) {
-    super(message);
-    this.name = 'RateLimitError';
-  }
-}
-
-export class UpstreamError extends Error {
-  constructor(message: string, public retryable: boolean = true) {
-    super(message);
-    this.name = 'UpstreamError';
-  }
 }
