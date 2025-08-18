@@ -2,7 +2,8 @@
 import { config } from 'dotenv';
 import type { Config } from './types.js';
 
-config({ path: './places-proxy/.env' });
+// Load environment variables from the correct path
+config({ path: '.env' });
 
 function parseBoolean(value: string | undefined, defaultValue: boolean): boolean {
   if (!value) return defaultValue;
@@ -38,5 +39,13 @@ export const appConfig: Config = {
 
 // Validate required configuration
 if (!appConfig.googlePlacesApiKey) {
+  console.error('ERROR: GOOGLE_PLACES_API_KEY is required but not found in environment variables');
+  console.error('Please check your .env file in the places-proxy directory');
   throw new Error('GOOGLE_PLACES_API_KEY is required');
 }
+
+console.log('Configuration loaded successfully:', {
+  port: appConfig.port,
+  hasApiKey: !!appConfig.googlePlacesApiKey,
+  allowedOrigins: appConfig.allowedOrigins,
+});
