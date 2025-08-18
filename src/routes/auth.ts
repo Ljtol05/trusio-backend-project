@@ -210,10 +210,18 @@ router.post('/register', async (req, res) => {
     // Send verification email
     await sendVerificationEmail(email, verificationCode);
 
+    // Generate JWT token immediately for frontend to use
+    const newUser = await db.user.findUnique({ where: { email } });
+    const token = generateToken(newUser!.id);
+
     logger.info({ email }, 'User registered, verification email sent');
     res.status(201).json({ 
-      message: 'Verification email sent.',
+      message: 'Registration successful. Verification email sent.',
+      token,
+      verificationStep: 'email',
+      nextStep: 'email',
       user: {
+        id: newUser!.id,
         email,
         name: fullName,
         emailVerified: false,
