@@ -30,7 +30,7 @@ export class RateLimiter {
       .reduce((sum, w) => sum + w.count, 0);
 
     if (requestsInWindow >= this.globalMaxRequests) {
-      const retryAfter = Math.ceil((this.globalWindows[0]?.resetTime - now) / 1000) || this.globalWindowSeconds;
+      const retryAfter = Math.ceil(((this.globalWindows[0]?.resetTime || now) - now) / 1000) || this.globalWindowSeconds;
       throw new RateLimitError(retryAfter);
     }
 
@@ -56,7 +56,7 @@ export class RateLimiter {
       .reduce((sum, w) => sum + w.count, 0);
 
     if (requestsInWindow >= this.ipMaxRequests) {
-      const retryAfter = Math.ceil((ipWindows[0]?.resetTime - now) / 1000) || this.ipWindowSeconds;
+      const retryAfter = Math.ceil(((ipWindows[0]?.resetTime || now) - now) / 1000) || this.ipWindowSeconds;
       throw new RateLimitError(retryAfter);
     }
 
