@@ -143,14 +143,25 @@ async function verifyPhoneCode(phone: string, code: string): Promise<boolean> {
         twilioError: error.code || 'unknown'
       }, 'Failed to verify phone code via Twilio Verify API');
       
-      // In production, you might want to fail here instead of falling back
-      // For development, we'll fall back to stored code verification
+      // Only allow fallback in development mode
+      if (env.NODE_ENV === 'development') {
+        logger.warn({ phone }, 'Using development fallback for phone verification');
+        return false;
+      }
+      
+      // In production, fail verification if Twilio fails
       return false;
     }
   }
 
   // Development fallback - this should not be used in production
-  logger.warn({ phone }, 'Using development fallback for phone verification');
+  if (env.NODE_ENV === 'development') {
+    logger.warn({ phone }, 'Using development fallback for phone verification');
+    return false;
+  }
+  
+  // Production without Twilio - should not happen
+  logger.error('Phone verification attempted without Twilio configuration in production');
   return false;
 }
 
@@ -173,7 +184,7 @@ router.post('/register', async (req, res) => {
 
     // Generate verification code
     const verificationCode = generateVerificationCode();
-    const codeHash = await bcrypt.hash(verificationCode, 10);
+    const codeHash = await bcrypt.hash(verificationCode, 12);
     const ttl = Number(env.VERIFICATION_CODE_TTL);
 
     // Create user
@@ -222,6 +233,15 @@ router.post('/register', async (req, res) => {
 // POST /api/auth/verify-email
 router.post('/verify-email', async (req, res) => {
   try {
+    // Clean up expired verification codes periodically
+    await db.verificationCode.deleteMany({
+      where: {
+        expiresAt: {
+          lt: new Date()
+        }
+      }
+    });
+
     logger.debug({ body: req.body }, 'Verify email request received');
     const { email, code } = verifyEmailSchema.parse(req.body);
 
@@ -303,7 +323,7 @@ router.post('/resend-verification', async (req, res) => {
 
     // Generate new verification code
     const verificationCode = generateVerificationCode();
-    const codeHash = await bcrypt.hash(verificationCode, 10);
+    const codeHash = await bcrypt.hash(verificationCode, 12);
     const ttl = Number(env.VERIFICATION_CODE_TTL);
 
     // Update verification code
@@ -350,24 +370,16 @@ router.post('/login', async (req, res) => {
     // Generate token for authenticated API access even if verification incomplete
     const token = generateToken(user.id);
 
-    // Progressive verification - check what step user needs to complete
+    // Check email verification first - don't issue tokens for unverified emails
     if (!user.emailVerified) {
-      return res.status(200).json({ 
-        message: 'Please verify your email first.',
-        token,
+      return res.status(401).json({ 
+        error: 'Email not verified. Please verify your email before logging in.',
         verificationStep: 'email',
-        nextStep: 'email',
-        user: {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          phone: user.phone,
-          emailVerified: user.emailVerified,
-          phoneVerified: user.phoneVerified,
-          kycApproved: user.kycApproved,
-        }
+        nextStep: 'email'
       });
     }
+
+    // Progressive verification - check what step user needs to complete
     
     if (!user.phoneVerified) {
       return res.status(200).json({ 
@@ -480,10 +492,15 @@ router.post('/start-phone-verification', authenticateToken, async (req: any, res
   try {
     const { phone } = startPhoneVerificationSchema.parse(req.body);
 
+    // Normalize phone number for consistency
+    const normalizedPhone = phone.replace(/\D/g, '');
+    
     // Check if phone is already verified by another user
     const existingUser = await db.user.findFirst({ 
       where: { 
-        phone,
+        phone: {
+          contains: normalizedPhone.slice(-10) // Check last 10 digits
+        },
         phoneVerified: true,
         id: { not: req.user.id }
       }
@@ -545,8 +562,10 @@ router.post('/verify-phone', authenticateToken, async (req: any, res) => {
       // Use Twilio Verify API
       isValidCode = await verifyPhoneCode(phone, code);
     } else {
-      // Development fallback - check stored code
-      isValidCode = user.phoneVerificationCode === code;
+      // Development fallback - check stored code (only in development)
+      if (env.NODE_ENV === 'development' && user.phoneVerificationCode === code) {
+        isValidCode = true;
+      }
     }
 
     if (!isValidCode) {
@@ -641,7 +660,7 @@ router.post('/forgot-password', async (req, res) => {
 
     // Generate reset code
     const resetCode = generateVerificationCode();
-    const codeHash = await bcrypt.hash(resetCode, 10);
+    const codeHash = await bcrypt.hash(resetCode, 12);
     const ttl = Number(env.VERIFICATION_CODE_TTL);
 
     // Store reset code (reuse VerificationCode table)
@@ -678,6 +697,15 @@ router.post('/reset-password', async (req, res) => {
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
+
+    // Clean up expired codes first
+    await db.verificationCode.deleteMany({
+      where: {
+        expiresAt: {
+          lt: new Date()
+        }
+      }
+    });
 
     // Check reset code
     const verificationRecord = await db.verificationCode.findUnique({ where: { email } });
