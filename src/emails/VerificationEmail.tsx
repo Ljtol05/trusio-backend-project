@@ -37,15 +37,22 @@ export const VerificationEmail = ({ verificationCode, isPasswordReset = false }:
             textAlign: 'center',
             borderBottom: '1px solid #e1e5e9'
           }}>
-            <img 
-              src="https://i.postimg.cc/bJLTtgyn/Image.png" 
-              alt="Owllocate" 
-              style={{
-                width: '48px',
-                height: '48px',
-                marginBottom: '12px'
-              }}
-            />
+            <div style={{
+              width: '48px',
+              height: '48px',
+              borderRadius: '50%',
+              backgroundColor: '#2563eb',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginBottom: '12px'
+            }}>
+              <span style={{
+                color: 'white',
+                fontSize: '24px',
+                fontWeight: 'bold'
+              }}>🦉</span>
+            </div>
             <Heading style={{ 
               color: '#1a1a1a', 
               fontSize: '20px', 
