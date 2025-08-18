@@ -1,0 +1,394 @@
+~/workspace/places-proxy$ npm run build
+
+> places-proxy@1.0.0 build
+> tsc
+
+src/errors.ts:17:14 - error TS2300: Duplicate identifier 'ValidationError'.
+
+17 export class ValidationError extends AppError {
+                ~~~~~~~~~~~~~~~
+
+src/errors.ts:23:14 - error TS2300: Duplicate identifier 'RateLimitError'.
+
+23 export class RateLimitError extends AppError {
+                ~~~~~~~~~~~~~~
+
+src/errors.ts:29:14 - error TS2300: Duplicate identifier 'UpstreamError'.
+
+29 export class UpstreamError extends AppError {
+                ~~~~~~~~~~~~~
+
+src/errors.ts:57:14 - error TS2300: Duplicate identifier 'ValidationError'.
+
+57 export class ValidationError extends Error {
+                ~~~~~~~~~~~~~~~
+
+src/errors.ts:64:14 - error TS2300: Duplicate identifier 'RateLimitError'.
+
+64 export class RateLimitError extends Error {
+                ~~~~~~~~~~~~~~
+
+src/errors.ts:71:14 - error TS2300: Duplicate identifier 'UpstreamError'.
+
+71 export class UpstreamError extends Error {
+                ~~~~~~~~~~~~~
+
+src/google.ts:3:3 - error TS2300: Duplicate identifier 'AutocompleteResponse'.
+
+3   AutocompleteResponse,
+    ~~~~~~~~~~~~~~~~~~~~
+
+src/google.ts:4:3 - error TS2300: Duplicate identifier 'PlaceDetails'.
+
+4   PlaceDetails,
+    ~~~~~~~~~~~~
+
+src/google.ts:5:3 - error TS2300: Duplicate identifier 'GoogleAutocompleteResponse'.
+
+5   GoogleAutocompleteResponse,
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+src/google.ts:6:3 - error TS2300: Duplicate identifier 'GoogleDetailsResponse'.
+
+6   GoogleDetailsResponse
+    ~~~~~~~~~~~~~~~~~~~~~
+
+src/google.ts:11:14 - error TS2300: Duplicate identifier 'GooglePlacesClient'.
+
+11 export class GooglePlacesClient {
+                ~~~~~~~~~~~~~~~~~~
+
+src/google.ts:42:56 - error TS2345: Argument of type '{ reqId: string | undefined; upstreamStatus: number; latencyMs: number; }' is not assignable to parameter of type 'undefined'.
+
+ 42       logger.debug('Google Autocomplete API response', {
+                                                           ~
+ 43         reqId,
+    ~~~~~~~~~~~~~~
+... 
+ 45         latencyMs,
+    ~~~~~~~~~~~~~~~~~~
+ 46       });
+    ~~~~~~~
+
+src/google.ts:98:51 - error TS2345: Argument of type '{ reqId: string | undefined; upstreamStatus: number; latencyMs: number; }' is not assignable to parameter of type 'undefined'.
+
+ 98       logger.debug('Google Details API response', {
+                                                      ~
+ 99         reqId,
+    ~~~~~~~~~~~~~~
+... 
+101         latencyMs,
+    ~~~~~~~~~~~~~~~~~~
+102       });
+    ~~~~~~~
+
+src/google.ts:188:15 - error TS2300: Duplicate identifier 'AutocompleteResponse'.
+
+188 import type { AutocompleteResponse, PlaceDetails, GoogleAutocompleteResponse, GoogleDetailsResponse } from './types.js';
+                  ~~~~~~~~~~~~~~~~~~~~
+
+src/google.ts:188:37 - error TS2300: Duplicate identifier 'PlaceDetails'.
+
+188 import type { AutocompleteResponse, PlaceDetails, GoogleAutocompleteResponse, GoogleDetailsResponse } from './types.js';
+                                        ~~~~~~~~~~~~
+
+src/google.ts:188:51 - error TS2300: Duplicate identifier 'GoogleAutocompleteResponse'.
+
+188 import type { AutocompleteResponse, PlaceDetails, GoogleAutocompleteResponse, GoogleDetailsResponse } from './types.js';
+                                                      ~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+src/google.ts:188:79 - error TS2300: Duplicate identifier 'GoogleDetailsResponse'.
+
+188 import type { AutocompleteResponse, PlaceDetails, GoogleAutocompleteResponse, GoogleDetailsResponse } from './types.js';
+                                                                                  ~~~~~~~~~~~~~~~~~~~~~
+
+src/google.ts:190:14 - error TS2300: Duplicate identifier 'GooglePlacesClient'.
+
+190 export class GooglePlacesClient {
+                 ~~~~~~~~~~~~~~~~~~
+
+src/rateLimit.ts:2:15 - error TS2300: Duplicate identifier 'RateLimitWindow'.
+
+2 import type { RateLimitWindow } from './types.js';
+                ~~~~~~~~~~~~~~~
+
+src/rateLimit.ts:5:14 - error TS2300: Duplicate identifier 'RateLimiter'.
+
+5 export class RateLimiter {
+               ~~~~~~~~~~~
+
+src/rateLimit.ts:73:15 - error TS2300: Duplicate identifier 'RateLimitWindow'.
+
+73 import type { RateLimitWindow } from './types.js';
+                 ~~~~~~~~~~~~~~~
+
+src/rateLimit.ts:75:14 - error TS2300: Duplicate identifier 'RateLimiter'.
+
+75 export class RateLimiter {
+                ~~~~~~~~~~~
+
+src/routes/autocomplete.ts:55:63 - error TS2345: Argument of type '{ reqId: string; method: string; path: string; status: number; latencyMs: number; cacheHit: boolean; ip: string; }' is not assignable to parameter of type 'undefined'.
+
+ 55         logger.info('Autocomplete request served from cache', {
+                                                                  ~
+ 56           reqId,
+    ~~~~~~~~~~~~~~~~
+... 
+ 62           ip,
+    ~~~~~~~~~~~~~
+ 63         });
+    ~~~~~~~~~
+
+src/routes/autocomplete.ts:71:60 - error TS2345: Argument of type '{ reqId: string; query: string; }' is not assignable to parameter of type 'undefined'.
+
+71       logger.debug('Making upstream autocomplete request', {
+                                                              ~
+72         reqId,
+   ~~~~~~~~~~~~~~
+73         query: truncatedQuery
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+74       });
+   ~~~~~~~
+
+src/routes/autocomplete.ts:82:53 - error TS2345: Argument of type '{ reqId: string; method: string; path: string; status: number; latencyMs: number; cacheHit: boolean; ip: string; }' is not assignable to parameter of type 'undefined'.
+
+ 82       logger.info('Autocomplete request completed', {
+                                                        ~
+ 83         reqId,
+    ~~~~~~~~~~~~~~
+... 
+ 89         ip,
+    ~~~~~~~~~~~
+ 90       });
+    ~~~~~~~
+
+src/routes/autocomplete.ts:101:60 - error TS2345: Argument of type '{ reqId: string; method: string; path: string; status: number; latencyMs: number; errorCode: string; ip: string; }' is not assignable to parameter of type 'undefined'.
+
+101           logger.warn('Soft-failing autocomplete request', {
+                                                               ~
+102             reqId,
+    ~~~~~~~~~~~~~~~~~~
+... 
+108             ip,
+    ~~~~~~~~~~~~~~~
+109           });
+    ~~~~~~~~~~~
+
+src/routes/autocomplete.ts:116:53 - error TS2345: Argument of type '{ reqId: string; method: string; path: string; status: number; latencyMs: number; errorCode: string; ip: string; }' is not assignable to parameter of type 'undefined'.
+
+116         logger.error('Autocomplete request failed', {
+                                                        ~
+117           reqId,
+    ~~~~~~~~~~~~~~~~
+... 
+123           ip,
+    ~~~~~~~~~~~~~
+124         });
+    ~~~~~~~~~
+
+src/routes/autocomplete.ts:131:53 - error TS2345: Argument of type '{ reqId: string; method: string; path: string; status: number; latencyMs: number; errorCode: string; ip: string; }' is not assignable to parameter of type 'undefined'.
+
+131       logger.error('Unexpected autocomplete error', {
+                                                        ~
+132         reqId,
+    ~~~~~~~~~~~~~~
+... 
+138         ip,
+    ~~~~~~~~~~~
+139       });
+    ~~~~~~~
+
+src/routes/details.ts:53:58 - error TS2345: Argument of type '{ reqId: string; method: string; path: string; status: number; latencyMs: number; cacheHit: boolean; ip: string; }' is not assignable to parameter of type 'undefined'.
+
+ 53         logger.info('Details request served from cache', {
+                                                             ~
+ 54           reqId,
+    ~~~~~~~~~~~~~~~~
+... 
+ 60           ip,
+    ~~~~~~~~~~~~~
+ 61         });
+    ~~~~~~~~~
+
+src/routes/details.ts:68:55 - error TS2345: Argument of type '{ reqId: string; placeId: string; }' is not assignable to parameter of type 'undefined'.
+
+68       logger.debug('Making upstream details request', {
+                                                         ~
+69         reqId,
+   ~~~~~~~~~~~~~~
+70         placeId: id
+   ~~~~~~~~~~~~~~~~~~~
+71       });
+   ~~~~~~~
+
+src/routes/details.ts:79:48 - error TS2345: Argument of type '{ reqId: string; method: string; path: string; status: number; latencyMs: number; cacheHit: boolean; ip: string; }' is not assignable to parameter of type 'undefined'.
+
+ 79       logger.info('Details request completed', {
+                                                   ~
+ 80         reqId,
+    ~~~~~~~~~~~~~~
+... 
+ 86         ip,
+    ~~~~~~~~~~~
+ 87       });
+    ~~~~~~~
+
+src/routes/details.ts:97:48 - error TS2345: Argument of type '{ reqId: string; method: string; path: string; status: number; latencyMs: number; errorCode: string; ip: string; }' is not assignable to parameter of type 'undefined'.
+
+ 97         logger.error('Details request failed', {
+                                                   ~
+ 98           reqId,
+    ~~~~~~~~~~~~~~~~
+... 
+104           ip,
+    ~~~~~~~~~~~~~
+105         });
+    ~~~~~~~~~
+
+src/routes/details.ts:112:48 - error TS2345: Argument of type '{ reqId: string; method: string; path: string; status: number; latencyMs: number; errorCode: string; ip: string; }' is not assignable to parameter of type 'undefined'.
+
+112       logger.error('Unexpected details error', {
+                                                   ~
+113         reqId,
+    ~~~~~~~~~~~~~~
+... 
+119         ip,
+    ~~~~~~~~~~~
+120       });
+    ~~~~~~~
+
+src/routes/health.ts:2:15 - error TS2300: Duplicate identifier 'FastifyInstance'.
+
+2 import type { FastifyInstance } from 'fastify';
+                ~~~~~~~~~~~~~~~
+
+src/routes/health.ts:3:15 - error TS2300: Duplicate identifier 'HealthResponse'.
+
+3 import type { HealthResponse } from '../types.js';
+                ~~~~~~~~~~~~~~
+
+src/routes/health.ts:5:7 - error TS2451: Cannot redeclare block-scoped variable 'startTime'.
+
+5 const startTime = Date.now();
+        ~~~~~~~~~
+
+src/routes/health.ts:7:23 - error TS2323: Cannot redeclare exported variable 'healthRoutes'.
+
+7 export async function healthRoutes(fastify: FastifyInstance) {
+                        ~~~~~~~~~~~~
+
+src/routes/health.ts:7:23 - error TS2393: Duplicate function implementation.
+
+7 export async function healthRoutes(fastify: FastifyInstance) {
+                        ~~~~~~~~~~~~
+
+src/routes/health.ts:18:15 - error TS2300: Duplicate identifier 'FastifyInstance'.
+
+18 import type { FastifyInstance } from 'fastify';
+                 ~~~~~~~~~~~~~~~
+
+src/routes/health.ts:19:15 - error TS2300: Duplicate identifier 'HealthResponse'.
+
+19 import type { HealthResponse } from '../types.js';
+                 ~~~~~~~~~~~~~~
+
+src/routes/health.ts:21:7 - error TS2451: Cannot redeclare block-scoped variable 'startTime'.
+
+21 const startTime = Date.now();
+         ~~~~~~~~~
+
+src/routes/health.ts:23:23 - error TS2323: Cannot redeclare exported variable 'healthRoutes'.
+
+23 export async function healthRoutes(fastify: FastifyInstance) {
+                         ~~~~~~~~~~~~
+
+src/routes/health.ts:23:23 - error TS2393: Duplicate function implementation.
+
+23 export async function healthRoutes(fastify: FastifyInstance) {
+                         ~~~~~~~~~~~~
+
+src/server.ts:70:37 - error TS2345: Argument of type '{ errorMessage: string; stack: string | undefined; method: string; url: string; }' is not assignable to parameter of type 'undefined'.
+
+ 70     logger.error('Unhandled error', {
+                                        ~
+ 71       errorMessage: error.message,
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+... 
+ 74       url: request.url,
+    ~~~~~~~~~~~~~~~~~~~~~~~
+ 75     });
+    ~~~~~
+
+src/server.ts:93:52 - error TS2345: Argument of type '{ port: number; googleApiKeySet: boolean; }' is not assignable to parameter of type 'undefined'.
+
+93     logger.info('Starting places proxy server...', {
+                                                      ~
+94       port: appConfig.port,
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+95       googleApiKeySet: !!appConfig.googlePlacesApiKey,
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+96     });
+   ~~~~~
+
+src/server.ts:105:61 - error TS2345: Argument of type '{ serverPort: number; allowedOrigins: string[]; softFailAutocomplete: boolean; }' is not assignable to parameter of type 'undefined'.
+
+105     logger.info('Places proxy server started successfully', {
+                                                                ~
+106       serverPort: appConfig.port,
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+... 
+108       softFailAutocomplete: appConfig.softFailAutocomplete,
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+109     });
+    ~~~~~
+
+src/server.ts:118:47 - error TS2345: Argument of type '{ error: unknown; }' is not assignable to parameter of type 'undefined'.
+
+118         logger.error('Error during shutdown', { error: err });
+                                                  ~~~~~~~~~~~~~~
+
+src/server.ts:127:44 - error TS2345: Argument of type '{ error: string; stack: string | undefined; }' is not assignable to parameter of type 'undefined'.
+
+127     logger.error('Failed to start server', {
+                                               ~
+128       error: error instanceof Error ? error.message : String(error),
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+129       stack: error instanceof Error ? error.stack : undefined
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+130     });
+    ~~~~~
+
+src/server.ts:137:38 - error TS2345: Argument of type '{ error: string; stack: string | undefined; }' is not assignable to parameter of type 'undefined'.
+
+137   logger.error('Uncaught exception', {
+                                         ~
+138     error: error.message,
+    ~~~~~~~~~~~~~~~~~~~~~~~~~
+139     stack: error.stack,
+    ~~~~~~~~~~~~~~~~~~~~~~~
+140   });
+    ~~~
+
+src/server.ts:145:39 - error TS2345: Argument of type '{ reason: string; stack: string | undefined; }' is not assignable to parameter of type 'undefined'.
+
+145   logger.error('Unhandled rejection', {
+                                          ~
+146     reason: reason instanceof Error ? reason.message : String(reason),
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+147     stack: reason instanceof Error ? reason.stack : undefined,
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+148   });
+    ~~~
+
+
+Found 50 errors in 7 files.
+
+Errors  Files
+     6  src/errors.ts:17
+    12  src/google.ts:3
+     4  src/rateLimit.ts:2
+     6  src/routes/autocomplete.ts:55
+     5  src/routes/details.ts:53
+    10  src/routes/health.ts:2
+     7  src/server.ts:70
+~/workspace/places-proxy$ 
