@@ -1,0 +1,31 @@
+
+{
+  "name": "places-proxy",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Secure proxy service for Google Places API",
+  "main": "dist/server.js",
+  "scripts": {
+    "dev": "ts-node-esm --watch src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "test": "vitest",
+    "test:run": "vitest run"
+  },
+  "dependencies": {
+    "fastify": "^4.24.3",
+    "@fastify/cors": "^8.4.0",
+    "lru-cache": "^10.0.1",
+    "dotenv": "^16.3.1",
+    "nanoid": "^5.0.3"
+  },
+  "devDependencies": {
+    "@types/node": "^20.8.7",
+    "typescript": "^5.2.2",
+    "ts-node": "^10.9.1",
+    "vitest": "^0.34.6"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
