@@ -1,14 +1,14 @@
 
 import pino from 'pino';
-import { appConfig } from './config.js';
 
+// Create a simple logger that doesn't depend on config to avoid circular deps
 export const logger = pino({
-  level: appConfig.logLevel || 'info',
+  level: process.env.LOG_LEVEL || 'info',
   transport: process.env.NODE_ENV === 'development' ? {
     target: 'pino-pretty',
     options: {
       colorize: true,
-      translateTime: 'HH:MM:ss Z',
+      translateTime: 'HH:MM:ss',
       ignore: 'pid,hostname',
     },
   } : undefined,
