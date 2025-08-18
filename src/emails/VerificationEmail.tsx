@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Html, Head, Body, Container, Text, Heading, Hr, Section } from '@react-email/components';
 
@@ -16,7 +15,7 @@ export const VerificationEmail = ({ verificationCode, isPasswordReset = false }:
   return (
     <Html lang="en">
       <Head>
-        <title>{title} - OwlLocate Financial Services</title>
+        <title>{title} - Owllocate Financial Services</title>
       </Head>
       <Body style={{ 
         fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
@@ -40,7 +39,7 @@ export const VerificationEmail = ({ verificationCode, isPasswordReset = false }:
           }}>
             <img 
               src="https://raw.githubusercontent.com/your-repo/main/owl-light-logo.png" 
-              alt="OwlLocate" 
+              alt="Owllocate" 
               style={{
                 width: '48px',
                 height: '48px',
@@ -54,7 +53,7 @@ export const VerificationEmail = ({ verificationCode, isPasswordReset = false }:
               margin: '0',
               letterSpacing: '-0.01em'
             }}>
-              OwlLocate Financial Services
+              Owllocate Financial Services
             </Heading>
           </Section>
 
@@ -139,7 +138,7 @@ export const VerificationEmail = ({ verificationCode, isPasswordReset = false }:
               textAlign: 'center',
               lineHeight: '1.3'
             }}>
-              OwlLocate Financial Services<br />
+              Owllocate Financial Services<br />
               This is an automated message. Please do not reply to this email.<br />
               For assistance, contact us at support@owllocate.it
             </Text>
