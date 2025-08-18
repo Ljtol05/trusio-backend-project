@@ -19,7 +19,7 @@ deploymentTarget = "autoscale"
 ignorePorts = false
 
 [workflows]
-runButton = "Development Server"
+runButton = "Places Proxy Dev"
 
 [[workflows.workflow]]
 name = "Development Server"
