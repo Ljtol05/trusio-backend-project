@@ -54,3 +54,32 @@ export class TTLCache<T> {
     return this.cache.size;
   }
 }
+import { LRUCache } from 'lru-cache';
+
+export class TTLCache {
+  private cache: LRUCache<string, any>;
+
+  constructor(maxItems: number) {
+    this.cache = new LRUCache({
+      max: maxItems,
+      ttl: 1000 * 60 * 5, // 5 minutes default
+    });
+  }
+
+  get(key: string): any {
+    return this.cache.get(key);
+  }
+
+  set(key: string, value: any, ttlSeconds?: number): void {
+    const options = ttlSeconds ? { ttl: ttlSeconds * 1000 } : {};
+    this.cache.set(key, value, options);
+  }
+
+  delete(key: string): void {
+    this.cache.delete(key);
+  }
+
+  clear(): void {
+    this.cache.clear();
+  }
+}

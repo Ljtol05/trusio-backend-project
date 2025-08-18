@@ -58,3 +58,16 @@ class Logger {
 }
 
 export const logger = new Logger({ logLevel: process.env.LOG_LEVEL || 'info' } as Config);
+import pino from 'pino';
+
+export const logger = pino({
+  level: process.env.NODE_ENV === 'production' ? 'info' : 'debug',
+  transport: process.env.NODE_ENV === 'development' ? {
+    target: 'pino-pretty',
+    options: {
+      colorize: true,
+      translateTime: 'HH:MM:ss',
+      ignore: 'pid,hostname',
+    },
+  } : undefined,
+});

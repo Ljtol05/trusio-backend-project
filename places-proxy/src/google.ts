@@ -185,3 +185,104 @@ export class GooglePlacesClient {
     };
   }
 }
+import type { AutocompleteResponse, PlaceDetails, GoogleAutocompleteResponse, GoogleDetailsResponse } from './types.js';
+
+export class GooglePlacesClient {
+  constructor(
+    private apiKey: string,
+    private timeoutMs: number
+  ) {}
+
+  async autocomplete(query: string, sessionToken?: string, limit: number = 5): Promise<AutocompleteResponse> {
+    const url = new URL('https://maps.googleapis.com/maps/api/place/autocomplete/json');
+    url.searchParams.set('input', query);
+    url.searchParams.set('key', this.apiKey);
+    if (sessionToken) {
+      url.searchParams.set('sessiontoken', sessionToken);
+    }
+
+    const response = await fetch(url.toString(), {
+      signal: AbortSignal.timeout(this.timeoutMs),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Google API error: ${response.status}`);
+    }
+
+    const data: GoogleAutocompleteResponse = await response.json();
+    
+    if (data.status !== 'OK') {
+      throw new Error(`Google API returned status: ${data.status}`);
+    }
+
+    return {
+      suggestions: data.predictions.slice(0, limit).map(prediction => ({
+        id: prediction.place_id,
+        description: prediction.description,
+        primaryText: prediction.structured_formatting.main_text,
+        secondaryText: prediction.structured_formatting.secondary_text,
+      })),
+    };
+  }
+
+  async getDetails(placeId: string, sessionToken?: string): Promise<PlaceDetails> {
+    const url = new URL('https://maps.googleapis.com/maps/api/place/details/json');
+    url.searchParams.set('place_id', placeId);
+    url.searchParams.set('key', this.apiKey);
+    url.searchParams.set('fields', 'place_id,address_components,geometry');
+    if (sessionToken) {
+      url.searchParams.set('sessiontoken', sessionToken);
+    }
+
+    const response = await fetch(url.toString(), {
+      signal: AbortSignal.timeout(this.timeoutMs),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Google API error: ${response.status}`);
+    }
+
+    const data: GoogleDetailsResponse = await response.json();
+    
+    if (data.status !== 'OK') {
+      throw new Error(`Google API returned status: ${data.status}`);
+    }
+
+    const result = data.result;
+    const addressComponents = result.address_components;
+
+    // Parse address components
+    let addressLine1 = '';
+    let city = '';
+    let state = '';
+    let postalCode = '';
+
+    for (const component of addressComponents) {
+      if (component.types.includes('street_number')) {
+        addressLine1 = component.long_name + ' ';
+      }
+      if (component.types.includes('route')) {
+        addressLine1 += component.long_name;
+      }
+      if (component.types.includes('locality')) {
+        city = component.long_name;
+      }
+      if (component.types.includes('administrative_area_level_1')) {
+        state = component.short_name;
+      }
+      if (component.types.includes('postal_code')) {
+        postalCode = component.long_name;
+      }
+    }
+
+    return {
+      id: result.place_id,
+      addressLine1: addressLine1.trim(),
+      city,
+      state,
+      postalCode,
+      lat: result.geometry.location.lat,
+      lng: result.geometry.location.lng,
+    };
+  }
+}
