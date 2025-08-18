@@ -2,7 +2,7 @@
 import { config } from 'dotenv';
 import type { Config } from './types.js';
 
-config();
+config({ path: '.env' });
 
 function parseBoolean(value: string | undefined, defaultValue: boolean): boolean {
   if (!value) return defaultValue;
@@ -36,7 +36,7 @@ export const appConfig: Config = {
   requestTimeoutMs: parseNumber(process.env.REQUEST_TIMEOUT_MS, 2500),
 };
 
-// Validation
+// Validate required configuration
 if (!appConfig.googlePlacesApiKey) {
-  throw new Error('GOOGLE_PLACES_API_KEY environment variable is required');
+  throw new Error('GOOGLE_PLACES_API_KEY is required');
 }
