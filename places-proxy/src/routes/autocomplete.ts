@@ -68,7 +68,10 @@ export async function autocompleteRoutes(
 
       // Upstream call
       const truncatedQuery = q.length > 40 ? q.substring(0, 40) + '…' : q;
-      logger.debug('Making upstream autocomplete request', { reqId, query: truncatedQuery });
+      logger.debug('Making upstream autocomplete request', { 
+        reqId, 
+        query: truncatedQuery 
+      });
 
       const result = await googleClient.autocomplete(q, sessionToken, limit, reqId);
       

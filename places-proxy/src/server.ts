@@ -48,7 +48,7 @@ async function createServer() {
   await fastify.register(async function (fastify) {
     fastify.addHook('preHandler', async (request, reply) => {
       // Add request context
-      request.requestTime = Date.now();
+      (request as any).requestTime = Date.now();
     });
 
     await healthRoutes(fastify);
@@ -68,7 +68,7 @@ async function createServer() {
   // Global error handler
   fastify.setErrorHandler(async (error, request, reply) => {
     logger.error('Unhandled error', {
-      error: error.message,
+      errorMessage: error.message,
       stack: error.stack,
       method: request.method,
       url: request.url,
@@ -98,7 +98,7 @@ async function start() {
     });
 
     logger.info('Places proxy server started', {
-      port: appConfig.port,
+      serverPort: appConfig.port,
       allowedOrigins: appConfig.allowedOrigins,
       softFailAutocomplete: appConfig.softFailAutocomplete,
     });

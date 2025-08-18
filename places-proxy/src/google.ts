@@ -1,4 +1,3 @@
-
 import type { 
   AutocompleteSuggestion, 
   AutocompleteResponse, 
@@ -54,23 +53,23 @@ export class GooglePlacesClient {
       }
 
       const data: GoogleAutocompleteResponse = await response.json();
-      
+
       if (data.status !== 'OK' && data.status !== 'ZERO_RESULTS') {
         throw new UpstreamError(`Google API status: ${data.status}`);
       }
 
       return this.normalizeAutocompleteResponse(data, limit);
-    } catch (error) {
+    } catch (error: any) {
       clearTimeout(timeoutId);
-      
+
       if (error.name === 'AbortError') {
         throw new UpstreamError('Request timeout', true);
       }
-      
+
       if (error instanceof UpstreamError) {
         throw error;
       }
-      
+
       throw new UpstreamError(`Network error: ${error.message}`, true);
     }
   }
@@ -110,23 +109,23 @@ export class GooglePlacesClient {
       }
 
       const data: GoogleDetailsResponse = await response.json();
-      
+
       if (data.status !== 'OK') {
         throw new UpstreamError(`Google API status: ${data.status}`);
       }
 
       return this.normalizeDetailsResponse(data, placeId);
-    } catch (error) {
+    } catch (error: any) {
       clearTimeout(timeoutId);
-      
+
       if (error.name === 'AbortError') {
         throw new UpstreamError('Request timeout', true);
       }
-      
+
       if (error instanceof UpstreamError) {
         throw error;
       }
-      
+
       throw new UpstreamError(`Network error: ${error.message}`, true);
     }
   }
@@ -150,7 +149,7 @@ export class GooglePlacesClient {
   private normalizeDetailsResponse(data: GoogleDetailsResponse, placeId: string): PlaceDetails {
     const { result } = data;
     const components = result.address_components;
-    
+
     let streetNumber = '';
     let route = '';
     let locality = '';
@@ -159,7 +158,7 @@ export class GooglePlacesClient {
 
     for (const component of components) {
       const types = component.types;
-      
+
       if (types.includes('street_number')) {
         streetNumber = component.long_name;
       } else if (types.includes('route')) {

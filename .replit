@@ -34,6 +34,15 @@ args = "npm run prisma:generate"
 task = "shell.exec"
 args = "npm run dev"
 
+[[workflows.workflow]]
+name = "Places Proxy Dev"
+author = 46306395
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd places-proxy && npm run dev"
+
 [[ports]]
 localPort = 5000
 externalPort = 80

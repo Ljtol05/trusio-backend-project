@@ -65,7 +65,10 @@ export async function detailsRoutes(
       }
 
       // Upstream call
-      logger.debug('Making upstream details request', { reqId, placeId: id });
+      logger.debug('Making upstream details request', { 
+        reqId, 
+        placeId: id 
+      });
 
       const result = await googleClient.getDetails(id, sessionToken, reqId);
       
