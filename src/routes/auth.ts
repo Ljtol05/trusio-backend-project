@@ -521,8 +521,12 @@ router.post('/start-phone-verification', authenticateToken, async (req: any, res
     });
     
     if (existingUser) {
-      logger.warn({ phone: formattedPhone, userId: req.user.id }, 'Phone already verified by another user');
-      return res.status(400).json({ error: 'Phone number already verified by another user' });
+      logger.warn({ phone: formattedPhone, userId: req.user.id, associatedEmail: existingUser.email }, 'Phone already verified by another user');
+      return res.status(400).json({ 
+        error: 'Phone number already verified by another user',
+        associatedEmail: existingUser.email,
+        message: `This phone number is already verified with the account: ${existingUser.email}`
+      });
     }
 
     // Send SMS verification using Twilio Verify API
