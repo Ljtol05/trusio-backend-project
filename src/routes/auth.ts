@@ -498,46 +498,63 @@ router.get('/me', authenticateToken, async (req: any, res) => {
 // POST /api/auth/start-phone-verification
 router.post('/start-phone-verification', authenticateToken, async (req: any, res) => {
   try {
+    logger.debug({ body: req.body, userId: req.user?.id }, 'Start phone verification request received');
+    
     const { phone } = startPhoneVerificationSchema.parse(req.body);
 
-    // Normalize phone number for consistency
-    const normalizedPhone = phone.replace(/\D/g, '');
+    // Normalize phone number for consistency - ensure it starts with +
+    let normalizedPhone = phone.replace(/\D/g, '');
+    if (!normalizedPhone.startsWith('1') && normalizedPhone.length === 10) {
+      normalizedPhone = '1' + normalizedPhone; // Add US country code if missing
+    }
+    const formattedPhone = '+' + normalizedPhone;
+    
+    logger.debug({ originalPhone: phone, normalizedPhone, formattedPhone }, 'Phone normalization');
     
     // Check if phone is already verified by another user
     const existingUser = await db.user.findFirst({ 
       where: { 
-        phone: {
-          contains: normalizedPhone.slice(-10) // Check last 10 digits
-        },
+        phone: formattedPhone,
         phoneVerified: true,
         id: { not: req.user.id }
       }
     });
     
     if (existingUser) {
+      logger.warn({ phone: formattedPhone, userId: req.user.id }, 'Phone already verified by another user');
       return res.status(400).json({ error: 'Phone number already verified by another user' });
     }
 
     // Send SMS verification using Twilio Verify API
-    const verificationResult = await sendPhoneVerificationSMS(phone);
+    logger.debug({ phone: formattedPhone, userId: req.user.id }, 'Attempting to send SMS verification');
+    const verificationResult = await sendPhoneVerificationSMS(formattedPhone);
+
+    if (!verificationResult) {
+      logger.error({ phone: formattedPhone, userId: req.user.id }, 'Failed to send SMS verification');
+      return res.status(500).json({ error: 'Failed to send verification SMS' });
+    }
 
     // Update user with phone (no need to store verification code with Twilio Verify API)
     await db.user.update({
       where: { id: req.user.id },
       data: {
-        phone,
+        phone: formattedPhone,
         phoneVerified: false,
         phoneVerificationCode: verificationResult, // Store SID or fallback code for dev
       },
     });
 
-    logger.info({ userId: req.user.id, phone }, 'Phone verification SMS sent');
-    res.json({ message: 'Phone verification code sent.' });
+    logger.info({ userId: req.user.id, phone: formattedPhone }, 'Phone verification SMS sent successfully');
+    res.json({ 
+      message: 'Phone verification code sent.',
+      phone: formattedPhone
+    });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ error: error.errors[0].message });
+      logger.error({ zodErrors: error.errors, requestBody: req.body }, 'Validation failed for start-phone-verification');
+      return res.status(400).json({ error: error.errors[0].message, details: error.errors });
     }
-    logger.error(error, 'Start phone verification error');
+    logger.error({ error: error.message, stack: error.stack, userId: req.user?.id }, 'Start phone verification error');
     res.status(500).json({ error: 'Failed to start phone verification' });
   }
 });
