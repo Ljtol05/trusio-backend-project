@@ -98,7 +98,7 @@ export function updateKycStatusByRef(
 
   kycSessions.set(userId, session);
 
-  logger.info({ userId, providerRef, decision, reason }, 'KYC status updated via webhook');
+  logger.info({ userId, providerRef, decision, reason }, 'KYC status updated in memory store');
   return true;
 }
 

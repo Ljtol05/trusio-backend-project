@@ -65,7 +65,7 @@ router.post('/start', authenticateToken, async (req, res) => {
           where: { id: req.user.id },
           data: { kycApproved: true },
         });
-        logger.info({ userId: req.user.id, providerRef: result.providerRef }, 'KYC auto-approved for development');
+        logger.info({ userId: req.user.id, providerRef: result.providerRef }, 'KYC auto-approved for development and database updated');
       }
     }, 3000);
 
@@ -84,10 +84,24 @@ router.post('/start', authenticateToken, async (req, res) => {
 });
 
 // GET /api/kyc/status - Get current KYC status
-router.get('/status', authenticateToken, (req, res) => {
+router.get('/status', authenticateToken, async (req, res) => {
   try {
-    const status = getKycStatus(req.user.id.toString());
-    res.json(status);
+    const memoryStatus = getKycStatus(req.user.id.toString());
+    
+    // Also check database for consistency
+    const user = await db.user.findUnique({ where: { id: req.user.id } });
+    const dbKycApproved = user?.kycApproved || false;
+    
+    // If memory shows approved but database doesn't, update database
+    if (memoryStatus.status === 'approved' && !dbKycApproved) {
+      await db.user.update({
+        where: { id: req.user.id },
+        data: { kycApproved: true },
+      });
+      logger.info({ userId: req.user.id }, 'Database KYC status synced with memory store');
+    }
+    
+    res.json(memoryStatus);
   } catch (error) {
     logger.error({ error, userId: req.user?.id }, 'Error getting KYC status');
     res.status(500).json({ error: 'Internal server error' });
@@ -112,15 +126,17 @@ router.post('/webhooks/kyc', async (req, res) => {
     }
 
     // Update user's KYC approval status in database
-    if (payload.decision === 'approved') {
-      // Find user by provider reference and update their KYC status
-      const kycStatus = getKycStatusByRef(payload.providerRef);
-      if (kycStatus?.userId) {
-        await db.user.update({
-          where: { id: parseInt(kycStatus.userId) },
-          data: { kycApproved: true },
-        });
-      }
+    const kycStatus = getKycStatusByRef(payload.providerRef);
+    if (kycStatus?.userId) {
+      await db.user.update({
+        where: { id: parseInt(kycStatus.userId) },
+        data: { kycApproved: payload.decision === 'approved' },
+      });
+      logger.info({ 
+        userId: kycStatus.userId, 
+        providerRef: payload.providerRef, 
+        decision: payload.decision 
+      }, 'Database updated with KYC decision');
     }
 
     res.json({ ok: true });
