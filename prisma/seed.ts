@@ -38,7 +38,7 @@ async function main() {
     await prisma.card.create({
       data: {
         userId: user.id,
-        name: `${env.name} Card`,
+        label: `${env.name} Card`,
         last4: Math.floor(1000 + Math.random() * 9000).toString(),
         type: 'category',
         isActive: true,
