@@ -52,7 +52,14 @@ router.post('/test', async (req, res) => {
   }
 });
 
-router.use(authenticateToken);
+// Apply JWT authentication to all routes except MCP endpoints
+router.use((req, res, next) => {
+  // Skip JWT auth for MCP endpoints - they use service account auth
+  if (req.path.startsWith('/mcp/')) {
+    return next();
+  }
+  return authenticateToken(req, res, next);
+});
 
 /**
  * Helper: cents → "12.34"
@@ -975,7 +982,9 @@ const mcpRouter = Router();
 // GET /api/mcp/envelopes - Get user envelopes for MCP
 mcpRouter.get('/envelopes', authenticateServiceAccount, async (req: any, res) => {
   try {
-    if (!req.serviceAccount.permissions.includes('mcp:read')) {
+    const hasReadPermission = req.serviceAccount.permissions.includes('mcp:read') || 
+                              req.serviceAccount.permissions.includes('api:read');
+    if (!hasReadPermission) {
       return res.status(403).json({ error: 'Insufficient permissions' });
     }
 
@@ -1002,7 +1011,9 @@ mcpRouter.get('/envelopes', authenticateServiceAccount, async (req: any, res) =>
 // GET /api/mcp/transactions - Get recent transactions for MCP
 mcpRouter.get('/transactions', authenticateServiceAccount, async (req: any, res) => {
   try {
-    if (!req.serviceAccount.permissions.includes('mcp:read')) {
+    const hasReadPermission = req.serviceAccount.permissions.includes('mcp:read') || 
+                              req.serviceAccount.permissions.includes('api:read');
+    if (!hasReadPermission) {
       return res.status(403).json({ error: 'Insufficient permissions' });
     }
 
@@ -1029,7 +1040,9 @@ mcpRouter.get('/transactions', authenticateServiceAccount, async (req: any, res)
 // POST /api/mcp/chat - MCP chat endpoint
 mcpRouter.post('/chat', authenticateServiceAccount, async (req: any, res) => {
   try {
-    if (!req.serviceAccount.permissions.includes('mcp:read')) {
+    const hasReadPermission = req.serviceAccount.permissions.includes('mcp:read') || 
+                              req.serviceAccount.permissions.includes('api:read');
+    if (!hasReadPermission) {
       return res.status(403).json({ error: 'Insufficient permissions' });
     }
 
