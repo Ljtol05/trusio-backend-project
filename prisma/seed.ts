@@ -48,8 +48,14 @@ async function main() {
 
   // Create 1:1 category virtual cards for a few envelopes
   for (const env of envelopes.slice(0, 4)) {
-    await prisma.card.create({
-      data: {
+    await prisma.card.upsert({
+      where: { envelopeId: env.id },
+      update: {
+        label: `${env.name} Card`,
+        last4: Math.floor(1000 + Math.random() * 9000).toString(),
+        inWallet: Math.random() > 0.5,
+      },
+      create: {
         userId: user.id,
         label: `${env.name} Card`,
         last4: Math.floor(1000 + Math.random() * 9000).toString(),
