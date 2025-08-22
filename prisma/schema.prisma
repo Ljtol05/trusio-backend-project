@@ -181,7 +181,7 @@ model ServiceAccount {
   name        String
   description String?
   tokenHash   String   @unique
-  permissions String[] // JSON array of permission strings
+  permissions String   // JSON string of permission array for SQLite compatibility
   enabled     Boolean  @default(true)
   lastUsedAt  DateTime?
   expiresAt   DateTime

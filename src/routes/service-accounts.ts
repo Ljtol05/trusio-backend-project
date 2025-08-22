@@ -99,7 +99,7 @@ router.post('/', authenticateToken, async (req: any, res) => {
         name,
         description,
         tokenHash: hash,
-        permissions,
+        permissions: JSON.stringify(permissions),
         expiresAt,
       }
     });
@@ -115,7 +115,7 @@ router.post('/', authenticateToken, async (req: any, res) => {
       id: serviceAccount.id,
       name: serviceAccount.name,
       description: serviceAccount.description,
-      permissions: serviceAccount.permissions,
+      permissions: JSON.parse(serviceAccount.permissions),
       token, // Only returned once during creation
       expiresAt: serviceAccount.expiresAt,
       createdAt: serviceAccount.createdAt,
@@ -147,7 +147,13 @@ router.get('/', authenticateToken, async (req: any, res) => {
       orderBy: { createdAt: 'desc' }
     });
 
-    res.json({ serviceAccounts });
+    // Parse permissions JSON for each service account
+    const parsedServiceAccounts = serviceAccounts.map(sa => ({
+      ...sa,
+      permissions: JSON.parse(sa.permissions)
+    }));
+
+    res.json({ serviceAccounts: parsedServiceAccounts });
   } catch (error) {
     logger.error(error, 'Error fetching service accounts');
     res.status(500).json({ error: 'Failed to fetch service accounts' });
@@ -171,9 +177,15 @@ router.put('/:id', authenticateToken, async (req: any, res) => {
       return res.status(404).json({ error: 'Service account not found' });
     }
 
+    // Convert permissions array to JSON string if provided
+    const updateData = { ...updates };
+    if (updates.permissions) {
+      updateData.permissions = JSON.stringify(updates.permissions);
+    }
+
     const updated = await db.serviceAccount.update({
       where: { id: serviceAccountId },
-      data: updates,
+      data: updateData,
     });
 
     logger.info({ 
@@ -186,7 +198,7 @@ router.put('/:id', authenticateToken, async (req: any, res) => {
       id: updated.id,
       name: updated.name,
       description: updated.description,
-      permissions: updated.permissions,
+      permissions: JSON.parse(updated.permissions),
       enabled: updated.enabled,
       lastUsedAt: updated.lastUsedAt,
       expiresAt: updated.expiresAt,
