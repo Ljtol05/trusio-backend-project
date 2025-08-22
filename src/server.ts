@@ -57,8 +57,8 @@ app.use((req, res, next) => {
 
 // Health check endpoint (no auth required)
 app.get('/healthz', (req, res) => {
-  res.json({ 
-    status: 'ok', 
+  res.json({
+    status: 'ok',
     timestamp: new Date().toISOString(),
     service: 'envelopes-backend'
   });
