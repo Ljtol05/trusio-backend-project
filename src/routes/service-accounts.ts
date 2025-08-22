@@ -1,4 +1,3 @@
-
 import { Router } from 'express';
 import { z } from 'zod';
 import bcrypt from 'bcryptjs';
@@ -41,7 +40,7 @@ export const authenticateServiceAccount = async (req: any, res: any, next: any) 
 
   try {
     const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
-    
+
     const serviceAccount = await db.serviceAccount.findFirst({
       where: { 
         tokenHash,
@@ -88,7 +87,7 @@ router.post('/', authenticateToken, async (req: any, res) => {
     }
 
     const { token, hash } = generateServiceAccountToken();
-    
+
     // Default expiration: 1 year
     const expiresAt = new Date();
     expiresAt.setFullYear(expiresAt.getFullYear() + 1);

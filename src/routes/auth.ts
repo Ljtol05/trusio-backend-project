@@ -1,4 +1,3 @@
-
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
@@ -93,7 +92,7 @@ async function sendPhoneVerificationSMS(phone: string): Promise<string | null> {
       // Dynamic import for Twilio using ES modules
       const { default: twilio } = await import('twilio');
       const client = twilio(env.TWILIO_ACCOUNT_SID, env.TWILIO_AUTH_TOKEN);
-      
+
       const verification = await client.verify.v2.services(env.TWILIO_VERIFY_SERVICE_SID)
         .verifications
         .create({ to: phone, channel: 'sms' });
@@ -107,7 +106,7 @@ async function sendPhoneVerificationSMS(phone: string): Promise<string | null> {
         twilioError: error.code || 'unknown',
         accountSidFormat: env.TWILIO_ACCOUNT_SID ? env.TWILIO_ACCOUNT_SID.substring(0, 5) : 'none'
       }, 'Failed to send SMS verification via Twilio Verify API');
-      
+
       // Fallback to console in case of error
       const fallbackCode = generateVerificationCode();
       console.log(`\n📱 TWILIO ERROR FALLBACK for ${phone}: ${fallbackCode}\n`);
@@ -129,7 +128,7 @@ async function verifyPhoneCode(phone: string, code: string): Promise<boolean> {
     try {
       const { default: twilio } = await import('twilio');
       const client = twilio(env.TWILIO_ACCOUNT_SID, env.TWILIO_AUTH_TOKEN);
-      
+
       const verificationCheck = await client.verify.v2.services(env.TWILIO_VERIFY_SERVICE_SID)
         .verificationChecks
         .create({ to: phone, code });
@@ -142,13 +141,13 @@ async function verifyPhoneCode(phone: string, code: string): Promise<boolean> {
         phone,
         twilioError: error.code || 'unknown'
       }, 'Failed to verify phone code via Twilio Verify API');
-      
+
       // Only allow fallback in development mode
       if (env.NODE_ENV === 'development') {
         logger.warn({ phone }, 'Using development fallback for phone verification');
         return false;
       }
-      
+
       // In production, fail verification if Twilio fails
       return false;
     }
@@ -159,7 +158,7 @@ async function verifyPhoneCode(phone: string, code: string): Promise<boolean> {
     logger.warn({ phone }, 'Using development fallback for phone verification');
     return false;
   }
-  
+
   // Production without Twilio - should not happen
   logger.error('Phone verification attempted without Twilio configuration in production');
   return false;
@@ -281,7 +280,7 @@ router.post('/verify-email', async (req, res) => {
       where: { id: user.id },
       data: { emailVerified: true },
     });
-    
+
     await db.verificationCode.delete({ where: { email } });
 
     // Generate auth token for authenticated API access
@@ -388,7 +387,7 @@ router.post('/login', async (req, res) => {
     }
 
     // Progressive verification - check what step user needs to complete
-    
+
     if (!user.phoneVerified) {
       return res.status(200).json({ 
         message: 'Please verify your phone number.',
@@ -466,7 +465,7 @@ export const authenticateToken = async (req: any, res: any, next: any) => {
   try {
     const decoded = jwt.verify(token, env.JWT_SECRET) as { userId: number };
     const user = await db.user.findUnique({ where: { id: decoded.userId } });
-    
+
     if (!user) {
       logger.warn({ userId: decoded.userId }, 'User not found for token');
       return res.status(401).json({ error: 'Invalid token' });
@@ -499,7 +498,7 @@ router.get('/me', authenticateToken, async (req: any, res) => {
 router.post('/start-phone-verification', authenticateToken, async (req: any, res) => {
   try {
     logger.debug({ body: req.body, userId: req.user?.id }, 'Start phone verification request received');
-    
+
     const { phone } = startPhoneVerificationSchema.parse(req.body);
 
     // Normalize phone number for consistency - ensure it starts with +
@@ -508,9 +507,9 @@ router.post('/start-phone-verification', authenticateToken, async (req: any, res
       normalizedPhone = '1' + normalizedPhone; // Add US country code if missing
     }
     const formattedPhone = '+' + normalizedPhone;
-    
+
     logger.debug({ originalPhone: phone, normalizedPhone, formattedPhone }, 'Phone normalization');
-    
+
     // Check if phone is already verified by another user
     const existingUser = await db.user.findFirst({ 
       where: { 
@@ -519,7 +518,7 @@ router.post('/start-phone-verification', authenticateToken, async (req: any, res
         id: { not: req.user.id }
       }
     });
-    
+
     if (existingUser) {
       logger.warn({ phone: formattedPhone, userId: req.user.id, associatedEmail: existingUser.email }, 'Phone already verified by another user');
       return res.status(400).json({ 
@@ -586,7 +585,7 @@ router.post('/verify-phone', authenticateToken, async (req: any, res) => {
 
     // Verify code using Twilio Verify API or fallback
     let isValidCode = false;
-    
+
     if (env.TWILIO_ACCOUNT_SID && env.TWILIO_AUTH_TOKEN && env.TWILIO_VERIFY_SERVICE_SID) {
       // Use Twilio Verify API
       isValidCode = await verifyPhoneCode(phone, code);
