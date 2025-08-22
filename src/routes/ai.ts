@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { db } from '../lib/db.js';
 import { logger } from '../lib/logger.js';
 import { authenticateToken } from './auth.js';
+import { authenticateServiceAccount } from './service-accounts.js';
 import { chatJSON, isAIEnabled } from '../lib/openai.js';
 import {
   AICoachRequestSchema,
@@ -967,5 +968,120 @@ router.post('/approve-transaction/:id', async (req: any, res) => {
     res.status(500).json({ error: 'Failed to approve transaction' });
   }
 });
+
+// MCP-specific endpoints with service account authentication
+const mcpRouter = Router();
+
+// GET /api/mcp/envelopes - Get user envelopes for MCP
+mcpRouter.get('/envelopes', authenticateServiceAccount, async (req: any, res) => {
+  try {
+    if (!req.serviceAccount.permissions.includes('mcp:read')) {
+      return res.status(403).json({ error: 'Insufficient permissions' });
+    }
+
+    const envelopes = await db.envelope.findMany({
+      where: { userId: req.user.id, isActive: true },
+      select: {
+        id: true,
+        name: true,
+        icon: true,
+        color: true,
+        currentAmountCents: true,
+        budgetAmountCents: true,
+      },
+      orderBy: { order: 'asc' }
+    });
+
+    res.json({ envelopes });
+  } catch (error) {
+    logger.error(error, 'MCP envelopes fetch error');
+    res.status(500).json({ error: 'Failed to fetch envelopes' });
+  }
+});
+
+// GET /api/mcp/transactions - Get recent transactions for MCP
+mcpRouter.get('/transactions', authenticateServiceAccount, async (req: any, res) => {
+  try {
+    if (!req.serviceAccount.permissions.includes('mcp:read')) {
+      return res.status(403).json({ error: 'Insufficient permissions' });
+    }
+
+    const limit = Math.min(parseInt(req.query.limit as string) || 50, 200);
+    
+    const transactions = await db.transaction.findMany({
+      where: { userId: req.user.id },
+      include: {
+        envelope: {
+          select: { name: true, icon: true, color: true }
+        }
+      },
+      orderBy: { postedAt: 'desc' },
+      take: limit
+    });
+
+    res.json({ transactions });
+  } catch (error) {
+    logger.error(error, 'MCP transactions fetch error');
+    res.status(500).json({ error: 'Failed to fetch transactions' });
+  }
+});
+
+// POST /api/mcp/chat - MCP chat endpoint
+mcpRouter.post('/chat', authenticateServiceAccount, async (req: any, res) => {
+  try {
+    if (!req.serviceAccount.permissions.includes('mcp:read')) {
+      return res.status(403).json({ error: 'Insufficient permissions' });
+    }
+
+    const { message } = z.object({
+      message: z.string().min(1, 'Message is required'),
+    }).parse(req.body);
+
+    // Get user context for AI
+    const [envelopes, recentTransactions] = await Promise.all([
+      db.envelope.findMany({
+        where: { userId: req.user.id, isActive: true },
+        select: { name: true, currentAmountCents: true, budgetAmountCents: true }
+      }),
+      db.transaction.findMany({
+        where: { userId: req.user.id },
+        take: 20,
+        orderBy: { postedAt: 'desc' },
+        select: { merchant: true, amountCents: true, envelope: { select: { name: true } } }
+      })
+    ]);
+
+    const context = {
+      envelopes: envelopes.map(e => ({
+        name: e.name,
+        balance: e.currentAmountCents,
+        budget: e.budgetAmountCents
+      })),
+      recentTransactions: recentTransactions.map(t => ({
+        merchant: t.merchant,
+        amount: t.amountCents,
+        envelope: t.envelope?.name
+      }))
+    };
+
+    const response = await chatJSON({
+      system: `You are a financial AI assistant. The user has the following financial context: ${JSON.stringify(context)}. Provide helpful financial insights and advice based on their envelopes and spending patterns.`,
+      user: message,
+      schemaName: "response",
+    });
+
+    logger.info({ 
+      userId: req.user.id,
+      serviceAccountId: req.serviceAccount.id 
+    }, 'MCP chat request processed');
+
+    res.json({ response: response.response || 'I apologize, but I cannot process that request right now.' });
+  } catch (error) {
+    logger.error(error, 'MCP chat error');
+    res.status(500).json({ error: 'Failed to process chat request' });
+  }
+});
+
+router.use('/mcp', mcpRouter);
 
 export default router;

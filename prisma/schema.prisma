@@ -29,6 +29,7 @@ model User {
   rules                    Rule[]
   routingConfig            RoutingConfig?
   userMemories             UserMemory[]
+  serviceAccounts          ServiceAccount[]
 }
 
 model Envelope {
@@ -166,9 +167,26 @@ model UserMemory {
 }
 
 model VerificationCode {
-  id                       Int           @id @default(autoincrement())
-  email                    String        @unique
-  codeHash                 String
-  expiresAt                DateTime
-  createdAt                DateTime      @default(now())
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  codeHash  String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+
+model ServiceAccount {
+  id          Int      @id @default(autoincrement())
+  userId      Int
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  tokenHash   String   @unique
+  permissions String[] // JSON array of permission strings
+  enabled     Boolean  @default(true)
+  lastUsedAt  DateTime?
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([userId, name])
 }

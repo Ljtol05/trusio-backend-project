@@ -18,6 +18,7 @@ import aiRoutes from './routes/ai.js';
 import eventRoutes from './routes/events.js';
 import webhookRoutes from './routes/webhooks.js';
 import kycRoutes from './routes/kyc.js';
+import serviceAccountRoutes from './routes/service-accounts.js';
 
 const app = express();
 
@@ -72,8 +73,9 @@ app.use('/api/rules', authenticateToken, ruleRoutes); // Corrected rulesRoutes t
 app.use('/api/routing', authenticateToken, routingRoutes);
 app.use('/api/cards', authenticateToken, cardRoutes);
 app.use('/api/kyc', authenticateToken, kycRoutes);
-app.use('/api/ai', authenticateToken, aiRoutes);
-app.use('/api/events', authenticateToken, eventRoutes);
+app.use('/api/ai', aiRoutes);
+app.use('/api/events', eventsRoutes);
+app.use('/api/service-accounts', serviceAccountRoutes);
 
 // 404 handler
 app.use((req, res) => {
