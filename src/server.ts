@@ -74,7 +74,7 @@ app.use('/api/routing', authenticateToken, routingRoutes);
 app.use('/api/cards', authenticateToken, cardRoutes);
 app.use('/api/kyc', authenticateToken, kycRoutes);
 app.use('/api/ai', aiRoutes);
-app.use('/api/events', eventsRoutes);
+app.use('/api/events', eventRoutes);
 app.use('/api/service-accounts', serviceAccountRoutes);
 
 // 404 handler
