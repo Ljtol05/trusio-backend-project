@@ -40,9 +40,8 @@ async function main() {
         userId: user.id,
         label: `${env.name} Card`,
         last4: Math.floor(1000 + Math.random() * 9000).toString(),
-        isActive: true,
         inWallet: Math.random() > 0.5,
-        // Note: envelopeId field removed as it doesn't exist in current schema
+        envelopeId: env.id,
       },
     });
   }
