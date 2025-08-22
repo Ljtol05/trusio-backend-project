@@ -55,9 +55,13 @@ app.use((req, res, next) => {
   next();
 });
 
-// Health check
-app.get('/healthz', (_req, res) => {
-  res.json({ ok: true });
+// Health check endpoint (no auth required)
+app.get('/healthz', (req, res) => {
+  res.json({ 
+    status: 'ok', 
+    timestamp: new Date().toISOString(),
+    service: 'envelopes-backend'
+  });
 });
 
 // API routes
