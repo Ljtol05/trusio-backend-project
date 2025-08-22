@@ -1,15 +1,28 @@
 import { PrismaClient } from '@prisma/client';
+import bcrypt from 'bcryptjs';
+
 const prisma = new PrismaClient();
 
 async function main() {
+  // Hash the demo password
+  const hashedPassword = await bcrypt.hash('demo123', 12);
+  
   // single stub user
   const user = await prisma.user.upsert({
     where: { email: 'demo@envelopes.app' },
-    update: {},
+    update: {
+      password: hashedPassword, // Update password if user exists
+      emailVerified: true,
+      phoneVerified: true,
+      kycApproved: true
+    },
     create: {
       name: 'Demo User',
       email: 'demo@envelopes.app',
-      password: 'demo123' // Simple demo password
+      password: hashedPassword,
+      emailVerified: true,
+      phoneVerified: true,
+      kycApproved: true
     },
   });
 
