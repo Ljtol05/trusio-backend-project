@@ -13,18 +13,20 @@ const envSchema = z.object({
   MAIL_FROM: z.string().optional().default('Verify <verify@owllocate.it.com>'),
   VERIFICATION_CODE_TTL: z.string().default('600000'),
 
-  // OpenAI - Optional for AI agent functionality
+  // OpenAI Configuration
   OPENAI_API_KEY: z.string().optional(),
-  OPENAI_PROJECT_ID: z.string().optional(), 
-  OPENAI_ORG_ID: z.string().optional(), // Organization ID for legacy compatibility
-  OPENAI_MODEL_PRIMARY: z.string().default('gpt-3.5-turbo'), // Most reliable model
-  OPENAI_MODEL_FALLBACK: z.string().default('gpt-3.5-turbo'), // Same as primary for consistency
-  OPENAI_MODEL_AGENTIC: z.string().default('gpt-3.5-turbo'), // Use reliable model for agents too
-  OPENAI_MODEL_EMBEDDING: z.string().default('text-embedding-ada-002'), // More widely available
+  OPENAI_PROJECT_ID: z.string().optional(),
+  OPENAI_ORG_ID: z.string().optional(),
+  OPENAI_MODEL_PRIMARY: z.string().default("gpt-4o"),
+  OPENAI_MODEL_FALLBACK: z.string().default("gpt-4o-mini"),
+  OPENAI_MODEL_AGENTIC: z.string().default("gpt-4o"),
+  OPENAI_MODEL_EMBEDDING: z.string().default("text-embedding-3-small"),
+  OPENAI_TIMEOUT_MS: z.coerce.number().default(60000),
+  OPENAI_MAX_RETRIES: z.coerce.number().default(3),
 
-  //timeouts/retries - optimized for agent interactions
-  OPENAI_TIMEOUT_MS: z.string().default('90000').transform(Number), // Longer for complex agent responses
-  OPENAI_MAX_RETRIES: z.string().default('2').transform(Number), // Fewer retries for faster agent response
+  // Agents SDK Configuration
+  OPENAI_AGENTS_TRACING_ENABLED: z.string().transform(val => val === "true").default("true"),
+  OPENAI_AGENTS_API_TYPE: z.enum(["chat_completions", "responses"]).default("chat_completions"),
 
   // Twilio
   TWILIO_ACCOUNT_SID: z.string().optional(),

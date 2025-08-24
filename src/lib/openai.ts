@@ -1,5 +1,6 @@
 // src/lib/openai.ts
 import OpenAI from "openai";
+import { setDefaultOpenAIKey, setDefaultOpenAIClient, setOpenAIAPI, setTracingDisabled } from "@openai/agents";
 import { env } from "../config/env.js";
 import { logger } from "./logger.js";
 
@@ -28,9 +29,23 @@ try {
     }
 
     openaiClient = new OpenAI(clientConfig);
+    
+    // Configure OpenAI Agents SDK
+    setDefaultOpenAIKey(env.OPENAI_API_KEY);
+    setDefaultOpenAIClient(openaiClient);
+    setOpenAIAPI(env.OPENAI_AGENTS_API_TYPE);
+    
+    // Configure tracing
+    if (!env.OPENAI_AGENTS_TRACING_ENABLED) {
+      setTracingDisabled(true);
+    }
+    
     console.log("[openai] ✅ Client initialized successfully");
+    console.log("[openai] ✅ Agents SDK configured");
     if (env.OPENAI_PROJECT_ID) console.log("[openai] Using Project ID:", env.OPENAI_PROJECT_ID);
     if (env.OPENAI_ORG_ID) console.log("[openai] Using Org ID:", env.OPENAI_ORG_ID);
+    console.log("[openai] Agents API Type:", env.OPENAI_AGENTS_API_TYPE);
+    console.log("[openai] Tracing Enabled:", env.OPENAI_AGENTS_TRACING_ENABLED);
   } else {
     console.log("[openai] ⚠️  Client not initialized - missing OPENAI_API_KEY");
   }
