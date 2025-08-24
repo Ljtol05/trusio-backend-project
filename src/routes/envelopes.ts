@@ -3,10 +3,30 @@ import { z } from 'zod';
 import { db } from '../lib/db.js';
 import { logger } from '../lib/logger.js';
 import { authenticateToken } from './auth.js';
+import { authenticateServiceAccount } from './service-accounts.js';
 import { CreateEnvelopeSchema, UpdateEnvelopeSchema } from '../types/dto.js';
 
 const router = Router();
-router.use(authenticateToken);
+
+// Combined authentication middleware that supports both JWT and service account tokens
+const authenticateAny = async (req: any, res: any, next: any) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (!token) {
+    return res.status(401).json({ error: 'Access token required' });
+  }
+
+  // If token starts with 'sa_', use service account authentication
+  if (token.startsWith('sa_')) {
+    return authenticateServiceAccount(req, res, next);
+  } else {
+    // Otherwise use JWT authentication
+    return authenticateToken(req, res, next);
+  }
+};
+
+router.use(authenticateAny);
 
 // Get all envelopes
 router.get('/', async (req: any, res) => {

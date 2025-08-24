@@ -1002,17 +1002,18 @@ mcpRouter.get('/envelopes', authenticateServiceAccount, async (req: any, res) =>
       orderBy: { order: 'asc' }
     });
 
-    // Map to expected MCP format
+    // Map to expected MCP format with correct field names
     const mappedEnvelopes = envelopes.map(env => ({
       id: env.id,
       name: env.name,
       icon: env.icon,
       color: env.color,
-      currentAmountCents: env.balanceCents,
-      budgetAmountCents: env.balanceCents + (env.spentThisMonth || 0), // Approximate budget
       balanceCents: env.balanceCents,
       spentThisMonth: env.spentThisMonth,
-      order: env.order
+      order: env.order,
+      // Add computed fields for MCP compatibility
+      currentAmountCents: env.balanceCents,
+      budgetAmountCents: env.balanceCents + (env.spentThisMonth || 0)
     }));
 
     res.json({ envelopes: mappedEnvelopes });
@@ -1060,29 +1061,48 @@ mcpRouter.post('/chat', authenticateServiceAccount, async (req: any, res) => {
       return res.status(403).json({ error: 'Insufficient permissions' });
     }
 
-    const { message } = z.object({
+    // Validate request body
+    const validationResult = z.object({
       message: z.string().min(1, 'Message is required'),
-    }).parse(req.body);
+    }).safeParse(req.body);
 
-    // Get user context for AI
+    if (!validationResult.success) {
+      return res.status(400).json({ 
+        error: 'Validation failed', 
+        details: validationResult.error.errors 
+      });
+    }
+
+    const { message } = validationResult.data;
+
+    // Get user context for AI with correct field names
     const [envelopes, recentTransactions] = await Promise.all([
       db.envelope.findMany({
         where: { userId: req.user.id, isActive: true },
-        select: { name: true, currentAmountCents: true, budgetAmountCents: true }
+        select: { 
+          name: true, 
+          balanceCents: true, 
+          spentThisMonth: true 
+        }
       }),
       db.transaction.findMany({
         where: { userId: req.user.id },
         take: 20,
         orderBy: { postedAt: 'desc' },
-        select: { merchant: true, amountCents: true, envelope: { select: { name: true } } }
+        select: { 
+          merchant: true, 
+          amountCents: true, 
+          envelope: { select: { name: true } } 
+        }
       })
     ]);
 
     const context = {
       envelopes: envelopes.map(e => ({
         name: e.name,
-        balance: e.currentAmountCents,
-        budget: e.budgetAmountCents
+        balance: e.balanceCents,
+        budget: e.balanceCents + (e.spentThisMonth || 0),
+        spent: e.spentThisMonth
       })),
       recentTransactions: recentTransactions.map(t => ({
         merchant: t.merchant,
@@ -1091,21 +1111,60 @@ mcpRouter.post('/chat', authenticateServiceAccount, async (req: any, res) => {
       }))
     };
 
-    const response = await chatJSON({
-      system: `You are a financial AI assistant. The user has the following financial context: ${JSON.stringify(context)}. Provide helpful financial insights and advice based on their envelopes and spending patterns.`,
-      user: message,
-      schemaName: "response",
-    });
+    let aiResponse;
+    try {
+      const response = await chatJSON({
+        system: `You are a financial AI assistant. The user has the following financial context: ${JSON.stringify(context)}. Provide helpful financial insights and advice based on their envelopes and spending patterns.`,
+        user: message,
+        schemaName: "chatResponse",
+        validate: (obj: any) => {
+          if (obj && typeof obj === 'object') {
+            const response = obj.response || obj.message || obj.reply || obj.answer;
+            if (typeof response === 'string' && response.trim()) {
+              return { response: response.trim() };
+            }
+          }
+          throw new Error('Invalid AI response format');
+        }
+      });
+      aiResponse = response.response;
+    } catch (aiError) {
+      logger.warn({ err: aiError, message }, 'AI chat failed, using fallback');
+      aiResponse = `Based on your ${context.envelopes.length} envelopes with a total balance of $${(context.envelopes.reduce((sum, env) => sum + env.balance, 0) / 100).toFixed(2)}, I can help you with budgeting questions. What specific aspect would you like to discuss?`;
+    }
 
     logger.info({ 
       userId: req.user.id,
       serviceAccountId: req.serviceAccount.id 
     }, 'MCP chat request processed');
 
-    res.json({ response: response.response || 'I apologize, but I cannot process that request right now.' });
-  } catch (error) {
-    logger.error(error, 'MCP chat error');
-    res.status(500).json({ error: 'Failed to process chat request' });
+    res.json({ response: aiResponse });
+  } catch (error: any) {
+    logger.error({ 
+      error: error.message, 
+      stack: error.stack,
+      userId: req.user?.id,
+      serviceAccountId: req.serviceAccount?.id 
+    }, 'MCP chat error');
+    
+    if (error.name === 'PrismaClientValidationError') {
+      return res.status(400).json({ 
+        error: 'Database validation error', 
+        message: 'Invalid data format in request' 
+      });
+    }
+    
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ 
+        error: 'Request validation failed', 
+        details: error.errors 
+      });
+    }
+    
+    res.status(500).json({ 
+      error: 'Failed to process chat request',
+      message: 'Please try again or contact support if the issue persists'
+    });
   }
 });
 
