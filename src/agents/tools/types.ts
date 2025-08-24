@@ -1,11 +1,10 @@
-
 import { z } from "zod";
-import { ToolFunction } from "@openai/agents";
+import { ToolFunction, Tool } from '@openai/agents';
 
 // Financial tool categories
 export const TOOL_CATEGORIES = {
   BUDGET: "budget",
-  ENVELOPE: "envelope", 
+  ENVELOPE: "envelope",
   TRANSACTION: "transaction",
   ANALYSIS: "analysis",
   INSIGHT: "insight",

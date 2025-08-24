@@ -1,4 +1,3 @@
-
 import { TOOL_CATEGORIES } from "./types.js";
 import { logger } from "../../lib/logger.js";
 
@@ -67,7 +66,7 @@ export class ToolRegistry {
     try {
       // Extract tool name from the SDK tool
       const toolName = sdkTool.name || sdkTool.toString().match(/name:\s*["']([^"']+)["']/)?.[1] || 'unknown';
-      
+
       this.tools.set(toolName, {
         tool: sdkTool,
         category,
@@ -120,7 +119,7 @@ export class ToolRegistry {
     if (!tool) {
       const error = `Tool '${toolName}' not found`;
       logger.error({ toolName }, error);
-      
+
       const result: ToolExecutionResult = {
         toolName,
         success: false,
@@ -128,7 +127,7 @@ export class ToolRegistry {
         error,
         timestamp: new Date()
       };
-      
+
       this.executionHistory.push(result);
       return result;
     }
@@ -152,7 +151,7 @@ export class ToolRegistry {
       };
 
       this.executionHistory.push(result);
-      
+
       logger.info({ 
         toolName, 
         duration: result.duration,
@@ -171,7 +170,7 @@ export class ToolRegistry {
       };
 
       this.executionHistory.push(result);
-      
+
       logger.error({ 
         toolName, 
         error: error.message,
