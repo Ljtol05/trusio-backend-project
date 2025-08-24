@@ -1,29 +1,25 @@
-
 // Check if we're in a browser environment
 const isBrowser = typeof window !== 'undefined';
 
 const getBackendUrl = (): string => {
-  // If not in browser (Node.js/test environment), return default
-  if (!isBrowser) {
-    return process.env.BACKEND_URL || 'http://localhost:5000';
+  // Check if we're in browser environment
+  if (typeof window !== 'undefined') {
+    // Check if we're in Replit development environment
+    if (window.location.hostname.includes('replit')) {
+      // Extract the backend subdomain from current URL
+      const currentUrl = window.location.hostname;
+      const parts = currentUrl.split('-');
+
+      if (parts.length >= 2) {
+        // Replace the first part with 'backend' to get backend URL
+        parts[0] = 'backend';
+        return `https://${parts.join('-')}`;
+      }
+    }
   }
 
-  // Check if we're in Replit development environment
-  if (window.location.hostname.includes('replit.dev') || window.location.hostname.includes('repl.co')) {
-    // Extract the backend subdomain from current URL
-    const currentUrl = window.location.hostname;
-    // Replace any subdomain with backend subdomain
-    const backendUrl = currentUrl.replace(/^[^.]+/, 'backend');
-    return `https://${backendUrl}`;
-  }
-
-  // For local development, check if port is specified
-  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-    return `${window.location.protocol}//${window.location.hostname}:5000`;
-  }
-
-  // Fallback to current origin
-  return window.location.origin;
+  // Fallback to environment variable or localhost
+  return process.env.VITE_API_URL || 'http://localhost:5000';
 };
 
 export const API_BASE_URL = getBackendUrl();

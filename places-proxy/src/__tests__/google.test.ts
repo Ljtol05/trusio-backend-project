@@ -1,4 +1,3 @@
-
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { GooglePlacesClient } from '../google.js';
 
@@ -106,7 +105,7 @@ describe('GooglePlacesClient', () => {
 
       expect(result).toEqual({
         id: 'ChIJ123',
-        addressLine1: '',
+        addressLine1: '',  // Google API doesn't provide formatted address line in this mock
         city: 'Anytown',
         state: 'CA',
         postalCode: '12345',

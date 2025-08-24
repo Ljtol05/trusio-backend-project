@@ -5,7 +5,7 @@ import { logger } from '../lib/logger.js';
 import { auth } from '../services/auth.js';
 import { agentRegistry } from '../agents/agentRegistry.js';
 import { agentManager } from '../agents/registry.js';
-import { toolRegistry } from '../agents/tools/registry.js';
+import { toolRegistry } from '../agents/tools/index.js';
 import { db } from '../lib/db.js';
 import type { FinancialContext } from '../agents/tools/types.js';
 

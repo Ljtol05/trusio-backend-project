@@ -2,13 +2,7 @@ import { tool } from '@openai/agents';
 import { z } from 'zod';
 import { db } from "../../lib/db.js";
 import { logger } from "../../lib/logger.js";
-import { toolRegistry } from "./registry.js";
-import { 
-  EnvelopeActionParamsSchema, 
-  ToolContext, 
-  ToolResult,
-  TOOL_CATEGORIES 
-} from "./types.js";
+import { TOOL_CATEGORIES } from "./types.js";
 
 // Envelope creation tool
 export const createEnvelopeTool = tool({
@@ -302,52 +296,36 @@ export const optimizeCategoriesTool = tool({
   }
 });
 
-// Register envelope tools
-toolRegistry.registerTool({
-  name: "create_envelope",
-  description: "Create a new budget envelope with specified name, target amount, and category.",
-  category: TOOL_CATEGORIES.ENVELOPE,
-  parameters: z.object({
-    userId: z.string(),
-    name: z.string(),
-    targetAmount: z.number().positive(),
-    category: z.string().optional(),
-    description: z.string().optional(),
-  }),
-  execute: async (params, context) => { const result = await createEnvelopeTool.execute(params, context); return JSON.parse(result); },
-  requiresAuth: true,
-  riskLevel: 'low',
-  estimatedDuration: 1000
-});
+// Export tools for registration
+export const envelopeTools = [
+  {
+    name: "create_envelope",
+    description: "Create a new envelope for budget allocation",
+    category: "envelope" as const,
+    riskLevel: "low" as const,
+    estimatedDuration: 1000,
+    tool: createEnvelopeTool,
+  },
+  {
+    name: "transfer_funds",
+    description: "Transfer funds between envelopes",
+    category: "envelope" as const,
+    riskLevel: "medium" as const,
+    estimatedDuration: 1500,
+    tool: transferFundsTool,
+  },
+  {
+    name: "manage_balance", 
+    description: "Update envelope balance and track changes",
+    category: "envelope" as const,
+    riskLevel: "low" as const,
+    estimatedDuration: 800,
+    tool: manageBalanceTool,
+  }
+];
 
-toolRegistry.registerTool({
-  name: "transfer_funds",
-  description: "Transfer funds between envelopes. Useful for budget reallocation and optimization.",
-  category: TOOL_CATEGORIES.ENVELOPE,
-  parameters: z.object({
-    userId: z.string(),
-    fromEnvelopeId: z.string(),
-    toEnvelopeId: z.string(),
-    amount: z.number().positive(),
-    reason: z.string().optional(),
-  }),
-  execute: async (params, context) => { const result = await transferFundsTool.execute(params, context); return JSON.parse(result); },
-  requiresAuth: true,
-  riskLevel: 'medium',
-  estimatedDuration: 1500
-});
-
-toolRegistry.registerTool({
-  name: "optimize_categories",
-  description: "Analyze envelope categories and suggest optimizations for better budget management.",
-  category: TOOL_CATEGORIES.ENVELOPE,
-  parameters: z.object({
-    userId: z.string(),
-  }),
-  execute: async (params, context) => { const result = await optimizeCategoriesTool.execute(params, context); return JSON.parse(result); },
-  requiresAuth: true,
-  riskLevel: 'low',
-  estimatedDuration: 2000
-});
+// Register tools when this module is imported
+import { toolRegistry } from './registry.js';
+envelopeTools.forEach(toolDef => toolRegistry.registerTool(toolDef));
 
 export { createEnvelopeTool, transferFundsTool, optimizeCategoriesTool };

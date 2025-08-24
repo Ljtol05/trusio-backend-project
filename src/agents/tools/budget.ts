@@ -226,27 +226,37 @@ const spendingPatternsExecute = async (params: any, context: ToolContext): Promi
   }
 };
 
-// Register budget tools
-toolRegistry.registerTool({
-  name: "budget_analysis",
-  description: "Analyze budget performance and provide insights",
-  category: "budget",
-  riskLevel: "low",
-  requiresAuth: true,
-  estimatedDuration: 2000,
-  tool: budgetAnalysisTool,
-});
+// Export tools for registration
+export const budgetTools = [
+  {
+    name: "budget_analysis",
+    description: "Analyze budget performance and provide insights on spending patterns",
+    category: "budget",
+    riskLevel: "low" as const,
+    estimatedDuration: 2000,
+    tool: budgetAnalysisTool,
+  },
+  {
+    name: "spending_patterns",
+    description: "Analyze historical spending patterns and identify trends",
+    category: "budget" as const, 
+    riskLevel: "low" as const,
+    estimatedDuration: 1500,
+    tool: spendingPatternsTool,
+  },
+  {
+    name: "variance_calculation",
+    description: "Calculate budget variance and identify over/under spending",
+    category: "budget" as const,
+    riskLevel: "low" as const, 
+    estimatedDuration: 1000,
+    tool: varianceCalculationTool,
+  }
+];
 
-toolRegistry.registerTool({
-  name: "spending_patterns",
-  description: "Analyze user spending patterns by day, category, merchant, and time to identify trends and insights",
-  category: TOOL_CATEGORIES.BUDGET,
-  parameters: BudgetAnalysisParamsSchema,
-  execute: spendingPatternsExecute,
-  requiresAuth: true,
-  riskLevel: 'low',
-  estimatedDuration: 1500
-});
+// Register tools when this module is imported
+import { toolRegistry } from './registry.js';
+budgetTools.forEach(toolDef => toolRegistry.registerTool(toolDef));
 
 // Budget analysis tool using OpenAI Agents SDK pattern
 export const budgetAnalysisTool = tool({

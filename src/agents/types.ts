@@ -1,8 +1,3 @@
-` tag. Include all necessary functions and modifications based on the intention," and the fact that the edited snippet is not a complete replacement, I will reconstruct the file by including the parts from the original that are not present in the edited snippet, and incorporating the changes from the edited snippet.
-
-This approach ensures that all the necessary agent types and configurations are preserved while incorporating the new definitions from the edited snippet.
-
-<replit_final_file>
 import { z } from "zod";
 import { Agent, RunContext, ToolFunction } from "@openai/agents";
 

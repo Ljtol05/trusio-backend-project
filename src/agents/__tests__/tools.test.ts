@@ -37,7 +37,7 @@ vi.mock('../../lib/logger.js', () => ({
 }));
 
 // Now import the tool registry after mocks are set up
-const { toolRegistry } = await import('../tools/registry.js');
+const { toolRegistry } = await import('../tools/index.js');
 
 describe('Financial Tools', () => {
   let mockContext: ToolExecutionContext;
