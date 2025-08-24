@@ -1,6 +1,5 @@
 
 import { logger } from '../../lib/logger.js';
-import type { Tool, ToolExecutionResult, ToolExecutionContext } from './types.js';
 
 export interface ToolMetrics {
   executionCount: number;
@@ -8,6 +7,38 @@ export interface ToolMetrics {
   successRate: number;
   lastExecution?: Date;
   totalErrors: number;
+}
+
+export interface Tool {
+  name: string;
+  description?: string;
+  category?: string;
+  riskLevel?: 'low' | 'medium' | 'high';
+  requiresAuth?: boolean;
+  estimatedDuration?: number;
+  schema?: any;
+  execute: (parameters: any, context: any) => Promise<any>;
+}
+
+export interface ToolExecutionResult {
+  success: boolean;
+  result?: any;
+  error?: string;
+  timestamp: Date;
+  duration: number;
+}
+
+export interface ToolExecutionContext {
+  userId: string;
+  sessionId?: string;
+  agentName?: string;
+  timestamp?: Date;
+  userProfile?: {
+    id: string;
+    name?: string;
+    email?: string;
+  };
+  timeout?: number;
 }
 
 export class ToolRegistry {
@@ -21,7 +52,19 @@ export class ToolRegistry {
     error?: string;
   }> = [];
 
-  registerTool(name: string, tool: Tool): void {
+  registerTool(name: string, toolDefinition: any): void {
+    // Handle OpenAI SDK tool format
+    const tool: Tool = {
+      name: toolDefinition.name || name,
+      description: toolDefinition.description || 'No description available',
+      category: toolDefinition.category || 'general',
+      riskLevel: toolDefinition.riskLevel || 'low',
+      requiresAuth: toolDefinition.requiresAuth || false,
+      estimatedDuration: toolDefinition.estimatedDuration || 1000,
+      schema: toolDefinition.parameters,
+      execute: toolDefinition.execute || toolDefinition.tool,
+    };
+
     this.tools.set(name, tool);
     
     // Initialize metrics for the tool

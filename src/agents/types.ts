@@ -233,8 +233,9 @@ export interface AgentExecutionResult {
 export interface AgentCapability {
   name: string;
   description: string;
-  category: string;
-  complexity: 'low' | 'medium' | 'high';
+  tools: string[];
+  specialties: string[];
+  riskLevel: 'low' | 'medium' | 'high';
 }
 
 // Agent metrics

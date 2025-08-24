@@ -583,4 +583,4 @@ router.get('/status', auth, async (req, res) => {
   }
 });
 
-export { router as default };
+export default router;
