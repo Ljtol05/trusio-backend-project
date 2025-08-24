@@ -10,14 +10,26 @@ export const MODELS = {
   embedding: env.OPENAI_MODEL_EMBEDDING,
 } as const;
 
-export const openai = (env.OPENAI_API_KEY && env.OPENAI_PROJECT_ID)
-  ? new OpenAI({
+let openaiClient: OpenAI | null = null;
+
+try {
+  if (env.OPENAI_API_KEY && env.OPENAI_PROJECT_ID) {
+    openaiClient = new OpenAI({
       apiKey: env.OPENAI_API_KEY,
       project: env.OPENAI_PROJECT_ID, // Required for model access
       timeout: env.OPENAI_TIMEOUT_MS,
       maxRetries: env.OPENAI_MAX_RETRIES,
-    })
-  : null;
+    });
+    console.log("[openai] ✅ Client initialized successfully");
+  } else {
+    console.log("[openai] ⚠️  Client not initialized - missing configuration");
+  }
+} catch (error) {
+  console.error("[openai] ❌ Failed to initialize client:", error);
+  openaiClient = null;
+}
+
+export const openai = openaiClient;
 
 export const isAIEnabled = () => !!openai && !!env.OPENAI_API_KEY;
 

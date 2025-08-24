@@ -13,9 +13,9 @@ const envSchema = z.object({
   MAIL_FROM: z.string().optional().default('Verify <verify@owllocate.it.com>'),
   VERIFICATION_CODE_TTL: z.string().default('600000'),
 
-  // OpenAI - Required for AI agent functionality
-  OPENAI_API_KEY: z.string().min(1, 'OPENAI_API_KEY is required for AI features'),
-  OPENAI_PROJECT_ID: z.string().min(1, 'OPENAI_PROJECT_ID is required for proper model access'), 
+  // OpenAI - Optional for AI agent functionality
+  OPENAI_API_KEY: z.string().optional(),
+  OPENAI_PROJECT_ID: z.string().optional(), 
   OPENAI_MODEL_PRIMARY: z.string().default('gpt-4o-mini'), // Universally available
   OPENAI_MODEL_FALLBACK: z.string().default('gpt-3.5-turbo'), // Reliable fallback
   OPENAI_MODEL_AGENTIC: z.string().default('gpt-4o'), // For complex agentic tasks
@@ -47,13 +47,12 @@ export const env = envSchema.parse(rawEnv);
 
 // Validate OpenAI configuration for agent functionality
 if (!env.OPENAI_API_KEY || !env.OPENAI_PROJECT_ID) {
-  console.error("[env] Missing required OpenAI configuration:");
-  if (!env.OPENAI_API_KEY) console.error("  - OPENAI_API_KEY is required");
-  if (!env.OPENAI_PROJECT_ID) console.error("  - OPENAI_PROJECT_ID is required"); 
-  console.error("Please set these values in Replit Secrets for AI agent functionality.");
-}
-
-// Log successful OpenAI configuration
-if (env.OPENAI_API_KEY && env.OPENAI_PROJECT_ID) {
-  console.log("[env] OpenAI configured successfully for project:", env.OPENAI_PROJECT_ID);
+  console.warn("[env] OpenAI configuration incomplete:");
+  if (!env.OPENAI_API_KEY) console.warn("  - OPENAI_API_KEY missing from Replit Secrets");
+  if (!env.OPENAI_PROJECT_ID) console.warn("  - OPENAI_PROJECT_ID missing from Replit Secrets"); 
+  console.warn("AI features will be disabled. Set these in Replit Secrets to enable AI functionality.");
+} else {
+  console.log("[env] ✅ OpenAI configured successfully");
+  console.log("[env] Project ID:", env.OPENAI_PROJECT_ID);
+  console.log("[env] API Key:", env.OPENAI_API_KEY ? `${env.OPENAI_API_KEY.substring(0, 7)}...` : 'missing');
 }
