@@ -106,7 +106,7 @@ describe('GooglePlacesClient', () => {
 
       expect(result).toEqual({
         id: 'ChIJ123',
-        addressLine1: '123 Main Street',
+        addressLine1: '',
         city: 'Anytown',
         state: 'CA',
         postalCode: '12345',

@@ -229,13 +229,12 @@ const spendingPatternsExecute = async (params: any, context: ToolContext): Promi
 // Register budget tools
 toolRegistry.registerTool({
   name: "budget_analysis",
-  description: "Analyze budget performance, variances, and utilization across envelopes for specified time periods",
-  category: TOOL_CATEGORIES.BUDGET,
-  parameters: BudgetAnalysisParamsSchema,
-  execute: budgetAnalysisExecute,
+  description: "Analyze budget performance and provide insights",
+  category: "budget",
+  riskLevel: "low",
   requiresAuth: true,
-  riskLevel: 'low',
-  estimatedDuration: 2000
+  estimatedDuration: 2000,
+  tool: budgetAnalysisTool,
 });
 
 toolRegistry.registerTool({

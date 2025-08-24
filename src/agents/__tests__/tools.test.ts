@@ -1,9 +1,8 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { toolRegistry } from '../tools/registry.js';
 import type { FinancialContext, ToolExecutionContext } from '../tools/types.js';
 
-// Mock database
+// Setup mocks before any imports
 const mockDb = {
   envelope: {
     findMany: vi.fn(),
@@ -36,6 +35,9 @@ vi.mock('../../lib/logger.js', () => ({
     warn: vi.fn(),
   },
 }));
+
+// Now import the tool registry after mocks are set up
+const { toolRegistry } = await import('../tools/registry.js');
 
 describe('Financial Tools', () => {
   let mockContext: ToolExecutionContext;
