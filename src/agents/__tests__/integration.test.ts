@@ -16,6 +16,14 @@ vi.mock('@openai/agents', () => ({
   })),
   run: vi.fn().mockResolvedValue('AI-generated financial advice response'),
   tool: vi.fn(),
+  defineTool: vi.fn().mockImplementation((config) => ({
+    name: config.name,
+    description: config.description,
+    parameters: config.parameters,
+    execute: config.execute,
+  })),
+  setDefaultOpenAIKey: vi.fn(),
+  setDefaultOpenAIClient: vi.fn(),
 }));
 
 // Mock database operations

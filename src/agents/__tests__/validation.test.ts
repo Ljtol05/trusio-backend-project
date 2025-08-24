@@ -16,6 +16,14 @@ vi.mock('@openai/agents', () => ({
   Agent: vi.fn(),
   run: vi.fn(),
   tool: vi.fn(),
+  defineTool: vi.fn().mockImplementation((config) => ({
+    name: config.name,
+    description: config.description,
+    parameters: config.parameters,
+    execute: config.execute,
+  })),
+  setDefaultOpenAIKey: vi.fn(),
+  setDefaultOpenAIClient: vi.fn(),
 }));
 
 vi.mock('../../lib/logger.js', () => ({

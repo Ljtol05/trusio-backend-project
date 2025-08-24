@@ -36,6 +36,20 @@ vi.mock('../../lib/logger.js', () => ({
   },
 }));
 
+vi.mock('@openai/agents', () => ({
+  Agent: vi.fn(),
+  run: vi.fn(),
+  tool: vi.fn(),
+  defineTool: vi.fn().mockImplementation((config) => ({
+    name: config.name,
+    description: config.description,
+    parameters: config.parameters,
+    execute: config.execute,
+  })),
+  setDefaultOpenAIKey: vi.fn(),
+  setDefaultOpenAIClient: vi.fn(),
+}));
+
 // Now import the tool registry after mocks are set up
 const { toolRegistry } = await import('../tools/index.js');
 
