@@ -1,4 +1,3 @@
-
 import { Agent, setDefaultOpenAIKey, setDefaultOpenAIClient } from "@openai/agents";
 import { AgentConfig, AgentInstance, AgentRegistry, AgentMetrics, AGENT_ROLES } from "./types.js";
 import { agentConfigManager } from "./config.js";
@@ -53,14 +52,18 @@ export class AgentManager {
 
   private async initializeAgent(config: AgentConfig): Promise<void> {
     try {
+      // Import tools based on agent role
+      const { toolRegistry } = await import('./tools/registry.js');
+      const agentTools = getToolsForAgent(config.role);
+
       // Create agent instance using OpenAI Agents SDK
       const agent = new Agent({
         name: config.name,
         instructions: config.instructions,
         model: config.model || MODELS.agentic,
         temperature: config.temperature || 0.3,
-        max_tokens: config.maxTokens || 1000,
-        tools: [], // Tools will be added in next task
+        max_tokens: config.max_tokens || 1000,
+        tools: agentTools,
         // handoffs will be configured after all agents are initialized
       });
 
@@ -141,7 +144,7 @@ export class AgentManager {
     };
 
     instance.lastUsed = new Date();
-    
+
     logger.debug({ 
       role, 
       metrics: instance.metrics 
@@ -193,7 +196,7 @@ export class AgentManager {
 
   getAgentHealth(): Record<string, any> {
     const health: Record<string, any> = {};
-    
+
     Object.entries(this.registry).forEach(([role, instance]) => {
       const metrics = instance.metrics;
       const successRate = metrics.totalInteractions > 0 
@@ -219,13 +222,13 @@ export class AgentManager {
   private async configureHandoffs(): Promise<void> {
     // Configure handoffs between agents based on their config
     const configs = agentConfigManager.getActiveConfigs();
-    
+
     for (const config of configs) {
       const instance = this.registry[config.role];
       if (!instance || !config.handoffs) continue;
 
       const handoffTargets: Record<string, Agent> = {};
-      
+
       for (const targetRole of config.handoffs) {
         const targetInstance = this.registry[targetRole];
         if (targetInstance) {
@@ -244,7 +247,7 @@ export class AgentManager {
 
   async shutdown(): Promise<void> {
     logger.info("Shutting down agent manager");
-    
+
     // Log final metrics
     Object.entries(this.registry).forEach(([role, instance]) => {
       logger.info({ 
@@ -255,7 +258,7 @@ export class AgentManager {
 
     this.registry = {};
     this.initialized = false;
-    
+
     logger.info("Agent manager shutdown complete");
   }
 
@@ -294,18 +297,31 @@ export const ensureRegistryReady = (): boolean => {
     logger.error('Agent manager not initialized');
     return false;
   }
-  
+
   const activeAgents = agentManager.getActiveAgents();
   const requiredRoles = Object.values(AGENT_ROLES);
-  
+
   const missingAgents = requiredRoles.filter(role => 
     !activeAgents.some(agent => agent.config.role === role)
   );
-  
+
   if (missingAgents.length > 0) {
     logger.error({ missingAgents }, 'Required agents missing from registry');
     return false;
   }
-  
+
   return true;
 };
+
+// Function to get tools for a specific agent role
+function getToolsForAgent(role: AGENT_ROLES): any[] {
+  // Placeholder: In a real implementation, this would dynamically
+  // import and return tools based on the role from a tool registry.
+  // For now, we'll return an empty array.
+  // Example:
+  // if (role === AGENT_ROLES.FINANCIAL_COACH) {
+  //   const { getFinancialCoachTools } = await import('./tools/financialCoachTools.js');
+  //   return getFinancialCoachTools();
+  // }
+  return [];
+}

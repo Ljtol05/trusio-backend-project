@@ -3,6 +3,7 @@
 export * from './types.js';
 export * from './config.js';
 export * from './registry.js';
+export * from './tools/index.js';
 
 // Re-export commonly used OpenAI Agents SDK types and functions
 export { Agent, run, tool, Runner } from '@openai/agents';
@@ -15,6 +16,14 @@ import { logger } from '../lib/logger.js';
 export const initializeAgentSystem = async (): Promise<boolean> => {
   try {
     logger.info('Initializing multi-agent financial coaching system...');
+    
+    // Initialize financial tools first
+    const { initializeTools } = await import('./tools/index.js');
+    const toolsInitialized = await initializeTools();
+    
+    if (!toolsInitialized) {
+      throw new Error('Failed to initialize financial tools');
+    }
     
     // Initialize the agent manager
     await agentManager.initialize();
