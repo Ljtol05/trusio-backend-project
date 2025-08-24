@@ -1343,14 +1343,19 @@ mcpRouter.post('/chat', authenticateServiceAccount, async (req: any, res) => {
     };
 
     let aiResponse;
+    let aiSuccess = false;
+    
     try {
+      // Try with the primary model first
       const response = await chatJSON({
-        system: `You are a financial AI assistant. The user has the following financial context: ${JSON.stringify(context)}. Provide helpful financial insights and advice based on their envelopes and spending patterns.`,
+        system: `You are a financial AI assistant. The user has the following financial context: ${JSON.stringify(context)}. Provide helpful financial insights and advice based on their envelopes and spending patterns. Keep responses conversational and helpful.`,
         user: message,
         schemaName: "chatResponse",
+        model: MODELS.primary,
+        temperature: 0.3,
         validate: (obj: any) => {
           if (obj && typeof obj === 'object') {
-            const response = obj.response || obj.message || obj.reply || obj.answer;
+            const response = obj.response || obj.message || obj.reply || obj.answer || obj.advice;
             if (typeof response === 'string' && response.trim()) {
               return { response: response.trim() };
             }
@@ -1359,19 +1364,57 @@ mcpRouter.post('/chat', authenticateServiceAccount, async (req: any, res) => {
         }
       });
       aiResponse = response.response;
-    } catch (aiError) {
-      logger.warn({ err: aiError, message }, 'AI chat failed, using fallback');
-      aiResponse = `Based on your ${context.envelopes.length} envelopes with a total balance of $${(context.envelopes.reduce((sum, env) => sum + env.balance, 0) / 100).toFixed(2)}, I can help you with budgeting questions. What specific aspect would you like to discuss?`;
+      aiSuccess = true;
+      
+      logger.info({ 
+        userId: req.user.id,
+        model: MODELS.primary,
+        responseLength: aiResponse.length 
+      }, 'MCP AI response successful');
+      
+    } catch (aiError: any) {
+      logger.warn({ 
+        err: aiError.message, 
+        status: aiError.status,
+        model: MODELS.primary,
+        message: message.substring(0, 100) 
+      }, 'MCP AI chat failed, using smart fallback');
+      
+      // Enhanced contextual fallback based on user's actual data
+      const totalBalance = context.envelopes.reduce((sum, env) => sum + env.balance, 0);
+      const topEnvelope = context.envelopes.length > 0 
+        ? context.envelopes.reduce((max, env) => env.balance > max.balance ? env : max)
+        : null;
+      
+      const messageLower = message.toLowerCase();
+      
+      if (messageLower.includes('budget') || messageLower.includes('envelope')) {
+        aiResponse = `I can see you have ${context.envelopes.length} envelopes with a total of $${totalBalance.toFixed(2)}. ${topEnvelope ? `Your largest envelope is ${topEnvelope.name} with $${topEnvelope.balance.toFixed(2)}.` : ''} What would you like to know about your budget?`;
+      } else if (messageLower.includes('spend') || messageLower.includes('money')) {
+        aiResponse = `Looking at your spending patterns across ${context.envelopes.length} envelopes, I can help you analyze where your money is going. What specific spending category are you curious about?`;
+      } else if (messageLower.includes('save') || messageLower.includes('goal')) {
+        aiResponse = `With your current $${totalBalance.toFixed(2)} across envelopes, I can help you set up a savings strategy. What are your financial goals?`;
+      } else {
+        aiResponse = `I'm here to help with your budget! You have ${context.envelopes.length} envelopes totaling $${totalBalance.toFixed(2)}. I can help with spending analysis, budget adjustments, or financial planning. What would you like to explore?`;
+      }
     }
 
     logger.info({ 
       userId: req.user.id,
       serviceAccountId: req.serviceAccount.id,
       model: MODELS.primary,
-      messageLength: message.length 
+      messageLength: message.length,
+      aiSuccess 
     }, 'MCP chat request processed');
 
-    res.json({ response: aiResponse });
+    res.json({ 
+      response: aiResponse,
+      success: true,
+      aiEnabled: aiSuccess,
+      fallback: !aiSuccess,
+      envelopeCount: context.envelopes.length,
+      totalBalance: context.envelopes.reduce((sum, env) => sum + env.balance, 0).toFixed(2)
+    });
   } catch (error: any) {
     logger.error({ 
       error: error.message, 
