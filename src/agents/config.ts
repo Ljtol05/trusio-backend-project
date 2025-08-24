@@ -1,4 +1,3 @@
-
 import { AgentConfig, AGENT_ROLES, AGENT_CAPABILITIES, AgentConfigSchema } from "./types.js";
 import { env } from "../config/env.js";
 import { logger } from "../lib/logger.js";
@@ -87,6 +86,7 @@ Present findings clearly with specific numbers and actionable recommendations.`,
     model: env.OPENAI_MODEL_AGENTIC,
     temperature: 0.2,
     maxTokens: 800,
+    max_tokens: 800,
     tools: ["budget_analysis", "spending_patterns", "variance_calculation"],
     handoffs: [AGENT_ROLES.ENVELOPE_MANAGER, AGENT_ROLES.FINANCIAL_COACH],
     isActive: true,
@@ -171,6 +171,7 @@ Deliver insights that are actionable, relevant, and presented in an easy-to-unde
     model: env.OPENAI_MODEL_AGENTIC,
     temperature: 0.2,
     maxTokens: 800,
+    max_tokens: 800,
     tools: ["trend_analysis", "predictive_modeling", "goal_tracking"],
     handoffs: [AGENT_ROLES.FINANCIAL_COACH, AGENT_ROLES.BUDGET_ANALYZER],
     isActive: true,
@@ -223,7 +224,7 @@ export class AgentConfigManager {
         ...existingConfig,
         ...updates
       });
-      
+
       this.configs.set(role, updatedConfig);
       logger.info({ role, updates }, "Updated agent configuration");
       return true;

@@ -36,6 +36,9 @@ export class AgentManager {
         await this.initializeAgent(config);
       }
 
+      // Configure handoffs after all agents are initialized
+      await this.configureHandoffs();
+
       this.initialized = true;
       logger.info({ 
         initialized: Object.keys(this.registry).length,
@@ -55,10 +58,8 @@ export class AgentManager {
         name: config.name,
         instructions: config.instructions,
         model: config.model || MODELS.agentic,
-        modelSettings: {
-          temperature: config.temperature || 0.3,
-          max_tokens: config.maxTokens || 1000,
-        },
+        temperature: config.temperature || 0.3,
+        max_tokens: config.maxTokens || 1000,
         tools: [], // Tools will be added in next task
         // handoffs will be configured after all agents are initialized
       });
@@ -213,6 +214,32 @@ export class AgentManager {
     });
 
     return health;
+  }
+
+  private async configureHandoffs(): Promise<void> {
+    // Configure handoffs between agents based on their config
+    const configs = agentConfigManager.getActiveConfigs();
+    
+    for (const config of configs) {
+      const instance = this.registry[config.role];
+      if (!instance || !config.handoffs) continue;
+
+      const handoffTargets: Record<string, Agent> = {};
+      
+      for (const targetRole of config.handoffs) {
+        const targetInstance = this.registry[targetRole];
+        if (targetInstance) {
+          handoffTargets[targetRole] = targetInstance.agent;
+        }
+      }
+
+      // Set the handoff targets on the agent
+      // Note: This will be properly implemented when tools are added in Task 3
+      logger.debug({ 
+        fromRole: config.role, 
+        toRoles: Object.keys(handoffTargets) 
+      }, "Configured agent handoffs");
+    }
   }
 
   async shutdown(): Promise<void> {

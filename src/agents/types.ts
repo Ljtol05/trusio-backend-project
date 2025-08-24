@@ -17,6 +17,7 @@ export const AgentConfigSchema = z.object({
   model: z.string().optional(),
   temperature: z.number().min(0).max(2).optional(),
   maxTokens: z.number().positive().optional(),
+  max_tokens: z.number().positive().optional(), // SDK uses max_tokens
   tools: z.array(z.string()).optional(),
   handoffs: z.array(z.string()).optional(),
   isActive: z.boolean().default(true),

@@ -4,7 +4,7 @@ export * from './types.js';
 export * from './config.js';
 export * from './registry.js';
 
-// Re-export commonly used OpenAI Agents SDK types
+// Re-export commonly used OpenAI Agents SDK types and functions
 export { Agent, run, tool, Runner } from '@openai/agents';
 export type { Tool, ToolFunction, RunContext } from '@openai/agents';
 
