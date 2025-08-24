@@ -1,6 +1,5 @@
-
 import { z } from 'zod';
-import { defineTool } from '@openai/agents';
+import { defineTool, toolRegistry } from '@openai/agents';
 import { db } from '../../lib/db.js';
 import { logger } from '../../lib/logger.js';
 import type { ToolExecutionContext, FinancialContext } from './types.js';
@@ -35,13 +34,13 @@ export const budgetAnalysisTool = defineTool({
   execute: async (input, context: ToolExecutionContext & FinancialContext) => {
     try {
       const { userId, timeframe, categories, includeProjections } = input;
-      
+
       logger.info({ userId, timeframe }, 'Executing budget analysis');
 
       // Calculate date range based on timeframe
       const endDate = new Date();
       const startDate = new Date();
-      
+
       switch (timeframe) {
         case 'weekly':
           startDate.setDate(startDate.getDate() - 7);
@@ -91,7 +90,7 @@ export const budgetAnalysisTool = defineTool({
       // Calculate spending by category
       const spendingByCategory: Record<string, number> = {};
       const incomeByCategory: Record<string, number> = {};
-      
+
       transactions.forEach(transaction => {
         const category = transaction.category || 'uncategorized';
         if (transaction.amount < 0) {
@@ -103,14 +102,14 @@ export const budgetAnalysisTool = defineTool({
 
       // Calculate budget variance
       const budgetVariance: Record<string, { budgeted: number; spent: number; variance: number; percentUsed: number }> = {};
-      
+
       envelopes.forEach(envelope => {
         const category = envelope.category || 'general';
         const spent = spendingByCategory[category] || 0;
         const budgeted = envelope.targetAmount || 0;
         const variance = budgeted - spent;
         const percentUsed = budgeted > 0 ? (spent / budgeted) * 100 : 0;
-        
+
         budgetVariance[category] = {
           budgeted,
           spent,
@@ -127,19 +126,19 @@ export const budgetAnalysisTool = defineTool({
 
       // Generate insights
       const insights: string[] = [];
-      
+
       // Budget adherence insights
       const overBudgetCategories = Object.entries(budgetVariance)
         .filter(([_, data]) => data.variance < 0)
         .map(([category, data]) => ({ category, overspent: Math.abs(data.variance) }));
-      
+
       if (overBudgetCategories.length > 0) {
         insights.push(`You've exceeded budget in ${overBudgetCategories.length} categories`);
         overBudgetCategories.forEach(({ category, overspent }) => {
           insights.push(`${category}: $${overspent.toFixed(2)} over budget`);
         });
       }
-      
+
       // Savings insights
       if (netFlow > 0) {
         insights.push(`Positive net flow of $${netFlow.toFixed(2)} this ${timeframe}`);
@@ -151,7 +150,7 @@ export const budgetAnalysisTool = defineTool({
       const topSpendingCategories = Object.entries(spendingByCategory)
         .sort(([,a], [,b]) => b - a)
         .slice(0, 3);
-      
+
       if (topSpendingCategories.length > 0) {
         insights.push(`Top spending categories: ${topSpendingCategories.map(([cat, amount]) => `${cat} ($${amount.toFixed(2)})`).join(', ')}`);
       }
@@ -188,6 +187,10 @@ export const budgetAnalysisTool = defineTool({
   },
 });
 
+// Register the tool when this module is imported
+toolRegistry.registerTool('budget_analysis', budgetAnalysisTool);
+
+
 export const spendingPatternsTool = defineTool({
   name: 'spending_patterns',
   description: 'Analyzes spending patterns and trends over time to identify recurring expenses and habits',
@@ -195,13 +198,13 @@ export const spendingPatternsTool = defineTool({
   execute: async (input, context: ToolExecutionContext & FinancialContext) => {
     try {
       const { userId, timeframe, lookbackPeriod, categories } = input;
-      
+
       logger.info({ userId, timeframe, lookbackPeriod }, 'Analyzing spending patterns');
 
       // Calculate lookback period
       const endDate = new Date();
       const startDate = new Date();
-      
+
       switch (timeframe) {
         case 'daily':
           startDate.setDate(startDate.getDate() - (lookbackPeriod * 7)); // weeks worth of days
@@ -241,7 +244,7 @@ export const spendingPatternsTool = defineTool({
         if (!categoryTrends[category]) {
           categoryTrends[category] = { amounts: [], dates: [] };
         }
-        
+
         categoryTrends[category].amounts.push(amount);
         categoryTrends[category].dates.push(date);
       });
@@ -254,12 +257,12 @@ export const spendingPatternsTool = defineTool({
         if (data.amounts.length >= 2) {
           const firstHalf = data.amounts.slice(0, Math.floor(data.amounts.length / 2));
           const secondHalf = data.amounts.slice(Math.floor(data.amounts.length / 2));
-          
+
           const firstAvg = firstHalf.reduce((sum, amt) => sum + amt, 0) / firstHalf.length;
           const secondAvg = secondHalf.reduce((sum, amt) => sum + amt, 0) / secondHalf.length;
-          
+
           const changePercent = firstAvg > 0 ? ((secondAvg - firstAvg) / firstAvg) * 100 : 0;
-          
+
           let trend: 'increasing' | 'decreasing' | 'stable';
           if (Math.abs(changePercent) < 5) {
             trend = 'stable';
@@ -268,9 +271,9 @@ export const spendingPatternsTool = defineTool({
           } else {
             trend = 'decreasing';
           }
-          
+
           trendAnalysis[category] = { trend, changePercent };
-          
+
           if (Math.abs(changePercent) >= 10) {
             insights.push(`${category} spending is ${trend} by ${Math.abs(changePercent).toFixed(1)}%`);
           }
@@ -297,6 +300,10 @@ export const spendingPatternsTool = defineTool({
   },
 });
 
+// Register the tool when this module is imported
+toolRegistry.registerTool('spending_patterns', spendingPatternsTool);
+
+
 export const varianceCalculationTool = defineTool({
   name: 'variance_calculation',
   description: 'Calculates budget variance and identifies areas of over/under spending',
@@ -304,7 +311,7 @@ export const varianceCalculationTool = defineTool({
   execute: async (input, context: ToolExecutionContext & FinancialContext) => {
     try {
       const { userId, budgetPeriod, startDate, endDate } = input;
-      
+
       logger.info({ userId, budgetPeriod }, 'Calculating budget variance');
 
       // Calculate period dates
@@ -317,7 +324,7 @@ export const varianceCalculationTool = defineTool({
       } else {
         periodEnd = new Date();
         periodStart = new Date();
-        
+
         if (budgetPeriod === 'current') {
           periodStart.setDate(1); // Start of current month
         } else if (budgetPeriod === 'previous') {
@@ -373,7 +380,7 @@ export const varianceCalculationTool = defineTool({
         const actual = actualSpending[category] || 0;
         const variance = budgeted - actual;
         const percentageVariance = budgeted > 0 ? (variance / budgeted) * 100 : 0;
-        
+
         let status: 'over' | 'under' | 'on-track';
         if (Math.abs(percentageVariance) <= 5) {
           status = 'on-track';
@@ -437,22 +444,25 @@ export const varianceCalculationTool = defineTool({
   },
 });
 
+// Register the tool when this module is imported
+toolRegistry.registerTool('variance_calculation', varianceCalculationTool);
+
 // Helper functions
 function generateBudgetRecommendations(budgetVariance: any, insights: string[]): string[] {
   const recommendations: string[] = [];
-  
+
   const overBudgetCategories = Object.entries(budgetVariance)
     .filter(([_, data]: [string, any]) => data.variance < 0);
-  
+
   if (overBudgetCategories.length > 0) {
     recommendations.push('Consider reviewing spending in over-budget categories');
     recommendations.push('Look for opportunities to reduce discretionary spending');
   }
-  
+
   if (insights.some(insight => insight.includes('Positive net flow'))) {
     recommendations.push('Great job maintaining positive cash flow! Consider increasing savings goals');
   }
-  
+
   return recommendations;
 }
 
@@ -461,9 +471,9 @@ function generateBudgetProjections(transactions: any[], timeframe: string): any 
   const totalSpent = transactions
     .filter(t => t.amount < 0)
     .reduce((sum, t) => sum + Math.abs(t.amount), 0);
-  
+
   const projectionMultiplier = timeframe === 'weekly' ? 4 : timeframe === 'monthly' ? 12 : 1;
-  
+
   return {
     projectedAnnualSpending: totalSpent * projectionMultiplier,
     confidence: 'medium',
@@ -472,29 +482,29 @@ function generateBudgetProjections(transactions: any[], timeframe: string): any 
 
 function generatePatternRecommendations(trendAnalysis: any, insights: string[]): string[] {
   const recommendations: string[] = [];
-  
+
   Object.entries(trendAnalysis).forEach(([category, data]: [string, any]) => {
     if (data.trend === 'increasing' && Math.abs(data.changePercent) >= 15) {
       recommendations.push(`Monitor ${category} spending - showing significant increase`);
     }
   });
-  
+
   return recommendations;
 }
 
 function generateVarianceRecommendations(varianceAnalysis: any): string[] {
   const recommendations: string[] = [];
-  
+
   const significantOverages = Object.entries(varianceAnalysis)
     .filter(([_, data]: [string, any]) => data.status === 'over' && Math.abs(data.percentageVariance) >= 20);
-  
+
   if (significantOverages.length > 0) {
     recommendations.push('Review budget allocations for categories with significant overages');
     significantOverages.forEach(([category, _]) => {
       recommendations.push(`Consider increasing budget or reducing spending in ${category}`);
     });
   }
-  
+
   return recommendations;
 }
 

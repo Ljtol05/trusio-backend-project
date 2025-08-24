@@ -1,4 +1,3 @@
-
 import { toolRegistry } from './registry.js';
 
 // Import all tool implementations
@@ -13,7 +12,7 @@ import { agentHandoff } from './handoff.js';
 function initializeTools() {
   // Clear any existing tools to prevent duplicates
   toolRegistry.clear();
-  
+
   // Register budget tools
   toolRegistry.registerTool('budget_analysis', budgetAnalysis);
   toolRegistry.registerTool('spending_patterns', spendingPatterns);
@@ -45,7 +44,16 @@ function initializeTools() {
 // Initialize tools immediately
 initializeTools();
 
-export { toolRegistry, initializeTools };
+// Register all tools
+import('./budget.js');
+import('./envelope.js');
+import('./transaction.js');
+import('./analysis.js');
+import('./insight.js');
+import('./handoff.js');
+
+// Export the configured registry
+export { toolRegistry };
 export * from './types.js';
 
 // Verify tools are registered
