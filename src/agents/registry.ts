@@ -1,174 +1,279 @@
 
-import { Agent } from "@openai/agents";
-import { AgentRole, AgentRegistry, FinancialRunContext } from "./types.js";
-import { AGENT_CONFIGS, buildContextualInstructions } from "./config.js";
+import { Agent, setDefaultOpenAIKey, setDefaultOpenAIClient } from "@openai/agents";
+import { AgentConfig, AgentInstance, AgentRegistry, AgentMetrics, AGENT_ROLES } from "./types.js";
+import { agentConfigManager } from "./config.js";
+import { openai, MODELS } from "../lib/openai.js";
+import { env } from "../config/env.js";
 import { logger } from "../lib/logger.js";
 
-export class FinancialAgentRegistry implements AgentRegistry {
-  private agents: Map<AgentRole, Agent> = new Map();
-  private initialized: boolean = false;
+export class AgentManager {
+  private registry: AgentRegistry = {};
+  private initialized = false;
 
   constructor() {
-    this.initializeAgents();
+    // Ensure OpenAI is configured for agents
+    if (env.OPENAI_API_KEY && openai) {
+      setDefaultOpenAIKey(env.OPENAI_API_KEY);
+      setDefaultOpenAIClient(openai);
+    }
   }
 
-  private initializeAgents(): void {
+  async initialize(): Promise<void> {
+    if (this.initialized) {
+      logger.info("Agent manager already initialized");
+      return;
+    }
+
+    if (!env.OPENAI_API_KEY || !openai) {
+      throw new Error("OpenAI configuration required for agent initialization");
+    }
+
     try {
-      // Initialize all agents with their base configurations
-      Object.entries(AGENT_CONFIGS).forEach(([role, config]) => {
-        const agentRole = role as AgentRole;
-        
-        const agent = new Agent({
-          name: config.name,
-          instructions: config.instructions,
-          model: config.model,
-          modelSettings: {
-            temperature: config.temperature,
-            max_tokens: config.maxTokens,
-          },
-          tools: config.tools || [],
-        });
+      const configs = agentConfigManager.getActiveConfigs();
+      logger.info({ count: configs.length }, "Initializing agents");
 
-        // Add event listeners for debugging and monitoring
-        agent.on('agent_start', (ctx, agentInstance) => {
-          logger.info({
-            agentName: agentInstance.name,
-            sessionId: (ctx as FinancialRunContext).sessionId,
-          }, 'Agent started');
-        });
-
-        agent.on('agent_end', (ctx, output) => {
-          logger.info({
-            agentName: config.name,
-            sessionId: (ctx as FinancialRunContext).sessionId,
-            outputLength: output?.length || 0,
-          }, 'Agent completed');
-        });
-
-        agent.on('tool_call', (ctx, toolCall) => {
-          logger.info({
-            agentName: config.name,
-            toolName: toolCall.function?.name,
-            sessionId: (ctx as FinancialRunContext).sessionId,
-          }, 'Tool called');
-        });
-
-        this.agents.set(agentRole, agent);
-        logger.info(`Initialized agent: ${config.name} (${agentRole})`);
-      });
+      for (const config of configs) {
+        await this.initializeAgent(config);
+      }
 
       this.initialized = true;
-      logger.info(`Agent registry initialized with ${this.agents.size} agents`);
+      logger.info({ 
+        initialized: Object.keys(this.registry).length,
+        roles: Object.keys(this.registry)
+      }, "Agent manager initialized successfully");
+
     } catch (error) {
-      logger.error({ error: error.message }, 'Failed to initialize agent registry');
-      throw new Error(`Agent registry initialization failed: ${error.message}`);
+      logger.error({ error }, "Failed to initialize agent manager");
+      throw error;
     }
   }
 
-  getAgent(role: AgentRole): Agent | undefined {
-    if (!this.initialized) {
-      logger.warn('Attempting to get agent from uninitialized registry');
-      return undefined;
+  private async initializeAgent(config: AgentConfig): Promise<void> {
+    try {
+      // Create agent instance using OpenAI Agents SDK
+      const agent = new Agent({
+        name: config.name,
+        instructions: config.instructions,
+        model: config.model || MODELS.agentic,
+        modelSettings: {
+          temperature: config.temperature || 0.3,
+          max_tokens: config.maxTokens || 1000,
+        },
+        tools: [], // Tools will be added in next task
+        // handoffs will be configured after all agents are initialized
+      });
+
+      // Initialize metrics
+      const metrics: AgentMetrics = {
+        agentName: config.name,
+        totalInteractions: 0,
+        successfulInteractions: 0,
+        averageResponseTime: 0,
+        averageConfidence: 0,
+        lastUsed: new Date().toISOString(),
+        errorCount: 0,
+        handoffCount: 0,
+      };
+
+      // Create agent instance
+      const instance: AgentInstance = {
+        config,
+        agent,
+        isInitialized: true,
+        lastUsed: new Date(),
+        metrics,
+      };
+
+      this.registry[config.role] = instance;
+      logger.info({ 
+        role: config.role, 
+        name: config.name,
+        model: config.model || MODELS.agentic
+      }, "Agent initialized successfully");
+
+    } catch (error) {
+      logger.error({ 
+        role: config.role, 
+        name: config.name, 
+        error 
+      }, "Failed to initialize agent");
+      throw error;
     }
+  }
+
+  getAgent(role: string): AgentInstance | null {
+    return this.registry[role] || null;
+  }
+
+  getAllAgents(): AgentRegistry {
+    return { ...this.registry };
+  }
+
+  getActiveAgents(): AgentInstance[] {
+    return Object.values(this.registry).filter(
+      instance => instance.config.isActive && instance.isInitialized
+    );
+  }
+
+  async getTriageAgent(): Promise<AgentInstance> {
+    const triageAgent = this.getAgent(AGENT_ROLES.TRIAGE);
+    if (!triageAgent) {
+      throw new Error("Triage agent not initialized");
+    }
+    return triageAgent;
+  }
+
+  async updateAgentMetrics(
+    role: string, 
+    update: Partial<AgentMetrics>
+  ): Promise<void> {
+    const instance = this.registry[role];
+    if (!instance) {
+      logger.warn({ role }, "Attempted to update metrics for non-existent agent");
+      return;
+    }
+
+    instance.metrics = {
+      ...instance.metrics,
+      ...update,
+      lastUsed: new Date().toISOString(),
+    };
+
+    instance.lastUsed = new Date();
     
-    const agent = this.agents.get(role);
-    if (!agent) {
-      logger.warn({ role }, 'Agent not found in registry');
+    logger.debug({ 
+      role, 
+      metrics: instance.metrics 
+    }, "Updated agent metrics");
+  }
+
+  async recordInteraction(
+    role: string, 
+    success: boolean, 
+    responseTime: number, 
+    confidence?: number
+  ): Promise<void> {
+    const instance = this.registry[role];
+    if (!instance) return;
+
+    const metrics = instance.metrics;
+    const newTotal = metrics.totalInteractions + 1;
+    const newSuccessful = success ? metrics.successfulInteractions + 1 : metrics.successfulInteractions;
+    const newErrorCount = success ? metrics.errorCount : metrics.errorCount + 1;
+
+    // Calculate running averages
+    const newAvgResponseTime = (
+      (metrics.averageResponseTime * metrics.totalInteractions) + responseTime
+    ) / newTotal;
+
+    let newAvgConfidence = metrics.averageConfidence;
+    if (confidence !== undefined) {
+      newAvgConfidence = (
+        (metrics.averageConfidence * metrics.totalInteractions) + confidence
+      ) / newTotal;
     }
+
+    await this.updateAgentMetrics(role, {
+      totalInteractions: newTotal,
+      successfulInteractions: newSuccessful,
+      averageResponseTime: Math.round(newAvgResponseTime),
+      averageConfidence: Math.round(newAvgConfidence),
+      errorCount: newErrorCount,
+    });
+  }
+
+  async recordHandoff(fromRole: string, toRole: string): Promise<void> {
+    await this.updateAgentMetrics(fromRole, {
+      handoffCount: (this.registry[fromRole]?.metrics.handoffCount || 0) + 1
+    });
+
+    logger.info({ fromRole, toRole }, "Agent handoff recorded");
+  }
+
+  getAgentHealth(): Record<string, any> {
+    const health: Record<string, any> = {};
     
-    return agent;
+    Object.entries(this.registry).forEach(([role, instance]) => {
+      const metrics = instance.metrics;
+      const successRate = metrics.totalInteractions > 0 
+        ? (metrics.successfulInteractions / metrics.totalInteractions) * 100 
+        : 100;
+
+      health[role] = {
+        isActive: instance.config.isActive,
+        isInitialized: instance.isInitialized,
+        lastUsed: instance.lastUsed,
+        totalInteractions: metrics.totalInteractions,
+        successRate: Math.round(successRate),
+        averageResponseTime: metrics.averageResponseTime,
+        averageConfidence: metrics.averageConfidence,
+        errorCount: metrics.errorCount,
+        handoffCount: metrics.handoffCount,
+      };
+    });
+
+    return health;
   }
 
-  registerAgent(role: AgentRole, agent: Agent): void {
-    this.agents.set(role, agent);
-    logger.info({ role, agentName: agent.name }, 'Agent registered');
-  }
+  async shutdown(): Promise<void> {
+    logger.info("Shutting down agent manager");
+    
+    // Log final metrics
+    Object.entries(this.registry).forEach(([role, instance]) => {
+      logger.info({ 
+        role, 
+        metrics: instance.metrics 
+      }, "Final agent metrics");
+    });
 
-  getAvailableAgents(): AgentRole[] {
-    return Array.from(this.agents.keys());
+    this.registry = {};
+    this.initialized = false;
+    
+    logger.info("Agent manager shutdown complete");
   }
 
   isInitialized(): boolean {
     return this.initialized;
   }
 
-  // Get agent with contextual instructions
-  getContextualAgent(role: AgentRole, context: FinancialRunContext): Agent | undefined {
-    const baseAgent = this.getAgent(role);
-    if (!baseAgent) return undefined;
-
-    const baseConfig = AGENT_CONFIGS[role];
-    const contextualInstructions = buildContextualInstructions(baseConfig, context.context);
-
-    // Create a new agent instance with contextual instructions
-    // Note: In production, you might want to cache these or use a more efficient approach
-    const contextualAgent = new Agent({
-      name: baseConfig.name,
-      instructions: contextualInstructions,
-      model: baseConfig.model,
-      modelSettings: {
-        temperature: baseConfig.temperature,
-        max_tokens: baseConfig.maxTokens,
-      },
-      tools: baseConfig.tools || [],
-    });
-
-    return contextualAgent;
-  }
-
-  // Health check for all agents
-  async healthCheck(): Promise<Record<AgentRole, boolean>> {
-    const health: Record<AgentRole, boolean> = {} as Record<AgentRole, boolean>;
-    
-    for (const [role, agent] of this.agents) {
-      try {
-        // Simple health check - ensure agent exists and has basic properties
-        health[role] = !!(agent.name && typeof agent.instructions === 'string');
-      } catch (error) {
-        logger.error({ role, error: error.message }, 'Agent health check failed');
-        health[role] = false;
-      }
-    }
-    
-    return health;
-  }
-
-  // Get agent statistics
-  getStats(): Record<string, any> {
-    return {
-      totalAgents: this.agents.size,
-      availableRoles: this.getAvailableAgents(),
-      initialized: this.initialized,
-      agentNames: Array.from(this.agents.entries()).map(([role, agent]) => ({
-        role,
-        name: agent.name,
-      })),
-    };
+  getInitializedCount(): number {
+    return Object.values(this.registry).filter(
+      instance => instance.isInitialized
+    ).length;
   }
 }
 
 // Singleton instance
-export const agentRegistry = new FinancialAgentRegistry();
+export const agentManager = new AgentManager();
+
+// Helper function to ensure agents are initialized
+export async function ensureAgentsInitialized(): Promise<void> {
+  if (!agentManager.isInitialized()) {
+    await agentManager.initialize();
+  }
+}
 
 // Helper functions for common operations
-export const getCoordinatorAgent = () => agentRegistry.getAgent(AgentRole.COORDINATOR);
-export const getBudgetingAgent = () => agentRegistry.getAgent(AgentRole.BUDGETING_SPECIALIST);
-export const getInvestmentAgent = () => agentRegistry.getAgent(AgentRole.INVESTMENT_ADVISOR);
-export const getDebtAgent = () => agentRegistry.getAgent(AgentRole.DEBT_MANAGER);
-export const getGoalAgent = () => agentRegistry.getAgent(AgentRole.GOAL_PLANNER);
-export const getRiskAgent = () => agentRegistry.getAgent(AgentRole.RISK_ASSESSOR);
+export const getTriageAgent = () => agentManager.getAgent(AGENT_ROLES.TRIAGE);
+export const getFinancialCoachAgent = () => agentManager.getAgent(AGENT_ROLES.FINANCIAL_COACH);
+export const getBudgetAnalyzerAgent = () => agentManager.getAgent(AGENT_ROLES.BUDGET_ANALYZER);
+export const getEnvelopeManagerAgent = () => agentManager.getAgent(AGENT_ROLES.ENVELOPE_MANAGER);
+export const getTransactionProcessorAgent = () => agentManager.getAgent(AGENT_ROLES.TRANSACTION_PROCESSOR);
+export const getInsightGeneratorAgent = () => agentManager.getAgent(AGENT_ROLES.INSIGHT_GENERATOR);
 
 // Validate registry is ready
 export const ensureRegistryReady = (): boolean => {
-  if (!agentRegistry.isInitialized()) {
-    logger.error('Agent registry not initialized');
+  if (!agentManager.isInitialized()) {
+    logger.error('Agent manager not initialized');
     return false;
   }
   
-  const availableAgents = agentRegistry.getAvailableAgents();
-  const requiredAgents = Object.values(AgentRole);
+  const activeAgents = agentManager.getActiveAgents();
+  const requiredRoles = Object.values(AGENT_ROLES);
   
-  const missingAgents = requiredAgents.filter(role => !availableAgents.includes(role));
+  const missingAgents = requiredRoles.filter(role => 
+    !activeAgents.some(agent => agent.config.role === role)
+  );
   
   if (missingAgents.length > 0) {
     logger.error({ missingAgents }, 'Required agents missing from registry');

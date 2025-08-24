@@ -8,7 +8,7 @@ export * from './registry.js';
 export { Agent, run, tool, Runner } from '@openai/agents';
 export type { Tool, ToolFunction, RunContext } from '@openai/agents';
 
-import { agentRegistry, ensureRegistryReady } from './registry.js';
+import { agentManager, ensureRegistryReady } from './registry.js';
 import { logger } from '../lib/logger.js';
 
 // Initialize the agent system
@@ -16,15 +16,18 @@ export const initializeAgentSystem = async (): Promise<boolean> => {
   try {
     logger.info('Initializing multi-agent financial coaching system...');
     
+    // Initialize the agent manager
+    await agentManager.initialize();
+    
     // Ensure registry is properly initialized
     if (!ensureRegistryReady()) {
-      throw new Error('Agent registry initialization failed');
+      throw new Error('Agent registry validation failed');
     }
     
-    // Perform health check on all agents
-    const healthStatus = await agentRegistry.healthCheck();
+    // Get system health check
+    const healthStatus = agentManager.getAgentHealth();
     const unhealthyAgents = Object.entries(healthStatus)
-      .filter(([_, healthy]) => !healthy)
+      .filter(([_, health]) => !health.isActive || !health.isInitialized)
       .map(([role, _]) => role);
     
     if (unhealthyAgents.length > 0) {
@@ -32,8 +35,12 @@ export const initializeAgentSystem = async (): Promise<boolean> => {
     }
     
     // Log system statistics
-    const stats = agentRegistry.getStats();
-    logger.info({ stats }, 'Agent system initialized successfully');
+    const initializedCount = agentManager.getInitializedCount();
+    logger.info({ 
+      initializedCount,
+      totalAgents: Object.keys(agentManager.getAllAgents()).length,
+      roles: Object.keys(agentManager.getAllAgents())
+    }, 'Agent system initialized successfully');
     
     return true;
   } catch (error) {
@@ -42,5 +49,5 @@ export const initializeAgentSystem = async (): Promise<boolean> => {
   }
 };
 
-// Export the singleton registry for direct access
-export { agentRegistry };
+// Export the singleton manager for direct access
+export { agentManager };
