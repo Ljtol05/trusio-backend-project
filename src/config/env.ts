@@ -16,9 +16,9 @@ const envSchema = z.object({
   // OpenAI - Optional for AI agent functionality
   OPENAI_API_KEY: z.string().optional(),
   OPENAI_PROJECT_ID: z.string().optional(), 
-  OPENAI_MODEL_PRIMARY: z.string().default('gpt-4o-mini'), // Universally available
-  OPENAI_MODEL_FALLBACK: z.string().default('gpt-3.5-turbo'), // Reliable fallback
-  OPENAI_MODEL_AGENTIC: z.string().default('gpt-4o'), // For complex agentic tasks
+  OPENAI_MODEL_PRIMARY: z.string().default('gpt-3.5-turbo'), // Universally available
+  OPENAI_MODEL_FALLBACK: z.string().default('gpt-3.5-turbo-0125'), // Reliable fallback
+  OPENAI_MODEL_AGENTIC: z.string().default('gpt-4-turbo-preview'), // For complex agentic tasks
   OPENAI_MODEL_EMBEDDING: z.string().default('text-embedding-3-small'),
 
   //timeouts/retries - optimized for agent interactions

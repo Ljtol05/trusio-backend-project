@@ -386,8 +386,11 @@ Be conversational and reference their actual envelope names. Match your tone to 
           temperature: 0.3, // Slightly higher for more natural responses
           validate: (obj: any) => {
             if (obj && typeof obj === 'object') {
-              const advice = obj.advice || obj.response || obj.recommendation || obj.suggestion;
-              const actions = obj.actions || obj.suggestions || obj.recommendations || [];
+              // Handle both wrapped and unwrapped responses
+              let responseData = obj.coachResponse || obj;
+              
+              const advice = responseData.advice || responseData.response || responseData.recommendation || responseData.suggestion;
+              const actions = responseData.actions || responseData.suggestions || responseData.recommendations || [];
 
               if (typeof advice === 'string' && advice.trim()) {
                 return { 
@@ -395,12 +398,21 @@ Be conversational and reference their actual envelope names. Match your tone to 
                   actions: Array.isArray(actions) ? actions : []
                 };
               }
+              
+              // Try to extract any meaningful text response
+              const stringValues = Object.values(responseData).filter(v => typeof v === 'string' && v.trim());
+              if (stringValues.length > 0) {
+                return {
+                  advice: stringValues[0],
+                  actions: Array.isArray(actions) ? actions : []
+                };
+              }
             }
-            throw new Error('Invalid AI response format');
+            throw new Error('Invalid AI response format - no valid advice field found');
           },
         }),
         new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('AI timeout - using smart fallback')), 20000) // Increased timeout
+          setTimeout(() => reject(new Error('AI timeout - using smart fallback')), 15000) // Reduced timeout for faster fallback
         )
       ]);
 
@@ -1355,12 +1367,30 @@ mcpRouter.post('/chat', authenticateServiceAccount, async (req: any, res) => {
         temperature: 0.3,
         validate: (obj: any) => {
           if (obj && typeof obj === 'object') {
-            const response = obj.response || obj.message || obj.reply || obj.answer || obj.advice;
+            // Handle both wrapped and unwrapped responses
+            let response;
+            
+            if (obj.chatResponse) {
+              // Wrapped in schema name
+              const wrapped = obj.chatResponse;
+              response = wrapped.response || wrapped.message || wrapped.reply || wrapped.answer || wrapped.advice;
+            } else {
+              // Direct response object
+              response = obj.response || obj.message || obj.reply || obj.answer || obj.advice;
+            }
+            
             if (typeof response === 'string' && response.trim()) {
               return { response: response.trim() };
             }
+            
+            // If we can't find a proper response field, try to extract any string value
+            const values = Object.values(obj);
+            const stringValue = values.find(v => typeof v === 'string' && v.trim());
+            if (stringValue) {
+              return { response: stringValue.trim() };
+            }
           }
-          throw new Error('Invalid AI response format');
+          throw new Error('Invalid AI response format - no valid response field found');
         }
       });
       aiResponse = response.response;

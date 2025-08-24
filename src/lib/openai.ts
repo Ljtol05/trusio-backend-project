@@ -34,7 +34,7 @@ export const openai = openaiClient;
 export const isAIEnabled = () => !!openai && !!env.OPENAI_API_KEY;
 
 // Models that should not receive a custom temperature on chat.completions
-const NO_TEMP_MODELS = [/^gpt-4-1/, /^gpt-5/, /^gpt-4o/];
+const NO_TEMP_MODELS = [/^gpt-4-1/, /^gpt-5/, /^gpt-4o/, /^gpt-4-turbo/];
 const supportsTemperature = (model: string | undefined) =>
   !!model && !NO_TEMP_MODELS.some((re) => re.test(model));
 
@@ -90,7 +90,31 @@ export async function chatJSON<T = unknown>({
       logger.info({ model: m, project: env.OPENAI_PROJECT_ID }, "Making OpenAI request");
       const res = await openai.chat.completions.create(payload);
       const content = res.choices[0]?.message?.content ?? "{}";
-      const obj = JSON.parse(content);
+      
+      // Enhanced JSON parsing with better error handling
+      let obj;
+      try {
+        obj = JSON.parse(content);
+        
+        // Ensure the response has the expected structure
+        if (!obj || typeof obj !== 'object') {
+          throw new Error('Response is not a valid object');
+        }
+        
+        // If no schemaName wrapper, try to find the actual content
+        if (!obj[schemaName] && Object.keys(obj).length === 1) {
+          const firstKey = Object.keys(obj)[0];
+          obj = { [schemaName]: obj[firstKey] };
+        } else if (!obj[schemaName]) {
+          obj = { [schemaName]: obj };
+        }
+        
+      } catch (parseError) {
+        logger.error({ content, parseError: parseError.message }, "Failed to parse OpenAI JSON response");
+        // Create a fallback response structure
+        obj = { [schemaName]: { response: content || "I apologize, but I'm having trouble processing your request right now." } };
+      }
+      
       return validate ? validate(obj) : (obj as T);
     } catch (err: any) {
       lastErr = err;
