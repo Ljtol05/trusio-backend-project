@@ -1,0 +1,210 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<testsuites name="vitest tests" tests="28" failures="7" errors="0" time="3.156">
+    <testsuite name="__tests__/agentRegistry.test.ts" timestamp="2025-08-24T05:36:30.314Z" hostname="a409799f0c85" tests="0" failures="0" errors="0" skipped="0" time="0">
+    </testsuite>
+    <testsuite name="__tests__/integration.test.ts" timestamp="2025-08-24T05:36:30.316Z" hostname="a409799f0c85" tests="1" failures="1" errors="0" skipped="0" time="0">
+        <testcase classname="__tests__/integration.test.ts" name="__tests__/integration.test.ts" time="0">
+            <failure message="Route.post() requires a callback function but got a [object Undefined]" type="Error">
+Error: Route.post() requires a callback function but got a [object Undefined]
+ ❯ Route.&lt;computed&gt; [as post] ../../node_modules/express/lib/router/route.js:216:15
+ ❯ Function.proto.&lt;computed&gt; [as post] ../../node_modules/express/lib/router/index.js:521:19
+ ❯ ../routes/ai.ts:127:8
+ ❯ ../server.ts:14:32
+            </failure>
+        </testcase>
+    </testsuite>
+    <testsuite name="__tests__/performance.test.ts" timestamp="2025-08-24T05:36:30.321Z" hostname="a409799f0c85" tests="12" failures="0" errors="0" skipped="0" time="0">
+        <testcase classname="__tests__/performance.test.ts" name="Agent Performance Tests &gt; Agent Response Times &gt; should respond within acceptable time limits" time="0">
+        </testcase>
+        <testcase classname="__tests__/performance.test.ts" name="Agent Performance Tests &gt; Agent Response Times &gt; should handle multiple concurrent agent requests" time="0">
+        </testcase>
+        <testcase classname="__tests__/performance.test.ts" name="Agent Performance Tests &gt; Agent Response Times &gt; should maintain performance with large financial context" time="0">
+        </testcase>
+        <testcase classname="__tests__/performance.test.ts" name="Agent Performance Tests &gt; Tool Performance &gt; should execute tools within acceptable time limits" time="0">
+        </testcase>
+        <testcase classname="__tests__/performance.test.ts" name="Agent Performance Tests &gt; Tool Performance &gt; should handle concurrent tool executions" time="0">
+        </testcase>
+        <testcase classname="__tests__/performance.test.ts" name="Agent Performance Tests &gt; Memory and Resource Usage &gt; should not leak memory during repeated operations" time="0">
+        </testcase>
+        <testcase classname="__tests__/performance.test.ts" name="Agent Performance Tests &gt; Memory and Resource Usage &gt; should handle agent registry operations efficiently" time="0">
+        </testcase>
+        <testcase classname="__tests__/performance.test.ts" name="Agent Performance Tests &gt; Stress Testing &gt; should handle high-frequency agent requests" time="0">
+        </testcase>
+        <testcase classname="__tests__/performance.test.ts" name="Agent Performance Tests &gt; Stress Testing &gt; should gracefully degrade under extreme load" time="0">
+        </testcase>
+        <testcase classname="__tests__/performance.test.ts" name="Agent Performance Tests &gt; Edge Cases and Resilience &gt; should handle malformed context gracefully" time="0">
+        </testcase>
+        <testcase classname="__tests__/performance.test.ts" name="Agent Performance Tests &gt; Edge Cases and Resilience &gt; should handle very long messages efficiently" time="0">
+        </testcase>
+        <testcase classname="__tests__/performance.test.ts" name="Agent Performance Tests &gt; Edge Cases and Resilience &gt; should maintain performance with frequent agent switching" time="0">
+        </testcase>
+    </testsuite>
+    <testsuite name="__tests__/tools.test.ts" timestamp="2025-08-24T05:36:30.332Z" hostname="a409799f0c85" tests="14" failures="5" errors="0" skipped="0" time="0.085">
+        <testcase classname="__tests__/tools.test.ts" name="Financial Tools &gt; Tool Registry &gt; should have all required tools registered" time="0.024">
+            <failure message="expected {} to have property &quot;budget_analysis&quot;" type="AssertionError">
+AssertionError: expected {} to have property &quot;budget_analysis&quot;
+ ❯ __tests__/tools.test.ts:88:21
+            </failure>
+            <failure message="expected {} to have property &quot;budget_analysis&quot;" type="AssertionError">
+AssertionError: expected {} to have property &quot;budget_analysis&quot;
+ ❯ __tests__/tools.test.ts:88:21
+            </failure>
+            <failure message="expected {} to have property &quot;budget_analysis&quot;" type="AssertionError">
+AssertionError: expected {} to have property &quot;budget_analysis&quot;
+ ❯ __tests__/tools.test.ts:88:21
+            </failure>
+        </testcase>
+        <testcase classname="__tests__/tools.test.ts" name="Financial Tools &gt; Tool Registry &gt; should return correct tool count" time="0.002">
+            <failure message="expected 0 to be greater than 10" type="AssertionError">
+AssertionError: expected 0 to be greater than 10
+ ❯ __tests__/tools.test.ts:117:21
+            </failure>
+            <failure message="expected 0 to be greater than 10" type="AssertionError">
+AssertionError: expected 0 to be greater than 10
+ ❯ __tests__/tools.test.ts:117:21
+            </failure>
+            <failure message="expected 0 to be greater than 10" type="AssertionError">
+AssertionError: expected 0 to be greater than 10
+ ❯ __tests__/tools.test.ts:117:21
+            </failure>
+        </testcase>
+        <testcase classname="__tests__/tools.test.ts" name="Financial Tools &gt; Budget Tools &gt; should execute budget analysis tool successfully" time="0.007">
+            <failure message="expected false to be true // Object.is equality" type="AssertionError">
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ __tests__/tools.test.ts:134:30
+            </failure>
+            <failure message="expected false to be true // Object.is equality" type="AssertionError">
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ __tests__/tools.test.ts:134:30
+            </failure>
+            <failure message="expected false to be true // Object.is equality" type="AssertionError">
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ __tests__/tools.test.ts:134:30
+            </failure>
+        </testcase>
+        <testcase classname="__tests__/tools.test.ts" name="Financial Tools &gt; Budget Tools &gt; should handle budget analysis errors gracefully" time="0.002">
+            <failure message="expected &apos;Tool not found: budget_analysis&apos; to contain &apos;Database error&apos;" type="AssertionError">
+AssertionError: expected &apos;Tool not found: budget_analysis&apos; to contain &apos;Database error&apos;
+
+- Expected
++ Received
+
+- Database error
++ Tool not found: budget_analysis
+
+ ❯ __tests__/tools.test.ts:151:28
+            </failure>
+            <failure message="expected &apos;Tool not found: budget_analysis&apos; to contain &apos;Database error&apos;" type="AssertionError">
+AssertionError: expected &apos;Tool not found: budget_analysis&apos; to contain &apos;Database error&apos;
+
+- Expected
++ Received
+
+- Database error
++ Tool not found: budget_analysis
+
+ ❯ __tests__/tools.test.ts:151:28
+            </failure>
+            <failure message="expected &apos;Tool not found: budget_analysis&apos; to contain &apos;Database error&apos;" type="AssertionError">
+AssertionError: expected &apos;Tool not found: budget_analysis&apos; to contain &apos;Database error&apos;
+
+- Expected
++ Received
+
+- Database error
++ Tool not found: budget_analysis
+
+ ❯ __tests__/tools.test.ts:151:28
+            </failure>
+        </testcase>
+        <testcase classname="__tests__/tools.test.ts" name="Financial Tools &gt; Envelope Tools &gt; should create envelope successfully" time="0.003">
+            <failure message="expected false to be true // Object.is equality" type="AssertionError">
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ __tests__/tools.test.ts:175:30
+            </failure>
+            <failure message="expected false to be true // Object.is equality" type="AssertionError">
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ __tests__/tools.test.ts:175:30
+            </failure>
+            <failure message="expected false to be true // Object.is equality" type="AssertionError">
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ __tests__/tools.test.ts:175:30
+            </failure>
+        </testcase>
+        <testcase classname="__tests__/tools.test.ts" name="Financial Tools &gt; Envelope Tools &gt; should transfer funds between envelopes" time="0">
+        </testcase>
+        <testcase classname="__tests__/tools.test.ts" name="Financial Tools &gt; Transaction Tools &gt; should categorize transactions correctly" time="0">
+        </testcase>
+        <testcase classname="__tests__/tools.test.ts" name="Financial Tools &gt; Transaction Tools &gt; should analyze spending patterns" time="0">
+        </testcase>
+        <testcase classname="__tests__/tools.test.ts" name="Financial Tools &gt; Analysis Tools &gt; should analyze budget variance" time="0">
+        </testcase>
+        <testcase classname="__tests__/tools.test.ts" name="Financial Tools &gt; Insight Tools &gt; should generate personalized recommendations" time="0">
+        </testcase>
+        <testcase classname="__tests__/tools.test.ts" name="Financial Tools &gt; Insight Tools &gt; should identify financial opportunities" time="0">
+        </testcase>
+        <testcase classname="__tests__/tools.test.ts" name="Financial Tools &gt; Agent Handoff Tool &gt; should execute agent handoff successfully" time="0">
+        </testcase>
+        <testcase classname="__tests__/tools.test.ts" name="Financial Tools &gt; Tool Error Handling &gt; should handle non-existent tool gracefully" time="0">
+        </testcase>
+        <testcase classname="__tests__/tools.test.ts" name="Financial Tools &gt; Tool Error Handling &gt; should handle tool execution timeout" time="0">
+        </testcase>
+    </testsuite>
+    <testsuite name="__tests__/validation.test.ts" timestamp="2025-08-24T05:36:30.375Z" hostname="a409799f0c85" tests="1" failures="1" errors="0" skipped="0" time="0">
+        <testcase classname="__tests__/validation.test.ts" name="__tests__/validation.test.ts" time="0">
+            <failure message="Transform failed with 1 error:
+/home/runner/workspace/src/agents/types.ts:252:1: ERROR: Unterminated string literal" type="Error">
+Error: Transform failed with 1 error:
+/home/runner/workspace/src/agents/types.ts:252:1: ERROR: Unterminated string literal
+ ❯ failureErrorWithLog ../../node_modules/vite/node_modules/esbuild/lib/main.js:1472:15
+ ❯ ../../node_modules/vite/node_modules/esbuild/lib/main.js:755:50
+ ❯ responseCallbacks.&lt;computed&gt; ../../node_modules/vite/node_modules/esbuild/lib/main.js:622:9
+ ❯ handleIncomingPacket ../../node_modules/vite/node_modules/esbuild/lib/main.js:677:12
+ ❯ Socket.readFromStdout ../../node_modules/vite/node_modules/esbuild/lib/main.js:600:7
+ ❯ Socket.emit ../../node:events:518:28
+            </failure>
+        </testcase>
+    </testsuite>
+</testsuites>
