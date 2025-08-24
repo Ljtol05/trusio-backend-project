@@ -1,8 +1,11 @@
 import express from 'express';
 import cors from 'cors';
-import { db } from './lib/db.js';
+import helmet from 'helmet';
+import { rateLimit } from 'express-rate-limit';
 import { logger } from './lib/logger.js';
 import { env } from './config/env.js';
+import { createApiRouter } from './routes/routing.js';
+import { db } from './lib/db.js';
 import { authenticateToken } from './routes/auth.js';
 
 // Import routes
@@ -19,6 +22,9 @@ import eventRoutes from './routes/events.js';
 import webhookRoutes from './routes/webhooks.js';
 import kycRoutes from './routes/kyc.js';
 import serviceAccountRoutes from './routes/service-accounts.js';
+
+// Import the agent API integration module
+import { initializeApiIntegration } from './agents/apiIntegration.js';
 
 const app = express();
 
