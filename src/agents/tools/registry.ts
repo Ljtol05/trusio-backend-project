@@ -52,10 +52,10 @@ export class ToolRegistry {
     error?: string;
   }> = [];
 
-  registerTool(name: string, toolDefinition: any): void {
+  registerTool(toolDefinition: any): void {
     // Handle OpenAI SDK tool format
     const tool: Tool = {
-      name: toolDefinition.name || name,
+      name: toolDefinition.name,
       description: toolDefinition.description || 'No description available',
       category: toolDefinition.category || 'general',
       riskLevel: toolDefinition.riskLevel || 'low',
@@ -65,7 +65,7 @@ export class ToolRegistry {
       execute: toolDefinition.execute || toolDefinition.tool,
     };
 
-    this.tools.set(name, tool);
+    this.tools.set(toolDefinition.name, tool);
     
     // Initialize metrics for the tool
     if (!this.metrics.has(name)) {
