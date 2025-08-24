@@ -6,12 +6,14 @@ import { logger } from "./logger.js";
 export const MODELS = {
   primary: env.OPENAI_MODEL_PRIMARY,
   fallback: env.OPENAI_MODEL_FALLBACK,
+  agentic: env.OPENAI_MODEL_AGENTIC,
+  embedding: env.OPENAI_MODEL_EMBEDDING,
 } as const;
 
-export const openai = env.OPENAI_API_KEY
+export const openai = (env.OPENAI_API_KEY && env.OPENAI_PROJECT_ID)
   ? new OpenAI({
       apiKey: env.OPENAI_API_KEY,
-      project: env.OPENAI_PROJECT_ID || undefined,
+      project: env.OPENAI_PROJECT_ID, // Required for model access
       timeout: env.OPENAI_TIMEOUT_MS,
       maxRetries: env.OPENAI_MAX_RETRIES,
     })
@@ -20,7 +22,7 @@ export const openai = env.OPENAI_API_KEY
 export const isAIEnabled = () => !!openai && !!env.OPENAI_API_KEY;
 
 // Models that should not receive a custom temperature on chat.completions
-const NO_TEMP_MODELS = [/^gpt-4\.1/, /^gpt-5/];
+const NO_TEMP_MODELS = [/^gpt-4-1/, /^gpt-5/, /^gpt-4o/];
 const supportsTemperature = (model: string | undefined) =>
   !!model && !NO_TEMP_MODELS.some((re) => re.test(model));
 
@@ -41,8 +43,14 @@ export async function chatJSON<T = unknown>({
   model,
   validate,
 }: ChatJSONParams<T>): Promise<T> {
-  if (!env.OPENAI_API_KEY || !openai) {
-    throw Object.assign(new Error("OPENAI_API_KEY missing"), { code: "NO_KEY" });
+  if (!env.OPENAI_API_KEY || !env.OPENAI_PROJECT_ID || !openai) {
+    const missingConfig = [];
+    if (!env.OPENAI_API_KEY) missingConfig.push("OPENAI_API_KEY");
+    if (!env.OPENAI_PROJECT_ID) missingConfig.push("OPENAI_PROJECT_ID");
+    throw Object.assign(
+      new Error(`Missing OpenAI configuration: ${missingConfig.join(", ")}`), 
+      { code: "NO_CONFIG" }
+    );
   }
 
   const modelsToTry = [model ?? MODELS.primary, MODELS.fallback].filter(Boolean) as string[];
@@ -67,13 +75,28 @@ export async function chatJSON<T = unknown>({
         payload.temperature = temperature;
       }
 
+      logger.info({ model: m, project: env.OPENAI_PROJECT_ID }, "Making OpenAI request");
       const res = await openai.chat.completions.create(payload);
       const content = res.choices[0]?.message?.content ?? "{}";
       const obj = JSON.parse(content);
       return validate ? validate(obj) : (obj as T);
     } catch (err: any) {
       lastErr = err;
-      logger.error({ error: err, model: m }, "OpenAI request failed");
+      logger.error({ 
+        error: err.message, 
+        status: err.status, 
+        code: err.code,
+        model: m,
+        project: env.OPENAI_PROJECT_ID 
+      }, "OpenAI request failed");
+
+      // Enhanced error logging for debugging
+      if (err.status === 403) {
+        logger.error("Model access denied - check project permissions for model: " + m);
+      }
+      if (err.status === 404) {
+        logger.error("Model not found - ensure model is available in project: " + m);
+      }
 
       // keep fallback behavior on common transient or permission errors
       const status = Number(err?.status ?? err?.code);
@@ -85,7 +108,14 @@ export async function chatJSON<T = unknown>({
 }
 
 export async function openaiPing(model = MODELS.primary) {
-  if (!env.OPENAI_API_KEY || !openai) return { ok: false, reason: "NO_KEY" as const };
+  if (!env.OPENAI_API_KEY || !env.OPENAI_PROJECT_ID || !openai) {
+    return { 
+      ok: false, 
+      reason: "NO_CONFIG" as const,
+      project: env.OPENAI_PROJECT_ID || "missing"
+    };
+  }
+  
   try {
     const payload: OpenAI.Chat.Completions.ChatCompletionCreateParams = {
       model,
@@ -93,23 +123,115 @@ export async function openaiPing(model = MODELS.primary) {
       response_format: { type: "json_object" },
       // don't set temperature here
     };
+    
+    logger.info({ model, project: env.OPENAI_PROJECT_ID }, "Testing OpenAI connection");
     const res = await openai.chat.completions.create(payload);
     const json = JSON.parse(res.choices[0]?.message?.content ?? "{}");
-    return { ok: Boolean(json.ok), model };
+    
+    return { 
+      ok: Boolean(json.ok), 
+      model,
+      project: env.OPENAI_PROJECT_ID
+    };
   } catch (e: any) {
-    return { ok: false, model, reason: e?.message ?? "unknown" };
+    logger.error({
+      error: e.message,
+      status: e.status,
+      model,
+      project: env.OPENAI_PROJECT_ID
+    }, "OpenAI ping failed");
+    
+    return { 
+      ok: false, 
+      model, 
+      project: env.OPENAI_PROJECT_ID,
+      reason: e?.message ?? "unknown",
+      status: e?.status
+    };
   }
 }
 
 export const createChatCompletion = async (
   messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[],
+  options: {
+    model?: string;
+    maxTokens?: number;
+    temperature?: number;
+    useAgentModel?: boolean;
+  } = {}
 ) => {
   if (!openai) throw new Error("OpenAI not configured");
-  const res = await openai.chat.completions.create({
-    model: MODELS.primary,
+  
+  const selectedModel = options.useAgentModel ? MODELS.agentic : (options.model || MODELS.primary);
+  
+  const payload: OpenAI.Chat.Completions.ChatCompletionCreateParams = {
+    model: selectedModel,
     messages,
-    // omit temperature here as well
-    max_tokens: 500,
-  });
+    max_tokens: options.maxTokens || 1500, // Increased for agent responses
+  };
+
+  // Add temperature if model supports it
+  if (supportsTemperature(selectedModel) && options.temperature !== undefined) {
+    payload.temperature = options.temperature;
+  }
+
+  logger.info({ model: selectedModel, project: env.OPENAI_PROJECT_ID }, "Creating chat completion");
+  const res = await openai.chat.completions.create(payload);
   return res.choices[0]?.message?.content || "";
+};
+
+// Agent-specific function for financial coaching conversations
+export const createAgentResponse = async (
+  systemPrompt: string,
+  userMessage: string,
+  conversationHistory: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [],
+  options: {
+    temperature?: number;
+    maxTokens?: number;
+    useAdvancedModel?: boolean;
+  } = {}
+) => {
+  if (!env.OPENAI_API_KEY || !env.OPENAI_PROJECT_ID || !openai) {
+    throw Object.assign(
+      new Error("OpenAI not properly configured for agent functionality"), 
+      { code: "NO_CONFIG" }
+    );
+  }
+
+  const model = options.useAdvancedModel ? MODELS.agentic : MODELS.primary;
+  
+  const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
+    { role: "system", content: systemPrompt },
+    ...conversationHistory,
+    { role: "user", content: userMessage }
+  ];
+
+  const payload: OpenAI.Chat.Completions.ChatCompletionCreateParams = {
+    model,
+    messages,
+    max_tokens: options.maxTokens || 2000,
+  };
+
+  if (supportsTemperature(model) && options.temperature !== undefined) {
+    payload.temperature = options.temperature;
+  }
+
+  try {
+    logger.info({ 
+      model, 
+      project: env.OPENAI_PROJECT_ID,
+      messageCount: messages.length 
+    }, "Creating agent response");
+    
+    const res = await openai.chat.completions.create(payload);
+    return res.choices[0]?.message?.content || "";
+  } catch (error: any) {
+    logger.error({
+      error: error.message,
+      status: error.status,
+      model,
+      project: env.OPENAI_PROJECT_ID
+    }, "Agent response failed");
+    throw error;
+  }
 };

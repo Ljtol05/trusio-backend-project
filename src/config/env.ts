@@ -13,15 +13,17 @@ const envSchema = z.object({
   MAIL_FROM: z.string().optional().default('Verify <verify@owllocate.it.com>'),
   VERIFICATION_CODE_TTL: z.string().default('600000'),
 
-  // OpenAI
-  OPENAI_API_KEY: z.string().optional().default(''),
-  OPENAI_PROJECT_ID: z.string().optional().default(''), 
-  OPENAI_MODEL_PRIMARY: z.string().default('gpt-4o-mini'),
-  OPENAI_MODEL_FALLBACK: z.string().default('gpt-3.5-turbo'),
+  // OpenAI - Required for AI agent functionality
+  OPENAI_API_KEY: z.string().min(1, 'OPENAI_API_KEY is required for AI features'),
+  OPENAI_PROJECT_ID: z.string().min(1, 'OPENAI_PROJECT_ID is required for proper model access'), 
+  OPENAI_MODEL_PRIMARY: z.string().default('gpt-4-1-mini'), // Optimized for agent workflows
+  OPENAI_MODEL_FALLBACK: z.string().default('gpt-4o-mini'),
+  OPENAI_MODEL_AGENTIC: z.string().default('gpt-5'), // For complex agentic tasks
+  OPENAI_MODEL_EMBEDDING: z.string().default('text-embedding-3-small'),
 
-  //timeouts/retries
-  OPENAI_TIMEOUT_MS: z.string().default('60000').transform(Number),
-  OPENAI_MAX_RETRIES: z.string().default('3').transform(Number),
+  //timeouts/retries - optimized for agent interactions
+  OPENAI_TIMEOUT_MS: z.string().default('90000').transform(Number), // Longer for complex agent responses
+  OPENAI_MAX_RETRIES: z.string().default('2').transform(Number), // Fewer retries for faster agent response
 
   // Twilio
   TWILIO_ACCOUNT_SID: z.string().optional(),
@@ -43,7 +45,15 @@ const rawEnv = {
 
 export const env = envSchema.parse(rawEnv);
 
-if (!env.OPENAI_API_KEY) {
-  // Don't throw on boot (so /healthz still works), but log a clear hint
-  console.warn("[env] OPENAI_API_KEY is missing. AI routes will return 503.");
+// Validate OpenAI configuration for agent functionality
+if (!env.OPENAI_API_KEY || !env.OPENAI_PROJECT_ID) {
+  console.error("[env] Missing required OpenAI configuration:");
+  if (!env.OPENAI_API_KEY) console.error("  - OPENAI_API_KEY is required");
+  if (!env.OPENAI_PROJECT_ID) console.error("  - OPENAI_PROJECT_ID is required"); 
+  console.error("Please set these values in Replit Secrets for AI agent functionality.");
+}
+
+// Log successful OpenAI configuration
+if (env.OPENAI_API_KEY && env.OPENAI_PROJECT_ID) {
+  console.log("[env] OpenAI configured successfully for project:", env.OPENAI_PROJECT_ID);
 }

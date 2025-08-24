@@ -4,7 +4,7 @@ import { db } from '../lib/db.js';
 import { logger } from '../lib/logger.js';
 import { authenticateToken } from './auth.js';
 import { authenticateServiceAccount } from './service-accounts.js';
-import { chatJSON, isAIEnabled } from '../lib/openai.js';
+import { chatJSON, isAIEnabled, createAgentResponse, MODELS } from '../lib/openai.js';
 import {
   AICoachRequestSchema,
   RoutingExplanationRequestSchema,
@@ -13,17 +13,53 @@ import {
 const router = Router();
 
 /**
- * Health check (no auth) – pings OpenAI with a tiny JSON response.
+ * Health check (no auth) – comprehensive OpenAI validation
  */
 router.get('/health', async (_req, res) => {
   try {
-    const { openaiPing } = await import('../lib/openai.js');
-    const result = await openaiPing();
-    res.json({ openai: result, timestamp: new Date().toISOString() });
-  } catch (error) {
-    res
-      .status(500)
-      .json({ error: 'OpenAI health check failed', details: String((error as any)?.message ?? error) });
+    const { openaiPing, MODELS } = await import('../lib/openai.js');
+    const { env } = await import('../config/env.js');
+    
+    // Test primary model
+    const primaryTest = await openaiPing(MODELS.primary);
+    
+    // Test fallback model
+    const fallbackTest = await openaiPing(MODELS.fallback);
+    
+    // Configuration status
+    const configStatus = {
+      hasApiKey: !!env.OPENAI_API_KEY,
+      hasProjectId: !!env.OPENAI_PROJECT_ID,
+      primaryModel: MODELS.primary,
+      fallbackModel: MODELS.fallback,
+      agenticModel: MODELS.agentic,
+      projectId: env.OPENAI_PROJECT_ID ? `${env.OPENAI_PROJECT_ID.substring(0, 8)}...` : 'missing'
+    };
+
+    const overallHealth = primaryTest.ok || fallbackTest.ok;
+
+    res.status(overallHealth ? 200 : 503).json({ 
+      status: overallHealth ? 'healthy' : 'degraded',
+      config: configStatus,
+      models: {
+        primary: primaryTest,
+        fallback: fallbackTest
+      },
+      recommendations: !overallHealth ? [
+        'Verify OPENAI_API_KEY is set in Replit Secrets',
+        'Verify OPENAI_PROJECT_ID is set in Replit Secrets',
+        'Check project has access to selected models',
+        'Review OpenAI API usage limits'
+      ] : [],
+      timestamp: new Date().toISOString()
+    });
+  } catch (error: any) {
+    res.status(500).json({ 
+      status: 'error',
+      error: 'OpenAI health check failed', 
+      details: error?.message ?? 'Unknown error',
+      timestamp: new Date().toISOString()
+    });
   }
 });
 
@@ -75,7 +111,11 @@ router.post('/coach', async (req: any, res) => {
     if (!isAIEnabled()) {
       return res
         .status(503)
-        .json({ error: 'AI service not available', message: 'OpenAI API key not configured' });
+        .json({ 
+          error: 'AI service not available', 
+          message: 'OpenAI API key and project ID must be configured in Replit Secrets',
+          requiredSecrets: ['OPENAI_API_KEY', 'OPENAI_PROJECT_ID']
+        });
     }
 
     const { question, context } = AICoachRequestSchema.parse(req.body);
@@ -336,13 +376,14 @@ Be conversational and reference their actual envelope names. Match your tone to 
     let aiSuccess = false;
 
     try {
-      // Try AI with optimized settings and faster timeout
+      // Use enhanced agent response for better conversational experience
       result = await Promise.race([
         chatJSON({
           system: systemPrompt,
           user: question,
           schemaName: 'coachResponse',
-          temperature: undefined, // Let the model use its default
+          model: MODELS.primary, // Use the best available model
+          temperature: 0.3, // Slightly higher for more natural responses
           validate: (obj: any) => {
             if (obj && typeof obj === 'object') {
               const advice = obj.advice || obj.response || obj.recommendation || obj.suggestion;
@@ -359,11 +400,16 @@ Be conversational and reference their actual envelope names. Match your tone to 
           },
         }),
         new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('AI timeout - using smart fallback')), 15000)
+          setTimeout(() => reject(new Error('AI timeout - using smart fallback')), 20000) // Increased timeout
         )
       ]);
 
       aiSuccess = true;
+      logger.info({ 
+        userId: req.user.id, 
+        model: MODELS.primary,
+        questionLength: question.length 
+      }, "AI coach response successful");
     } catch (aiError) {
       logger.warn({ err: aiError, question }, 'AI Coach timeout/error, using smart fallback');
 
@@ -536,10 +582,11 @@ Be conversational and reference their actual envelope names. Match your tone to 
 
     logger.error({ err: error }, 'Error in AI coach');
 
-    if (error?.code === 'NO_KEY') {
+    if (error?.code === 'NO_KEY' || error?.code === 'NO_CONFIG') {
       return res.status(503).json({
         error: 'AI service not configured',
-        message: 'Please set OPENAI_API_KEY in Replit Secrets',
+        message: 'Please set OPENAI_API_KEY and OPENAI_PROJECT_ID in Replit Secrets',
+        requiredSecrets: ['OPENAI_API_KEY', 'OPENAI_PROJECT_ID']
       });
     }
 
@@ -666,6 +713,190 @@ router.post('/explain-routing', async (req: any, res) => {
 
     logger.error({ err: error }, 'Error explaining routing');
     res.status(500).json({ error: 'Failed to process routing explanation' });
+  }
+});
+
+/**
+ * AI Agent for onboarding conversations - handles personalized financial coaching
+ */
+router.post('/agent-chat', async (req: any, res) => {
+  try {
+    if (!isAIEnabled()) {
+      return res.status(503).json({ 
+        error: 'AI agent not available',
+        message: 'OpenAI configuration required for agent functionality',
+        requiredSecrets: ['OPENAI_API_KEY', 'OPENAI_PROJECT_ID']
+      });
+    }
+
+    const { message, conversationHistory = [], userContext = {}, sessionId } = req.body;
+
+    if (!message || typeof message !== 'string') {
+      return res.status(400).json({ error: 'Message is required for agent conversation' });
+    }
+
+    // Get current user's financial state for context
+    const [envelopes, recentTransactions, userProfile] = await Promise.all([
+      db.envelope.findMany({
+        where: { userId: req.user.id, isActive: true },
+        select: { name: true, balanceCents: true, spentThisMonth: true, icon: true, color: true }
+      }),
+      db.transaction.findMany({
+        where: { userId: req.user.id },
+        take: 20,
+        orderBy: { postedAt: 'desc' },
+        select: { merchant: true, amountCents: true, envelope: { select: { name: true } } }
+      }),
+      db.user.findUnique({
+        where: { id: req.user.id },
+        select: { name: true, email: true, emailVerified: true, phoneVerified: true, kycApproved: true }
+      })
+    ]);
+
+    const financialContext = {
+      user: {
+        name: userProfile?.name || 'User',
+        isNewUser: envelopes.length === 0,
+        verificationStatus: {
+          email: userProfile?.emailVerified || false,
+          phone: userProfile?.phoneVerified || false,
+          kyc: userProfile?.kycApproved || false
+        }
+      },
+      envelopes: envelopes.map(e => ({
+        name: e.name,
+        balance: e.balanceCents / 100,
+        spent: (e.spentThisMonth || 0) / 100,
+        icon: e.icon,
+        color: e.color
+      })),
+      recentActivity: recentTransactions.slice(0, 5).map(t => ({
+        merchant: t.merchant,
+        amount: Math.abs(t.amountCents) / 100,
+        category: t.envelope?.name || 'Uncategorized'
+      })),
+      totalBalance: envelopes.reduce((sum, e) => sum + e.balanceCents, 0) / 100,
+      ...userContext
+    };
+
+    const agentSystemPrompt = `You are Emma, an expert financial AI agent specializing in envelope budgeting and personal finance. You're helping users set up and manage their budgeting system through conversational onboarding.
+
+CURRENT USER CONTEXT:
+${JSON.stringify(financialContext, null, 2)}
+
+YOUR ROLE AS AN AGENT:
+1. **Conversational Onboarding**: Guide new users through envelope setup with natural conversation
+2. **Financial Analysis**: Analyze spending patterns and provide personalized insights
+3. **Action Planning**: Suggest specific actions (create envelopes, transfer funds, adjust budgets)
+4. **Continuous Learning**: Remember user preferences and adapt recommendations
+
+CONVERSATION GUIDELINES:
+- Be warm, encouraging, and personable (you're Emma, their financial coach)
+- Ask follow-up questions to understand their financial goals and habits
+- For new users: focus on gathering income, expenses, and financial priorities
+- For existing users: analyze current patterns and suggest optimizations
+- Always provide specific, actionable recommendations with dollar amounts
+- Reference their actual financial data when making suggestions
+
+AVAILABLE ACTIONS YOU CAN SUGGEST:
+- Create envelope with specific budget allocation
+- Transfer money between envelopes
+- Set up automatic rules for transaction routing
+- Adjust budget allocations based on spending patterns
+
+CONVERSATION FLOW FOR NEW USERS:
+1. Welcome and understand their financial situation
+2. Gather monthly income and fixed expenses
+3. Understand spending priorities and problem areas
+4. Suggest personalized envelope structure
+5. Help them take first steps with specific actions
+
+Be conversational and natural - you're having a real conversation, not just answering questions.`;
+
+    try {
+      const agentResponse = await createAgentResponse(
+        agentSystemPrompt,
+        message,
+        conversationHistory,
+        {
+          temperature: 0.4, // More natural conversation
+          maxTokens: 2000,
+          useAdvancedModel: false // Start with primary model, can escalate if needed
+        }
+      );
+
+      // Analyze response for suggested actions
+      const suggestedActions = [];
+      const responseWords = agentResponse.toLowerCase();
+      
+      // Simple action detection - could be enhanced with more sophisticated NLP
+      if (responseWords.includes('create') && responseWords.includes('envelope')) {
+        suggestedActions.push({
+          type: 'create_envelope',
+          description: 'Set up personalized envelope system',
+          confidence: 0.8
+        });
+      }
+      if (responseWords.includes('transfer') && responseWords.includes('money')) {
+        suggestedActions.push({
+          type: 'transfer_funds',
+          description: 'Optimize envelope allocations',
+          confidence: 0.7
+        });
+      }
+
+      logger.info({
+        userId: req.user.id,
+        sessionId,
+        messageLength: message.length,
+        responseLength: agentResponse.length,
+        actionsDetected: suggestedActions.length
+      }, 'Agent conversation completed');
+
+      res.json({
+        response: agentResponse,
+        suggestedActions,
+        conversationId: sessionId || `conv_${Date.now()}`,
+        userContext: financialContext,
+        agentCapabilities: [
+          'envelope_creation',
+          'budget_analysis', 
+          'fund_transfers',
+          'spending_insights',
+          'financial_planning'
+        ],
+        nextSteps: financialContext.user.isNewUser 
+          ? ['gather_income', 'understand_expenses', 'create_envelopes']
+          : ['analyze_spending', 'optimize_allocations', 'set_goals']
+      });
+
+    } catch (agentError: any) {
+      logger.error({
+        error: agentError.message,
+        status: agentError.status,
+        userId: req.user.id,
+        sessionId
+      }, 'Agent conversation failed');
+
+      // Fallback response for agent failures
+      const fallbackResponse = financialContext.user.isNewUser
+        ? `Hi ${financialContext.user.name}! I'm Emma, your financial coach. I'm here to help you set up a personalized envelope budgeting system. To get started, could you tell me about your monthly income and main expenses? This will help me create the perfect budget structure for you.`
+        : `Hi ${financialContext.user.name}! I can see you have $${financialContext.totalBalance.toFixed(2)} across ${financialContext.envelopes.length} envelopes. What would you like to work on with your budget today?`;
+
+      res.json({
+        response: fallbackResponse,
+        isFailsafe: true,
+        suggestedActions: [],
+        error: 'Agent temporarily unavailable, using basic response'
+      });
+    }
+
+  } catch (error: any) {
+    logger.error({ err: error, userId: req.user?.id }, 'Agent chat endpoint error');
+    res.status(500).json({ 
+      error: 'Agent conversation failed',
+      message: 'Please try again or contact support'
+    });
   }
 });
 
@@ -1135,7 +1366,9 @@ mcpRouter.post('/chat', authenticateServiceAccount, async (req: any, res) => {
 
     logger.info({ 
       userId: req.user.id,
-      serviceAccountId: req.serviceAccount.id 
+      serviceAccountId: req.serviceAccount.id,
+      model: MODELS.primary,
+      messageLength: message.length 
     }, 'MCP chat request processed');
 
     res.json({ response: aiResponse });
