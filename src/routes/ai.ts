@@ -995,13 +995,27 @@ mcpRouter.get('/envelopes', authenticateServiceAccount, async (req: any, res) =>
         name: true,
         icon: true,
         color: true,
-        currentAmountCents: true,
-        budgetAmountCents: true,
+        balanceCents: true,
+        spentThisMonth: true,
+        order: true,
       },
       orderBy: { order: 'asc' }
     });
 
-    res.json({ envelopes });
+    // Map to expected MCP format
+    const mappedEnvelopes = envelopes.map(env => ({
+      id: env.id,
+      name: env.name,
+      icon: env.icon,
+      color: env.color,
+      currentAmountCents: env.balanceCents,
+      budgetAmountCents: env.balanceCents + (env.spentThisMonth || 0), // Approximate budget
+      balanceCents: env.balanceCents,
+      spentThisMonth: env.spentThisMonth,
+      order: env.order
+    }));
+
+    res.json({ envelopes: mappedEnvelopes });
   } catch (error) {
     logger.error(error, 'MCP envelopes fetch error');
     res.status(500).json({ error: 'Failed to fetch envelopes' });
