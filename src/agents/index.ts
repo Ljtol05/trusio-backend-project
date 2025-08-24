@@ -8,7 +8,8 @@ export * from './tools/index.js';
 export { Agent, run, tool, Runner } from '@openai/agents';
 export type { Tool, ToolFunction, RunContext } from '@openai/agents';
 
-import { agentManager, ensureRegistryReady, agentRegistry } from './registry.js';
+import { agentManager, ensureRegistryReady } from './registry.js';
+import { agentRegistry } from './agentRegistry.js';
 import { toolRegistry } from './tools/registry.js';
 import type { FinancialContext } from './tools/types.js';
 import { db } from '../lib/db.js';

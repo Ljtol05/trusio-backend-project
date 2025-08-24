@@ -277,6 +277,9 @@ export class AgentManager {
 // Singleton instance
 export const agentManager = new AgentManager();
 
+// Export the new agent registry as the primary registry
+export { agentRegistry } from './agentRegistry.js';
+
 // Helper function to ensure agents are initialized
 export async function ensureAgentsInitialized(): Promise<void> {
   if (!agentManager.isInitialized()) {
@@ -382,5 +385,5 @@ function getToolsForAgent(role: AGENT_ROLES): any[] {
   return agentTools;
 }
 
-// Import the new AgentRegistry definition
-import './agentRegistry.js';
+// Import the new AgentRegistry
+import { agentRegistry as newAgentRegistry } from './agentRegistry.js';

@@ -1,4 +1,3 @@
-
 import { z } from "zod";
 import { Agent, RunContext, ToolFunction } from "@openai/agents";
 
@@ -7,7 +6,7 @@ export const AgentConfigSchema = z.object({
   name: z.string().min(1, "Agent name is required"),
   role: z.enum([
     "financial_coach",
-    "budget_analyzer", 
+    "budget_analyzer",
     "envelope_manager",
     "transaction_processor",
     "insight_generator",
@@ -70,7 +69,7 @@ export const AgentResponseSchema = z.object({
   suggestedActions: z.array(z.object({
     type: z.enum([
       "create_envelope",
-      "transfer_funds", 
+      "transfer_funds",
       "analyze_spending",
       "set_budget",
       "review_goals",
@@ -107,7 +106,7 @@ export type AgentMetrics = z.infer<typeof AgentMetricsSchema>;
 export const AGENT_ROLES = {
   FINANCIAL_COACH: "financial_coach",
   BUDGET_ANALYZER: "budget_analyzer",
-  ENVELOPE_MANAGER: "envelope_manager", 
+  ENVELOPE_MANAGER: "envelope_manager",
   TRANSACTION_PROCESSOR: "transaction_processor",
   INSIGHT_GENERATOR: "insight_generator",
   TRIAGE: "triage"
@@ -117,7 +116,7 @@ export const AGENT_ROLES = {
 export const AGENT_CAPABILITIES = {
   [AGENT_ROLES.FINANCIAL_COACH]: [
     "conversation",
-    "goal_setting", 
+    "goal_setting",
     "financial_advice",
     "motivation",
     "education"
