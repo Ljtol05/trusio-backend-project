@@ -1,331 +1,363 @@
-import { tool } from '@openai/agents';
+
 import { z } from 'zod';
-import { db } from "../../lib/db.js";
-import { logger } from "../../lib/logger.js";
-import { TOOL_CATEGORIES } from "./types.js";
+import { defineTool } from '@openai/agents';
+import { db } from '../../lib/db.js';
+import { logger } from '../../lib/logger.js';
+import type { ToolExecutionContext, FinancialContext } from './types.js';
 
-// Envelope creation tool
-export const createEnvelopeTool = tool({
+// Zod schemas for validation
+const CreateEnvelopeInputSchema = z.object({
+  userId: z.string().min(1, 'User ID is required'),
+  name: z.string().min(1, 'Envelope name is required').max(100),
+  targetAmount: z.number().min(0, 'Target amount must be positive'),
+  category: z.string().optional(),
+  description: z.string().optional(),
+});
+
+const TransferFundsInputSchema = z.object({
+  userId: z.string().min(1, 'User ID is required'),
+  fromEnvelopeId: z.string().min(1, 'Source envelope ID is required'),
+  toEnvelopeId: z.string().min(1, 'Destination envelope ID is required'),
+  amount: z.number().min(0.01, 'Transfer amount must be positive'),
+  description: z.string().optional(),
+});
+
+const ManageBalanceInputSchema = z.object({
+  userId: z.string().min(1, 'User ID is required'),
+  envelopeId: z.string().min(1, 'Envelope ID is required'),
+  action: z.enum(['add', 'subtract', 'set']),
+  amount: z.number().min(0, 'Amount must be positive'),
+  description: z.string().optional(),
+});
+
+// Define tools using OpenAI SDK pattern
+export const createEnvelopeTool = defineTool({
   name: 'create_envelope',
-  description: 'Create a new budget envelope with specified name, target amount, and category.',
-  parameters: z.object({
-    userId: z.string(),
-    name: z.string(),
-    targetAmount: z.number().positive(),
-    category: z.string().optional(),
-    description: z.string().optional(),
-  }),
-}, async (params, context) => {
-  try {
-    const validatedParams = EnvelopeActionParamsSchema.parse(params);
-    const { userId, name, description, targetAmount, category } = validatedParams;
+  description: 'Creates a new budget envelope with specified target amount and category',
+  parameters: CreateEnvelopeInputSchema,
+  execute: async (input, context: ToolExecutionContext & FinancialContext) => {
+    try {
+      const { userId, name, targetAmount, category, description } = input;
+      
+      logger.info({ userId, name, targetAmount, category }, 'Creating new envelope');
 
-    if (!name) {
-      throw new Error("Envelope name is required for creation");
-    }
-
-    logger.info({ userId, name, targetAmount }, "Creating new envelope");
-
-    // Check if envelope name already exists for user
-    const existingEnvelope = await db.envelope.findFirst({
-      where: {
-        userId,
-        name: {
-          equals: name,
-          mode: 'insensitive'
-        }
-      }
-    });
-
-    if (existingEnvelope) {
-      return JSON.stringify({
-        success: false,
-        error: `Envelope with name "${name}" already exists`,
-        timestamp: new Date().toISOString()
+      // Check if envelope with same name already exists
+      const existingEnvelope = await db.envelope.findFirst({
+        where: {
+          userId,
+          name: {
+            equals: name,
+            mode: 'insensitive',
+          },
+        },
       });
-    }
 
-    // Create the envelope
-    const envelope = await db.envelope.create({
-      data: {
-        userId,
-        name,
-        description: description || `Budget envelope for ${name}`,
-        balance: 0,
-        targetAmount: targetAmount ? Math.round(targetAmount * 100) : 0, // Convert to cents
-        category: category || 'General'
+      if (existingEnvelope) {
+        throw new Error(`Envelope with name "${name}" already exists`);
       }
-    });
 
-    return JSON.stringify({
-      success: true,
-      data: {
+      // Create the envelope
+      const envelope = await db.envelope.create({
+        data: {
+          userId,
+          name,
+          targetAmount,
+          balance: 0, // Start with zero balance
+          category: category || 'general',
+          description,
+        },
+      });
+
+      // Get updated envelope count for user
+      const envelopeCount = await db.envelope.count({
+        where: { userId },
+      });
+
+      logger.info({ envelopeId: envelope.id, userId }, 'Envelope created successfully');
+
+      return {
+        success: true,
         envelope: {
           id: envelope.id,
           name: envelope.name,
+          targetAmount: envelope.targetAmount,
+          balance: envelope.balance,
+          category: envelope.category,
           description: envelope.description,
-          balance: envelope.balance / 100,
-          targetAmount: envelope.targetAmount / 100,
-          category: envelope.category
-        }
-      },
-      message: `Envelope "${name}" created successfully with target of $${(targetAmount || 0).toFixed(2)}`,
-      timestamp: new Date().toISOString()
-    });
+          createdAt: envelope.createdAt.toISOString(),
+        },
+        totalEnvelopes: envelopeCount,
+        recommendations: [
+          `Consider setting up automatic transfers to reach your $${targetAmount} target`,
+          'Track spending against this envelope to stay within budget',
+        ],
+      };
 
-  } catch (error: any) {
-    logger.error({ error: error.message, userId: params.userId }, "Envelope creation failed");
-
-    return JSON.stringify({
-      success: false,
-      error: `Failed to create envelope: ${error.message}`,
-      message: "Failed to create envelope",
-      timestamp: new Date().toISOString()
-    });
-  }
+    } catch (error: any) {
+      logger.error({ error, input }, 'Failed to create envelope');
+      throw new Error(`Failed to create envelope: ${error.message}`);
+    }
+  },
 });
 
-// Fund transfer tool
-export const transferFundsTool = tool({
+export const transferFundsTool = defineTool({
   name: 'transfer_funds',
-  description: 'Transfer funds between envelopes. Useful for budget reallocation and optimization.',
-  parameters: z.object({
-    userId: z.string(),
-    fromEnvelopeId: z.string(),
-    toEnvelopeId: z.string(),
-    amount: z.number().positive(),
-    reason: z.string().optional(),
-  }),
-}, async (params, context) => {
-  try {
-    const validatedParams = EnvelopeActionParamsSchema.parse(params);
-    const { userId, fromEnvelopeId, toEnvelopeId, amount } = validatedParams;
+  description: 'Transfers funds between two budget envelopes',
+  parameters: TransferFundsInputSchema,
+  execute: async (input, context: ToolExecutionContext & FinancialContext) => {
+    try {
+      const { userId, fromEnvelopeId, toEnvelopeId, amount, description } = input;
+      
+      logger.info({ userId, fromEnvelopeId, toEnvelopeId, amount }, 'Transferring funds between envelopes');
 
-    if (!fromEnvelopeId || !toEnvelopeId || !amount) {
-      throw new Error("Fund allocation requires fromEnvelopeId, toEnvelopeId, and amount");
-    }
+      if (fromEnvelopeId === toEnvelopeId) {
+        throw new Error('Cannot transfer funds to the same envelope');
+      }
 
-    logger.info({ userId, fromEnvelopeId, toEnvelopeId, amount }, "Allocating funds between envelopes");
+      // Get both envelopes and verify ownership
+      const [fromEnvelope, toEnvelope] = await Promise.all([
+        db.envelope.findFirst({
+          where: { id: fromEnvelopeId, userId },
+        }),
+        db.envelope.findFirst({
+          where: { id: toEnvelopeId, userId },
+        }),
+      ]);
 
-    // Get source and destination envelopes
-    const [fromEnvelope, toEnvelope] = await Promise.all([
-      db.envelope.findUnique({
-        where: { id: fromEnvelopeId, userId }
-      }),
-      db.envelope.findUnique({
-        where: { id: toEnvelopeId, userId }
-      })
-    ]);
+      if (!fromEnvelope) {
+        throw new Error('Source envelope not found');
+      }
 
-    if (!fromEnvelope || !toEnvelope) {
-      throw new Error("One or both envelopes not found");
-    }
+      if (!toEnvelope) {
+        throw new Error('Destination envelope not found');
+      }
 
-    const transferAmount = Math.round(amount * 100); // Convert to cents
+      if (fromEnvelope.balance < amount) {
+        throw new Error(`Insufficient funds in ${fromEnvelope.name}. Available: $${fromEnvelope.balance}`);
+      }
 
-    if (fromEnvelope.balance < transferAmount) {
-      return JSON.stringify({
-        success: false,
-        error: `Insufficient funds in "${fromEnvelope.name}". Available: $${(fromEnvelope.balance / 100).toFixed(2)}, Requested: $${amount.toFixed(2)}`,
-        timestamp: new Date().toISOString()
+      // Perform the transfer in a transaction
+      const result = await db.$transaction(async (prisma) => {
+        // Update source envelope
+        const updatedFromEnvelope = await prisma.envelope.update({
+          where: { id: fromEnvelopeId },
+          data: {
+            balance: {
+              decrement: amount,
+            },
+          },
+        });
+
+        // Update destination envelope
+        const updatedToEnvelope = await prisma.envelope.update({
+          where: { id: toEnvelopeId },
+          data: {
+            balance: {
+              increment: amount,
+            },
+          },
+        });
+
+        // Create transfer record
+        const transfer = await prisma.transfer.create({
+          data: {
+            userId,
+            fromEnvelopeId,
+            toEnvelopeId,
+            amount,
+            description: description || `Transfer from ${fromEnvelope.name} to ${toEnvelope.name}`,
+          },
+        });
+
+        return {
+          transfer,
+          fromEnvelope: updatedFromEnvelope,
+          toEnvelope: updatedToEnvelope,
+        };
       });
+
+      logger.info({ transferId: result.transfer.id, userId }, 'Funds transferred successfully');
+
+      return {
+        success: true,
+        transfer: {
+          id: result.transfer.id,
+          amount,
+          description: result.transfer.description,
+          createdAt: result.transfer.createdAt.toISOString(),
+        },
+        fromEnvelope: {
+          id: result.fromEnvelope.id,
+          name: fromEnvelope.name,
+          newBalance: result.fromEnvelope.balance,
+          targetAmount: result.fromEnvelope.targetAmount,
+        },
+        toEnvelope: {
+          id: result.toEnvelope.id,
+          name: toEnvelope.name,
+          newBalance: result.toEnvelope.balance,
+          targetAmount: result.toEnvelope.targetAmount,
+        },
+        recommendations: generateTransferRecommendations(result.fromEnvelope, result.toEnvelope),
+      };
+
+    } catch (error: any) {
+      logger.error({ error, input }, 'Failed to transfer funds');
+      throw new Error(`Failed to transfer funds: ${error.message}`);
     }
+  },
+});
 
-    // Perform the transfer using a transaction
-    await db.$transaction(async (tx) => {
-      // Subtract from source envelope
-      await tx.envelope.update({
-        where: { id: fromEnvelopeId },
-        data: { balance: { decrement: transferAmount } }
+export const manageBalanceTool = defineTool({
+  name: 'manage_balance',
+  description: 'Adds, subtracts, or sets the balance of a budget envelope',
+  parameters: ManageBalanceInputSchema,
+  execute: async (input, context: ToolExecutionContext & FinancialContext) => {
+    try {
+      const { userId, envelopeId, action, amount, description } = input;
+      
+      logger.info({ userId, envelopeId, action, amount }, 'Managing envelope balance');
+
+      // Get the envelope and verify ownership
+      const envelope = await db.envelope.findFirst({
+        where: { id: envelopeId, userId },
       });
 
-      // Add to destination envelope
-      await tx.envelope.update({
-        where: { id: toEnvelopeId },
-        data: { balance: { increment: transferAmount } }
+      if (!envelope) {
+        throw new Error('Envelope not found');
+      }
+
+      // Calculate new balance based on action
+      let newBalance: number;
+      let changeAmount: number;
+
+      switch (action) {
+        case 'add':
+          newBalance = envelope.balance + amount;
+          changeAmount = amount;
+          break;
+        case 'subtract':
+          if (envelope.balance < amount) {
+            throw new Error(`Insufficient funds. Current balance: $${envelope.balance}`);
+          }
+          newBalance = envelope.balance - amount;
+          changeAmount = -amount;
+          break;
+        case 'set':
+          newBalance = amount;
+          changeAmount = amount - envelope.balance;
+          break;
+        default:
+          throw new Error('Invalid action');
+      }
+
+      if (newBalance < 0) {
+        throw new Error('Balance cannot be negative');
+      }
+
+      // Update the envelope balance
+      const updatedEnvelope = await db.envelope.update({
+        where: { id: envelopeId },
+        data: { balance: newBalance },
       });
 
-      // Create transfer record
-      await tx.transfer.create({
+      // Create a transaction record for the balance change
+      await db.transaction.create({
         data: {
           userId,
-          fromEnvelopeId,
-          toEnvelopeId,
-          amount: transferAmount,
-          description: `Transfer from ${fromEnvelope.name} to ${toEnvelope.name}`,
-          status: 'completed'
-        }
+          amount: changeAmount,
+          description: description || `Balance ${action}: ${envelope.name}`,
+          category: envelope.category || 'envelope_management',
+          type: changeAmount > 0 ? 'credit' : 'debit',
+        },
       });
-    });
 
-    return JSON.stringify({
-      success: true,
-      data: {
-        transfer: {
-          from: fromEnvelope.name,
-          to: toEnvelope.name,
-          amount: amount,
-          newFromBalance: (fromEnvelope.balance - transferAmount) / 100,
-          newToBalance: (toEnvelope.balance + transferAmount) / 100
-        }
-      },
-      message: `Successfully transferred $${amount.toFixed(2)} from "${fromEnvelope.name}" to "${toEnvelope.name}"`,
-      timestamp: new Date().toISOString()
-    });
+      logger.info({ envelopeId, newBalance, userId }, 'Envelope balance updated successfully');
 
-  } catch (error: any) {
-    logger.error({ error: error.message, userId: params.userId }, "Fund transfer failed");
+      // Calculate progress towards target
+      const progressPercentage = envelope.targetAmount > 0 
+        ? (newBalance / envelope.targetAmount) * 100 
+        : 0;
 
-    return JSON.stringify({
-      success: false,
-      error: `Fund transfer failed: ${error.message}`,
-      message: "Failed to transfer funds",
-      timestamp: new Date().toISOString()
-    });
-  }
+      return {
+        success: true,
+        envelope: {
+          id: updatedEnvelope.id,
+          name: updatedEnvelope.name,
+          previousBalance: envelope.balance,
+          newBalance: updatedEnvelope.balance,
+          targetAmount: updatedEnvelope.targetAmount,
+          progressPercentage,
+          category: updatedEnvelope.category,
+        },
+        change: {
+          action,
+          amount: changeAmount,
+          description: description || `Balance ${action}`,
+        },
+        insights: generateBalanceInsights(updatedEnvelope, envelope, action),
+      };
+
+    } catch (error: any) {
+      logger.error({ error, input }, 'Failed to manage envelope balance');
+      throw new Error(`Failed to manage envelope balance: ${error.message}`);
+    }
+  },
 });
 
-// Category optimization tool
-export const optimizeCategoriesTool = tool({
-  name: 'optimize_categories',
-  description: 'Analyze envelope categories and suggest optimizations for better budget management.',
-  parameters: z.object({
-    userId: z.string(),
-  }),
-}, async (params, context) => {
-  try {
-    const { userId } = params;
-
-    logger.info({ userId }, "Analyzing envelope category optimization");
-
-    // Get all user envelopes with transaction data
-    const envelopes = await db.envelope.findMany({
-      where: { userId },
-      include: {
-        transactions: {
-          where: {
-            createdAt: {
-              gte: new Date(Date.now() - (90 * 24 * 60 * 60 * 1000)) // Last 90 days
-            }
-          }
-        }
-      }
-    });
-
-    // Analyze categories and suggest optimizations
-    const categoryAnalysis = {};
-    const recommendations = [];
-
-    envelopes.forEach(envelope => {
-      const category = envelope.category || 'Uncategorized';
-      const totalSpent = envelope.transactions.reduce((sum, t) => sum + Math.abs(t.amount), 0);
-      const utilizationRate = envelope.targetAmount > 0 ? (totalSpent / envelope.targetAmount) * 100 : 0;
-
-      if (!categoryAnalysis[category]) {
-        categoryAnalysis[category] = {
-          envelopeCount: 0,
-          totalBudget: 0,
-          totalSpent: 0,
-          averageUtilization: 0,
-          envelopes: []
-        };
-      }
-
-      categoryAnalysis[category].envelopeCount++;
-      categoryAnalysis[category].totalBudget += envelope.targetAmount;
-      categoryAnalysis[category].totalSpent += totalSpent;
-      categoryAnalysis[category].envelopes.push({
-        name: envelope.name,
-        utilization: utilizationRate
-      });
-    });
-
-    // Generate optimization recommendations
-    Object.entries(categoryAnalysis).forEach(([category, data]: [string, any]) => {
-      data.averageUtilization = data.totalBudget > 0 ? (data.totalSpent / data.totalBudget) * 100 : 0;
-
-      if (data.averageUtilization > 120) {
-        recommendations.push({
-          type: 'over_allocation',
-          category,
-          message: `${category} category is consistently over budget (${data.averageUtilization.toFixed(0)}% utilization). Consider increasing budgets or reducing spending.`,
-          priority: 'high'
-        });
-      } else if (data.averageUtilization < 50) {
-        recommendations.push({
-          type: 'under_allocation',
-          category,
-          message: `${category} category has low utilization (${data.averageUtilization.toFixed(0)}%). Consider reallocating funds to other categories.`,
-          priority: 'medium'
-        });
-      }
-
-      if (data.envelopeCount > 5) {
-        recommendations.push({
-          type: 'consolidation',
-          category,
-          message: `${category} has ${data.envelopeCount} envelopes. Consider consolidating similar envelopes for better management.`,
-          priority: 'low'
-        });
-      }
-    });
-
-    return JSON.stringify({
-      success: true,
-      data: {
-        categoryAnalysis,
-        recommendations,
-        summary: {
-          totalCategories: Object.keys(categoryAnalysis).length,
-          totalEnvelopes: envelopes.length,
-          highPriorityRecommendations: recommendations.filter(r => r.priority === 'high').length
-        }
-      },
-      message: `Category optimization analysis completed with ${recommendations.length} recommendations`,
-      timestamp: new Date().toISOString()
-    });
-
-  } catch (error: any) {
-    logger.error({ error: error.message, userId: params.userId }, "Category optimization failed");
-    return JSON.stringify({
-      success: false,
-      error: `Category optimization failed: ${error.message}`,
-      message: "Failed to optimize categories",
-      timestamp: new Date().toISOString()
-    });
+// Helper functions
+function generateTransferRecommendations(fromEnvelope: any, toEnvelope: any): string[] {
+  const recommendations: string[] = [];
+  
+  // Check if source envelope is getting low
+  if (fromEnvelope.targetAmount > 0) {
+    const remainingPercent = (fromEnvelope.balance / fromEnvelope.targetAmount) * 100;
+    if (remainingPercent < 20) {
+      recommendations.push(`Consider replenishing ${fromEnvelope.name} - now at ${remainingPercent.toFixed(1)}% of target`);
+    }
   }
-});
-
-// Export tools for registration
-export const envelopeTools = [
-  {
-    name: "create_envelope",
-    description: "Create a new envelope for budget allocation",
-    category: "envelope" as const,
-    riskLevel: "low" as const,
-    estimatedDuration: 1000,
-    tool: createEnvelopeTool,
-  },
-  {
-    name: "transfer_funds",
-    description: "Transfer funds between envelopes",
-    category: "envelope" as const,
-    riskLevel: "medium" as const,
-    estimatedDuration: 1500,
-    tool: transferFundsTool,
-  },
-  {
-    name: "manage_balance", 
-    description: "Update envelope balance and track changes",
-    category: "envelope" as const,
-    riskLevel: "low" as const,
-    estimatedDuration: 800,
-    tool: manageBalanceTool,
+  
+  // Check if destination envelope is approaching target
+  if (toEnvelope.targetAmount > 0) {
+    const progressPercent = (toEnvelope.balance / toEnvelope.targetAmount) * 100;
+    if (progressPercent >= 80) {
+      recommendations.push(`${toEnvelope.name} is ${progressPercent.toFixed(1)}% funded - great progress!`);
+    }
   }
-];
+  
+  return recommendations;
+}
 
-// Register tools when this module is imported
-import { toolRegistry } from './registry.js';
-envelopeTools.forEach(toolDef => toolRegistry.registerTool(toolDef));
+function generateBalanceInsights(updatedEnvelope: any, originalEnvelope: any, action: string): string[] {
+  const insights: string[] = [];
+  
+  const progressPercentage = updatedEnvelope.targetAmount > 0 
+    ? (updatedEnvelope.balance / updatedEnvelope.targetAmount) * 100 
+    : 0;
+  
+  if (action === 'add') {
+    insights.push(`Added funds to ${updatedEnvelope.name}`);
+    if (progressPercentage >= 100) {
+      insights.push('🎉 Envelope target reached!');
+    } else if (progressPercentage >= 75) {
+      insights.push('🎯 Envelope is nearly funded');
+    }
+  } else if (action === 'subtract') {
+    insights.push(`Withdrew funds from ${updatedEnvelope.name}`);
+    if (progressPercentage < 50) {
+      insights.push('⚠️ Envelope is below 50% of target');
+    }
+  }
+  
+  // Add progress insight
+  if (updatedEnvelope.targetAmount > 0) {
+    insights.push(`Current progress: ${progressPercentage.toFixed(1)}% of target ($${updatedEnvelope.balance}/$${updatedEnvelope.targetAmount})`);
+  }
+  
+  return insights;
+}
 
-export { createEnvelopeTool, transferFundsTool, optimizeCategoriesTool };
+// Export tool instances for registration
+export const createEnvelope = createEnvelopeTool;
+export const transferFunds = transferFundsTool;
+export const manageBalance = manageBalanceTool;

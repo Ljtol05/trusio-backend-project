@@ -1,137 +1,270 @@
 
-import { tool } from '@openai/agents';
-import { z } from 'zod';
 import { logger } from '../../lib/logger.js';
-import type { ToolExecutionContext, ToolResult } from './types.js';
+import type { Tool, ToolExecutionResult, ToolExecutionContext } from './types.js';
 
-interface ToolDefinition {
-  name: string;
-  description: string;
-  category: string;
-  riskLevel?: 'low' | 'medium' | 'high';
-  requiresAuth?: boolean;
-  estimatedDuration?: number;
-  tool: any;
+export interface ToolMetrics {
+  executionCount: number;
+  averageExecutionTime: number;
+  successRate: number;
+  lastExecution?: Date;
+  totalErrors: number;
 }
 
-class ToolRegistry {
-  private tools = new Map<string, ToolDefinition>();
-  private executionHistory: any[] = [];
-  private metrics = {
-    totalExecutions: 0,
-    successfulExecutions: 0,
-    failedExecutions: 0,
-    averageExecutionTime: 0,
-  };
+export class ToolRegistry {
+  private tools: Map<string, Tool> = new Map();
+  private metrics: Map<string, ToolMetrics> = new Map();
+  private executionHistory: Array<{
+    toolName: string;
+    timestamp: Date;
+    duration: number;
+    success: boolean;
+    error?: string;
+  }> = [];
 
-  registerTool(toolDef: ToolDefinition) {
-    this.tools.set(toolDef.name, toolDef);
-    logger.debug(`Registered tool: ${toolDef.name}`);
+  registerTool(name: string, tool: Tool): void {
+    this.tools.set(name, tool);
+    
+    // Initialize metrics for the tool
+    if (!this.metrics.has(name)) {
+      this.metrics.set(name, {
+        executionCount: 0,
+        averageExecutionTime: 0,
+        successRate: 100,
+        totalErrors: 0,
+      });
+    }
+    
+    logger.info({ toolName: name }, 'Tool registered');
   }
 
-  getAllTools() {
-    const result: Record<string, ToolDefinition> = {};
+  unregisterTool(name: string): boolean {
+    const removed = this.tools.delete(name);
+    if (removed) {
+      this.metrics.delete(name);
+      logger.info({ toolName: name }, 'Tool unregistered');
+    }
+    return removed;
+  }
+
+  clear(): void {
+    this.tools.clear();
+    this.metrics.clear();
+    this.executionHistory = [];
+    logger.info('Tool registry cleared');
+  }
+
+  hasTool(name: string): boolean {
+    return this.tools.has(name);
+  }
+
+  getTool(name: string): Tool | undefined {
+    return this.tools.get(name);
+  }
+
+  getAllTools(): Record<string, Tool> {
+    const result: Record<string, Tool> = {};
     this.tools.forEach((tool, name) => {
       result[name] = tool;
     });
     return result;
   }
 
-  getToolCount() {
+  getToolNames(): string[] {
+    return Array.from(this.tools.keys());
+  }
+
+  getToolCount(): number {
     return this.tools.size;
   }
 
   async executeTool(
-    toolName: string,
-    parameters: any,
+    name: string,
+    parameters: Record<string, unknown>,
     context: ToolExecutionContext
-  ): Promise<ToolResult> {
+  ): Promise<ToolExecutionResult> {
     const startTime = Date.now();
-    
+    const tool = this.tools.get(name);
+
+    if (!tool) {
+      const error = `Tool not found: ${name}`;
+      this.recordExecution(name, 0, false, error);
+      return {
+        success: false,
+        error,
+        timestamp: new Date(),
+        duration: 0,
+      };
+    }
+
     try {
-      const toolDef = this.tools.get(toolName);
-      
-      if (!toolDef) {
-        return {
-          success: false,
-          error: `Tool not found: ${toolName}`,
-          duration: Date.now() - startTime,
-          timestamp: new Date().toISOString(),
-        };
+      logger.info({ toolName: name, parameters }, 'Executing tool');
+
+      // Validate parameters if schema is provided
+      if (tool.schema) {
+        try {
+          tool.schema.parse(parameters);
+        } catch (validationError: any) {
+          const error = `Validation failed: ${validationError.message}`;
+          this.recordExecution(name, Date.now() - startTime, false, error);
+          return {
+            success: false,
+            error,
+            timestamp: new Date(),
+            duration: Date.now() - startTime,
+          };
+        }
       }
 
       // Execute the tool
-      const result = await toolDef.tool(parameters, context);
-      
+      const result = await tool.execute(parameters, context);
       const duration = Date.now() - startTime;
-      this.updateMetrics(true, duration);
-      
-      this.executionHistory.push({
-        toolName,
-        success: true,
-        duration,
-        timestamp: new Date().toISOString(),
-      });
+
+      // Record successful execution
+      this.recordExecution(name, duration, true);
+
+      logger.info({ toolName: name, duration }, 'Tool executed successfully');
 
       return {
         success: true,
         result,
+        timestamp: new Date(),
         duration,
-        timestamp: new Date().toISOString(),
       };
 
     } catch (error: any) {
       const duration = Date.now() - startTime;
-      this.updateMetrics(false, duration);
+      const errorMessage = error.message || 'Unknown error occurred';
       
-      this.executionHistory.push({
-        toolName,
-        success: false,
-        error: error.message,
-        duration,
-        timestamp: new Date().toISOString(),
-      });
+      this.recordExecution(name, duration, false, errorMessage);
+      
+      logger.error({ toolName: name, error, duration }, 'Tool execution failed');
 
-      logger.error({ error, toolName, parameters }, 'Tool execution failed');
-      
       return {
         success: false,
-        error: error.message || 'Unknown error occurred',
+        error: errorMessage,
+        timestamp: new Date(),
         duration,
-        timestamp: new Date().toISOString(),
       };
     }
   }
 
-  private updateMetrics(success: boolean, duration: number) {
-    this.metrics.totalExecutions++;
-    if (success) {
-      this.metrics.successfulExecutions++;
-    } else {
-      this.metrics.failedExecutions++;
+  private recordExecution(
+    toolName: string,
+    duration: number,
+    success: boolean,
+    error?: string
+  ): void {
+    // Add to execution history
+    this.executionHistory.push({
+      toolName,
+      timestamp: new Date(),
+      duration,
+      success,
+      error,
+    });
+
+    // Keep only last 100 executions
+    if (this.executionHistory.length > 100) {
+      this.executionHistory = this.executionHistory.slice(-100);
     }
-    
-    // Update average execution time
-    this.metrics.averageExecutionTime = 
-      (this.metrics.averageExecutionTime * (this.metrics.totalExecutions - 1) + duration) / 
-      this.metrics.totalExecutions;
+
+    // Update metrics
+    const metrics = this.metrics.get(toolName);
+    if (metrics) {
+      metrics.executionCount++;
+      metrics.lastExecution = new Date();
+      
+      // Update average execution time
+      const totalTime = metrics.averageExecutionTime * (metrics.executionCount - 1) + duration;
+      metrics.averageExecutionTime = totalTime / metrics.executionCount;
+      
+      // Update success rate
+      if (!success) {
+        metrics.totalErrors++;
+      }
+      metrics.successRate = ((metrics.executionCount - metrics.totalErrors) / metrics.executionCount) * 100;
+      
+      this.metrics.set(toolName, metrics);
+    }
   }
 
-  getToolMetrics(toolName?: string) {
+  getToolMetrics(toolName?: string): ToolMetrics | Record<string, ToolMetrics> {
     if (toolName) {
-      const toolHistory = this.executionHistory.filter(h => h.toolName === toolName);
-      return {
-        executions: toolHistory.length,
-        successRate: toolHistory.filter(h => h.success).length / toolHistory.length,
-        averageDuration: toolHistory.reduce((sum, h) => sum + h.duration, 0) / toolHistory.length,
+      return this.metrics.get(toolName) || {
+        executionCount: 0,
+        averageExecutionTime: 0,
+        successRate: 100,
+        totalErrors: 0,
       };
     }
-    return this.metrics;
+
+    const result: Record<string, ToolMetrics> = {};
+    this.metrics.forEach((metrics, name) => {
+      result[name] = metrics;
+    });
+    return result;
   }
 
-  getExecutionHistory(limit?: number) {
-    return limit ? this.executionHistory.slice(-limit) : this.executionHistory;
+  getExecutionHistory(limit: number = 10): Array<{
+    toolName: string;
+    timestamp: Date;
+    duration: number;
+    success: boolean;
+    error?: string;
+  }> {
+    return this.executionHistory
+      .slice(-limit)
+      .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+  }
+
+  // Health check method
+  isHealthy(): boolean {
+    if (this.tools.size === 0) {
+      return false;
+    }
+
+    // Check if any tools have consistently low success rates
+    const recentMetrics = Array.from(this.metrics.values());
+    const unhealthyTools = recentMetrics.filter(m => 
+      m.executionCount >= 5 && m.successRate < 80
+    );
+
+    return unhealthyTools.length === 0;
+  }
+
+  // Get registry statistics
+  getStatistics(): {
+    totalTools: number;
+    totalExecutions: number;
+    overallSuccessRate: number;
+    averageExecutionTime: number;
+    healthyTools: number;
+  } {
+    const totalExecutions = Array.from(this.metrics.values())
+      .reduce((sum, m) => sum + m.executionCount, 0);
+    
+    const totalErrors = Array.from(this.metrics.values())
+      .reduce((sum, m) => sum + m.totalErrors, 0);
+    
+    const overallSuccessRate = totalExecutions > 0 
+      ? ((totalExecutions - totalErrors) / totalExecutions) * 100 
+      : 100;
+    
+    const averageExecutionTime = Array.from(this.metrics.values())
+      .reduce((sum, m) => sum + m.averageExecutionTime, 0) / this.metrics.size || 0;
+    
+    const healthyTools = Array.from(this.metrics.values())
+      .filter(m => m.executionCount === 0 || m.successRate >= 80).length;
+
+    return {
+      totalTools: this.tools.size,
+      totalExecutions,
+      overallSuccessRate,
+      averageExecutionTime,
+      healthyTools,
+    };
   }
 }
 
+// Create and export a singleton instance
 export const toolRegistry = new ToolRegistry();

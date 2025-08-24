@@ -1,419 +1,504 @@
-import { db } from "../../lib/db.js";
-import { logger } from "../../lib/logger.js";
-import { toolRegistry } from "./registry.js";
-import { 
-  BudgetAnalysisParamsSchema, 
-  ToolContext, 
-  ToolResult,
-  TOOL_CATEGORIES 
-} from "./types.js";
-import { tool } from '@openai/agents';
+
 import { z } from 'zod';
+import { defineTool } from '@openai/agents';
+import { db } from '../../lib/db.js';
+import { logger } from '../../lib/logger.js';
+import type { ToolExecutionContext, FinancialContext } from './types.js';
 
+// Zod schemas for validation
+const BudgetAnalysisInputSchema = z.object({
+  userId: z.string().min(1, 'User ID is required'),
+  timeframe: z.enum(['weekly', 'monthly', 'quarterly', 'yearly']).default('monthly'),
+  categories: z.array(z.string()).optional(),
+  includeProjections: z.boolean().default(false),
+});
 
-// Budget Analysis Tool
-const budgetAnalysisExecute = async (params: any, context: ToolContext): Promise<ToolResult> => {
-  try {
-    const validatedParams = BudgetAnalysisParamsSchema.parse(params);
-    const { userId, timeRange, startDate, endDate, envelopeIds, includeProjections } = validatedParams;
+const SpendingPatternsInputSchema = z.object({
+  userId: z.string().min(1, 'User ID is required'),
+  timeframe: z.enum(['daily', 'weekly', 'monthly']).default('monthly'),
+  lookbackPeriod: z.number().min(1).max(12).default(3),
+  categories: z.array(z.string()).optional(),
+});
 
-    logger.info({ userId, timeRange }, "Executing budget analysis");
+const VarianceCalculationInputSchema = z.object({
+  userId: z.string().min(1, 'User ID is required'),
+  budgetPeriod: z.enum(['current', 'previous', 'custom']).default('current'),
+  startDate: z.string().optional(),
+  endDate: z.string().optional(),
+});
 
-    // Calculate date range
-    const now = new Date();
-    let dateFrom: Date;
-    let dateTo: Date = now;
+// Define tools using OpenAI SDK pattern
+export const budgetAnalysisTool = defineTool({
+  name: 'budget_analysis',
+  description: 'Analyzes user budget performance, spending patterns, and provides detailed financial insights',
+  parameters: BudgetAnalysisInputSchema,
+  execute: async (input, context: ToolExecutionContext & FinancialContext) => {
+    try {
+      const { userId, timeframe, categories, includeProjections } = input;
+      
+      logger.info({ userId, timeframe }, 'Executing budget analysis');
 
-    switch (timeRange) {
-      case 'current_month':
-        dateFrom = new Date(now.getFullYear(), now.getMonth(), 1);
-        break;
-      case 'last_month':
-        dateFrom = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-        dateTo = new Date(now.getFullYear(), now.getMonth(), 0);
-        break;
-      case 'last_3_months':
-        dateFrom = new Date(now.getFullYear(), now.getMonth() - 3, 1);
-        break;
-      case 'last_6_months':
-        dateFrom = new Date(now.getFullYear(), now.getMonth() - 6, 1);
-        break;
-      case 'custom':
-        if (!startDate || !endDate) {
-          throw new Error("Custom date range requires startDate and endDate");
+      // Calculate date range based on timeframe
+      const endDate = new Date();
+      const startDate = new Date();
+      
+      switch (timeframe) {
+        case 'weekly':
+          startDate.setDate(startDate.getDate() - 7);
+          break;
+        case 'monthly':
+          startDate.setMonth(startDate.getMonth() - 1);
+          break;
+        case 'quarterly':
+          startDate.setMonth(startDate.getMonth() - 3);
+          break;
+        case 'yearly':
+          startDate.setFullYear(startDate.getFullYear() - 1);
+          break;
+      }
+
+      // Get transactions for the period
+      const transactions = await db.transaction.findMany({
+        where: {
+          userId,
+          createdAt: {
+            gte: startDate,
+            lte: endDate,
+          },
+          ...(categories && categories.length > 0 ? {
+            category: {
+              in: categories,
+            },
+          } : {}),
+        },
+        orderBy: {
+          createdAt: 'desc',
+        },
+      });
+
+      // Get user's envelopes for budget comparison
+      const envelopes = await db.envelope.findMany({
+        where: { userId },
+        select: {
+          id: true,
+          name: true,
+          balance: true,
+          targetAmount: true,
+          category: true,
+        },
+      });
+
+      // Calculate spending by category
+      const spendingByCategory: Record<string, number> = {};
+      const incomeByCategory: Record<string, number> = {};
+      
+      transactions.forEach(transaction => {
+        const category = transaction.category || 'uncategorized';
+        if (transaction.amount < 0) {
+          spendingByCategory[category] = (spendingByCategory[category] || 0) + Math.abs(transaction.amount);
+        } else {
+          incomeByCategory[category] = (incomeByCategory[category] || 0) + transaction.amount;
         }
-        dateFrom = new Date(startDate);
-        dateTo = new Date(endDate);
-        break;
-      default:
-        dateFrom = new Date(now.getFullYear(), now.getMonth(), 1);
-    }
+      });
 
-    // Get user's envelopes
-    const envelopesQuery = await db.envelope.findMany({
-      where: {
-        userId,
-        ...(envelopeIds ? { id: { in: envelopeIds } } : {})
-      },
-      include: {
-        transactions: {
-          where: {
-            createdAt: {
-              gte: dateFrom,
-              lte: dateTo
-            }
+      // Calculate budget variance
+      const budgetVariance: Record<string, { budgeted: number; spent: number; variance: number; percentUsed: number }> = {};
+      
+      envelopes.forEach(envelope => {
+        const category = envelope.category || 'general';
+        const spent = spendingByCategory[category] || 0;
+        const budgeted = envelope.targetAmount || 0;
+        const variance = budgeted - spent;
+        const percentUsed = budgeted > 0 ? (spent / budgeted) * 100 : 0;
+        
+        budgetVariance[category] = {
+          budgeted,
+          spent,
+          variance,
+          percentUsed,
+        };
+      });
+
+      // Calculate totals
+      const totalSpent = Object.values(spendingByCategory).reduce((sum, amount) => sum + amount, 0);
+      const totalIncome = Object.values(incomeByCategory).reduce((sum, amount) => sum + amount, 0);
+      const totalBudgeted = envelopes.reduce((sum, env) => sum + (env.targetAmount || 0), 0);
+      const netFlow = totalIncome - totalSpent;
+
+      // Generate insights
+      const insights: string[] = [];
+      
+      // Budget adherence insights
+      const overBudgetCategories = Object.entries(budgetVariance)
+        .filter(([_, data]) => data.variance < 0)
+        .map(([category, data]) => ({ category, overspent: Math.abs(data.variance) }));
+      
+      if (overBudgetCategories.length > 0) {
+        insights.push(`You've exceeded budget in ${overBudgetCategories.length} categories`);
+        overBudgetCategories.forEach(({ category, overspent }) => {
+          insights.push(`${category}: $${overspent.toFixed(2)} over budget`);
+        });
+      }
+      
+      // Savings insights
+      if (netFlow > 0) {
+        insights.push(`Positive net flow of $${netFlow.toFixed(2)} this ${timeframe}`);
+      } else if (netFlow < 0) {
+        insights.push(`Negative net flow of $${Math.abs(netFlow).toFixed(2)} this ${timeframe}`);
+      }
+
+      // Top spending categories
+      const topSpendingCategories = Object.entries(spendingByCategory)
+        .sort(([,a], [,b]) => b - a)
+        .slice(0, 3);
+      
+      if (topSpendingCategories.length > 0) {
+        insights.push(`Top spending categories: ${topSpendingCategories.map(([cat, amount]) => `${cat} ($${amount.toFixed(2)})`).join(', ')}`);
+      }
+
+      const result = {
+        period: {
+          timeframe,
+          startDate: startDate.toISOString(),
+          endDate: endDate.toISOString(),
+        },
+        summary: {
+          totalSpent,
+          totalIncome,
+          totalBudgeted,
+          netFlow,
+          budgetUtilization: totalBudgeted > 0 ? (totalSpent / totalBudgeted) * 100 : 0,
+        },
+        spendingByCategory,
+        incomeByCategory,
+        budgetVariance,
+        insights,
+        recommendations: generateBudgetRecommendations(budgetVariance, insights),
+        ...(includeProjections && {
+          projections: generateBudgetProjections(transactions, timeframe),
+        }),
+      };
+
+      return result;
+
+    } catch (error: any) {
+      logger.error({ error, input }, 'Budget analysis failed');
+      throw new Error(`Budget analysis failed: ${error.message}`);
+    }
+  },
+});
+
+export const spendingPatternsTool = defineTool({
+  name: 'spending_patterns',
+  description: 'Analyzes spending patterns and trends over time to identify recurring expenses and habits',
+  parameters: SpendingPatternsInputSchema,
+  execute: async (input, context: ToolExecutionContext & FinancialContext) => {
+    try {
+      const { userId, timeframe, lookbackPeriod, categories } = input;
+      
+      logger.info({ userId, timeframe, lookbackPeriod }, 'Analyzing spending patterns');
+
+      // Calculate lookback period
+      const endDate = new Date();
+      const startDate = new Date();
+      
+      switch (timeframe) {
+        case 'daily':
+          startDate.setDate(startDate.getDate() - (lookbackPeriod * 7)); // weeks worth of days
+          break;
+        case 'weekly':
+          startDate.setDate(startDate.getDate() - (lookbackPeriod * 7));
+          break;
+        case 'monthly':
+          startDate.setMonth(startDate.getMonth() - lookbackPeriod);
+          break;
+      }
+
+      const transactions = await db.transaction.findMany({
+        where: {
+          userId,
+          amount: { lt: 0 }, // Only expenses
+          createdAt: {
+            gte: startDate,
+            lte: endDate,
+          },
+          ...(categories && categories.length > 0 ? {
+            category: { in: categories },
+          } : {}),
+        },
+        orderBy: { createdAt: 'asc' },
+      });
+
+      // Analyze patterns by timeframe
+      const patterns: Record<string, number[]> = {};
+      const categoryTrends: Record<string, { amounts: number[]; dates: string[] }> = {};
+
+      transactions.forEach(transaction => {
+        const category = transaction.category || 'uncategorized';
+        const amount = Math.abs(transaction.amount);
+        const date = transaction.createdAt.toISOString().split('T')[0];
+
+        if (!categoryTrends[category]) {
+          categoryTrends[category] = { amounts: [], dates: [] };
+        }
+        
+        categoryTrends[category].amounts.push(amount);
+        categoryTrends[category].dates.push(date);
+      });
+
+      // Calculate trends and insights
+      const insights: string[] = [];
+      const trendAnalysis: Record<string, { trend: 'increasing' | 'decreasing' | 'stable'; changePercent: number }> = {};
+
+      Object.entries(categoryTrends).forEach(([category, data]) => {
+        if (data.amounts.length >= 2) {
+          const firstHalf = data.amounts.slice(0, Math.floor(data.amounts.length / 2));
+          const secondHalf = data.amounts.slice(Math.floor(data.amounts.length / 2));
+          
+          const firstAvg = firstHalf.reduce((sum, amt) => sum + amt, 0) / firstHalf.length;
+          const secondAvg = secondHalf.reduce((sum, amt) => sum + amt, 0) / secondHalf.length;
+          
+          const changePercent = firstAvg > 0 ? ((secondAvg - firstAvg) / firstAvg) * 100 : 0;
+          
+          let trend: 'increasing' | 'decreasing' | 'stable';
+          if (Math.abs(changePercent) < 5) {
+            trend = 'stable';
+          } else if (changePercent > 0) {
+            trend = 'increasing';
+          } else {
+            trend = 'decreasing';
+          }
+          
+          trendAnalysis[category] = { trend, changePercent };
+          
+          if (Math.abs(changePercent) >= 10) {
+            insights.push(`${category} spending is ${trend} by ${Math.abs(changePercent).toFixed(1)}%`);
           }
         }
-      }
-    });
-
-    // Calculate budget analysis
-    const analysis = envelopesQuery.map(envelope => {
-      const totalSpent = envelope.transactions.reduce((sum, t) => sum + Math.abs(t.amount), 0);
-      const budgetAmount = envelope.targetAmount || 0;
-      const variance = budgetAmount - totalSpent;
-      const utilizationRate = budgetAmount > 0 ? (totalSpent / budgetAmount) * 100 : 0;
+      });
 
       return {
-        envelopeId: envelope.id,
-        envelopeName: envelope.name,
-        budgetAmount: budgetAmount / 100, // Convert to dollars
-        totalSpent: totalSpent / 100,
-        variance: variance / 100,
-        utilizationRate: Math.round(utilizationRate),
-        status: variance >= 0 ? 'under_budget' : 'over_budget',
-        transactionCount: envelope.transactions.length
-      };
-    });
-
-    // Calculate overall summary
-    const totalBudget = analysis.reduce((sum, a) => sum + a.budgetAmount, 0);
-    const totalSpent = analysis.reduce((sum, a) => sum + a.totalSpent, 0);
-    const overBudgetCount = analysis.filter(a => a.status === 'over_budget').length;
-
-    const summary = {
-      totalBudget,
-      totalSpent,
-      totalVariance: totalBudget - totalSpent,
-      overallUtilization: totalBudget > 0 ? Math.round((totalSpent / totalBudget) * 100) : 0,
-      envelopesOverBudget: overBudgetCount,
-      totalEnvelopes: analysis.length,
-      analysisDate: now.toISOString(),
-      timeRange: `${dateFrom.toISOString().split('T')[0]} to ${dateTo.toISOString().split('T')[0]}`
-    };
-
-    // Add projections if requested
-    let projections = null;
-    if (includeProjections && totalSpent > 0) {
-      const daysInPeriod = Math.ceil((dateTo.getTime() - dateFrom.getTime()) / (1000 * 60 * 60 * 24));
-      const dailySpendRate = totalSpent / daysInPeriod;
-      const daysLeftInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate() - now.getDate();
-
-      projections = {
-        projectedMonthlySpend: totalSpent + (dailySpendRate * daysLeftInMonth),
-        dailySpendRate,
-        daysLeftInMonth,
-        isOnTrack: (totalSpent + (dailySpendRate * daysLeftInMonth)) <= totalBudget
-      };
-    }
-
-    return {
-      success: true,
-      data: {
-        summary,
-        envelopeAnalysis: analysis,
-        projections,
-        metadata: {
-          analysisType: 'budget_analysis',
-          timeRange,
-          includeProjections
-        }
-      },
-      message: `Budget analysis completed for ${analysis.length} envelopes`
-    };
-
-  } catch (error: any) {
-    logger.error({ error: error.message, userId: params.userId }, "Budget analysis failed");
-    return {
-      success: false,
-      error: `Budget analysis failed: ${error.message}`
-    };
-  }
-};
-
-// Spending Patterns Tool
-const spendingPatternsExecute = async (params: any, context: ToolContext): Promise<ToolResult> => {
-  try {
-    const validatedParams = BudgetAnalysisParamsSchema.parse(params);
-    const { userId, timeRange } = validatedParams;
-
-    logger.info({ userId, timeRange }, "Analyzing spending patterns");
-
-    // Get transactions for analysis
-    const transactions = await db.transaction.findMany({
-      where: {
-        userId,
-        createdAt: {
-          gte: new Date(Date.now() - (30 * 24 * 60 * 60 * 1000)) // Last 30 days
-        }
-      },
-      include: {
-        envelope: true
-      },
-      orderBy: {
-        createdAt: 'desc'
-      }
-    });
-
-    // Analyze spending patterns
-    const patterns = {
-      dailySpending: {},
-      categorySpending: {},
-      merchantSpending: {},
-      timeOfDaySpending: { morning: 0, afternoon: 0, evening: 0, night: 0 }
-    };
-
-    transactions.forEach(transaction => {
-      const amount = Math.abs(transaction.amount) / 100;
-      const date = transaction.createdAt.toISOString().split('T')[0];
-      const hour = transaction.createdAt.getHours();
-      const category = transaction.envelope?.name || 'Uncategorized';
-
-      // Daily spending
-      patterns.dailySpending[date] = (patterns.dailySpending[date] || 0) + amount;
-
-      // Category spending
-      patterns.categorySpending[category] = (patterns.categorySpending[category] || 0) + amount;
-
-      // Time of day analysis
-      if (hour >= 6 && hour < 12) patterns.timeOfDaySpending.morning += amount;
-      else if (hour >= 12 && hour < 18) patterns.timeOfDaySpending.afternoon += amount;
-      else if (hour >= 18 && hour < 22) patterns.timeOfDaySpending.evening += amount;
-      else patterns.timeOfDaySpending.night += amount;
-    });
-
-    // Find highest spending day and category
-    const highestSpendingDay = Object.entries(patterns.dailySpending)
-      .sort(([,a], [,b]) => b - a)[0];
-
-    const highestSpendingCategory = Object.entries(patterns.categorySpending)
-      .sort(([,a], [,b]) => b - a)[0];
-
-    const insights = [
-      `Highest spending day: ${highestSpendingDay?.[0]} ($${highestSpendingDay?.[1]?.toFixed(2) || '0.00'})`,
-      `Top spending category: ${highestSpendingCategory?.[0]} ($${highestSpendingCategory?.[1]?.toFixed(2) || '0.00'})`,
-      `Most active spending time: ${Object.entries(patterns.timeOfDaySpending)
-        .sort(([,a], [,b]) => b - a)[0]?.[0] || 'unknown'}`
-    ];
-
-    return {
-      success: true,
-      data: {
-        patterns,
+        period: {
+          timeframe,
+          lookbackPeriod,
+          startDate: startDate.toISOString(),
+          endDate: endDate.toISOString(),
+        },
+        categoryTrends,
+        trendAnalysis,
         insights,
-        totalTransactions: transactions.length,
-        analysisDate: new Date().toISOString()
-      },
-      message: `Spending patterns analyzed for ${transactions.length} transactions`
-    };
+        recommendations: generatePatternRecommendations(trendAnalysis, insights),
+      };
 
-  } catch (error: any) {
-    logger.error({ error: error.message, userId: params.userId }, "Spending patterns analysis failed");
-    return {
-      success: false,
-      error: `Spending patterns analysis failed: ${error.message}`
-    };
-  }
-};
-
-// Export tools for registration
-export const budgetTools = [
-  {
-    name: "budget_analysis",
-    description: "Analyze budget performance and provide insights on spending patterns",
-    category: "budget",
-    riskLevel: "low" as const,
-    estimatedDuration: 2000,
-    tool: budgetAnalysisTool,
+    } catch (error: any) {
+      logger.error({ error, input }, 'Spending patterns analysis failed');
+      throw new Error(`Spending patterns analysis failed: ${error.message}`);
+    }
   },
-  {
-    name: "spending_patterns",
-    description: "Analyze historical spending patterns and identify trends",
-    category: "budget" as const, 
-    riskLevel: "low" as const,
-    estimatedDuration: 1500,
-    tool: spendingPatternsTool,
-  },
-  {
-    name: "variance_calculation",
-    description: "Calculate budget variance and identify over/under spending",
-    category: "budget" as const,
-    riskLevel: "low" as const, 
-    estimatedDuration: 1000,
-    tool: varianceCalculationTool,
-  }
-];
-
-// Register tools when this module is imported
-import { toolRegistry } from './registry.js';
-budgetTools.forEach(toolDef => toolRegistry.registerTool(toolDef));
-
-// Budget analysis tool using OpenAI Agents SDK pattern
-export const budgetAnalysisTool = tool({
-  name: 'budget_analysis',
-  description: `Analyze budget performance and spending patterns. 
-  Provides variance analysis, category breakdowns, and actionable recommendations.
-  Use this when users want to understand their budget performance or need spending insights.`,
-  parameters: BudgetAnalysisParamsSchema,
-}, async (params, context) => {
-  try {
-    logger.info({ 
-      userId: params.userId, 
-      timeRange: params.timeRange 
-    }, "Executing budget analysis");
-
-    // TODO: Implement actual budget analysis logic
-    // This would integrate with your Prisma database
-    const analysisResult = {
-      totalBudget: 5000,
-      totalSpent: 3200,
-      variance: 1800,
-      categoryBreakdown: [
-        { category: "Food", budgeted: 800, spent: 750, variance: 50 },
-        { category: "Transportation", budgeted: 300, spent: 280, variance: 20 },
-        { category: "Entertainment", budgeted: 200, spent: 250, variance: -50 }
-      ],
-      recommendations: [
-        "You're under budget in Food category - great job!",
-        "Consider reducing Entertainment spending by $50 next month"
-      ]
-    };
-
-    return JSON.stringify({
-      success: true,
-      data: analysisResult,
-      message: `Budget analysis completed for ${params.timeRange}`,
-      timestamp: new Date().toISOString()
-    });
-
-  } catch (error: any) {
-    logger.error({ 
-      error: error.message, 
-      userId: params.userId 
-    }, "Budget analysis failed");
-
-    return JSON.stringify({
-      success: false,
-      error: error.message,
-      message: "Failed to complete budget analysis",
-      timestamp: new Date().toISOString()
-    });
-  }
 });
 
-// Spending patterns analysis tool
-export const spendingPatternsTool = tool({
-  name: 'spending_patterns',
-  description: 'Analyze spending patterns and trends over time. Identifies recurring expenses, seasonal variations, and unusual spending behavior.',
-  parameters: z.object({
-    userId: z.string(),
-    timeRange: z.enum(['last_30_days', 'last_90_days', 'last_6_months', 'last_year']).default('last_30_days'),
-    categories: z.array(z.string()).optional(),
-  }),
-}, async (params, context) => {
-  try {
-    logger.info({ userId: params.userId }, "Analyzing spending patterns");
-
-    // TODO: Implement actual spending patterns analysis
-    const patternsResult = {
-      recurringExpenses: [
-        { merchant: "Netflix", amount: 15.99, frequency: "monthly" },
-        { merchant: "Grocery Store", amount: 120, frequency: "weekly" }
-      ],
-      seasonalTrends: {
-        holiday_spending: { increase: "25%", period: "December" },
-        summer_activities: { increase: "15%", period: "June-August" }
-      },
-      anomalies: [
-        { date: "2024-01-15", amount: 500, description: "Unusual restaurant spending" }
-      ],
-      insights: [
-        "Your grocery spending is very consistent week-to-week",
-        "Consider reviewing subscription services - you have 5 active subscriptions"
-      ]
-    };
-
-    return JSON.stringify({
-      success: true,
-      data: patternsResult,
-      message: "Spending patterns analysis completed",
-      timestamp: new Date().toISOString()
-    });
-
-  } catch (error: any) {
-    logger.error({ error: error.message, userId: params.userId }, "Spending patterns analysis failed");
-
-    return JSON.stringify({
-      success: false,
-      error: error.message,
-      message: "Failed to analyze spending patterns",
-      timestamp: new Date().toISOString()
-    });
-  }
-});
-
-// Budget variance calculation tool
-export const varianceCalculationTool = tool({
+export const varianceCalculationTool = defineTool({
   name: 'variance_calculation',
-  description: 'Calculate detailed budget vs actual spending variances with forecasting capabilities.',
-  parameters: z.object({
-    userId: z.string(),
-    envelopeIds: z.array(z.string()).optional(),
-    includeForecasting: z.boolean().default(false),
-  }),
-}, async (params, context) => {
-  try {
-    logger.info({ userId: params.userId }, "Calculating budget variance");
+  description: 'Calculates budget variance and identifies areas of over/under spending',
+  parameters: VarianceCalculationInputSchema,
+  execute: async (input, context: ToolExecutionContext & FinancialContext) => {
+    try {
+      const { userId, budgetPeriod, startDate, endDate } = input;
+      
+      logger.info({ userId, budgetPeriod }, 'Calculating budget variance');
 
-    // TODO: Implement actual variance calculation
-    const varianceResult = {
-      overallVariance: {
-        budgeted: 5000,
-        actual: 3200,
-        variance: 1800,
-        variancePercentage: 36
-      },
-      categoryVariances: [
-        { category: "Food", budgeted: 800, actual: 750, variance: 50, status: "under_budget" },
-        { category: "Transportation", budgeted: 300, actual: 280, variance: 20, status: "under_budget" },
-        { category: "Entertainment", budgeted: 200, actual: 250, variance: -50, status: "over_budget" }
-      ],
-      forecast: params.includeForecasting ? {
-        projectedMonthEnd: 4200,
-        recommendedAdjustments: [
-          "Increase Entertainment budget by $50",
-          "Consider reallocating unused Food budget"
-        ]
-      } : null
-    };
+      // Calculate period dates
+      let periodStart: Date;
+      let periodEnd: Date;
 
-    return JSON.stringify({
-      success: true,
-      data: varianceResult,
-      message: "Budget variance calculation completed",
-      timestamp: new Date().toISOString()
-    });
+      if (budgetPeriod === 'custom' && startDate && endDate) {
+        periodStart = new Date(startDate);
+        periodEnd = new Date(endDate);
+      } else {
+        periodEnd = new Date();
+        periodStart = new Date();
+        
+        if (budgetPeriod === 'current') {
+          periodStart.setDate(1); // Start of current month
+        } else if (budgetPeriod === 'previous') {
+          periodStart.setMonth(periodStart.getMonth() - 1);
+          periodStart.setDate(1);
+          periodEnd.setDate(0); // Last day of previous month
+        }
+      }
 
-  } catch (error: any) {
-    logger.error({ error: error.message, userId: params.userId }, "Variance calculation failed");
+      // Get budget data (envelopes) and actual spending
+      const [envelopes, transactions] = await Promise.all([
+        db.envelope.findMany({
+          where: { userId },
+          select: {
+            id: true,
+            name: true,
+            targetAmount: true,
+            category: true,
+          },
+        }),
+        db.transaction.findMany({
+          where: {
+            userId,
+            createdAt: {
+              gte: periodStart,
+              lte: periodEnd,
+            },
+            amount: { lt: 0 }, // Only expenses
+          },
+        }),
+      ]);
 
-    return JSON.stringify({
-      success: false,
-      error: error.message,
-      message: "Failed to calculate budget variance",
-      timestamp: new Date().toISOString()
-    });
-  }
+      // Calculate variance by category
+      const varianceAnalysis: Record<string, {
+        budgeted: number;
+        actual: number;
+        variance: number;
+        percentageVariance: number;
+        status: 'over' | 'under' | 'on-track';
+      }> = {};
+
+      // Group actual spending by category
+      const actualSpending: Record<string, number> = {};
+      transactions.forEach(transaction => {
+        const category = transaction.category || 'uncategorized';
+        actualSpending[category] = (actualSpending[category] || 0) + Math.abs(transaction.amount);
+      });
+
+      // Calculate variance for each envelope/category
+      envelopes.forEach(envelope => {
+        const category = envelope.category || 'general';
+        const budgeted = envelope.targetAmount || 0;
+        const actual = actualSpending[category] || 0;
+        const variance = budgeted - actual;
+        const percentageVariance = budgeted > 0 ? (variance / budgeted) * 100 : 0;
+        
+        let status: 'over' | 'under' | 'on-track';
+        if (Math.abs(percentageVariance) <= 5) {
+          status = 'on-track';
+        } else if (percentageVariance < 0) {
+          status = 'over';
+        } else {
+          status = 'under';
+        }
+
+        varianceAnalysis[category] = {
+          budgeted,
+          actual,
+          variance,
+          percentageVariance,
+          status,
+        };
+      });
+
+      // Add categories with spending but no budget
+      Object.entries(actualSpending).forEach(([category, actual]) => {
+        if (!varianceAnalysis[category]) {
+          varianceAnalysis[category] = {
+            budgeted: 0,
+            actual,
+            variance: -actual,
+            percentageVariance: -100,
+            status: 'over',
+          };
+        }
+      });
+
+      // Generate summary
+      const totalBudgeted = Object.values(varianceAnalysis).reduce((sum, item) => sum + item.budgeted, 0);
+      const totalActual = Object.values(varianceAnalysis).reduce((sum, item) => sum + item.actual, 0);
+      const totalVariance = totalBudgeted - totalActual;
+      const overBudgetCount = Object.values(varianceAnalysis).filter(item => item.status === 'over').length;
+      const underBudgetCount = Object.values(varianceAnalysis).filter(item => item.status === 'under').length;
+
+      return {
+        period: {
+          budgetPeriod,
+          startDate: periodStart.toISOString(),
+          endDate: periodEnd.toISOString(),
+        },
+        summary: {
+          totalBudgeted,
+          totalActual,
+          totalVariance,
+          overallPercentageVariance: totalBudgeted > 0 ? (totalVariance / totalBudgeted) * 100 : 0,
+          categoriesOverBudget: overBudgetCount,
+          categoriesUnderBudget: underBudgetCount,
+        },
+        varianceAnalysis,
+        recommendations: generateVarianceRecommendations(varianceAnalysis),
+      };
+
+    } catch (error: any) {
+      logger.error({ error, input }, 'Variance calculation failed');
+      throw new Error(`Variance calculation failed: ${error.message}`);
+    }
+  },
 });
 
-export { budgetAnalysisExecute, spendingPatternsExecute };
+// Helper functions
+function generateBudgetRecommendations(budgetVariance: any, insights: string[]): string[] {
+  const recommendations: string[] = [];
+  
+  const overBudgetCategories = Object.entries(budgetVariance)
+    .filter(([_, data]: [string, any]) => data.variance < 0);
+  
+  if (overBudgetCategories.length > 0) {
+    recommendations.push('Consider reviewing spending in over-budget categories');
+    recommendations.push('Look for opportunities to reduce discretionary spending');
+  }
+  
+  if (insights.some(insight => insight.includes('Positive net flow'))) {
+    recommendations.push('Great job maintaining positive cash flow! Consider increasing savings goals');
+  }
+  
+  return recommendations;
+}
+
+function generateBudgetProjections(transactions: any[], timeframe: string): any {
+  // Simple projection based on current trends
+  const totalSpent = transactions
+    .filter(t => t.amount < 0)
+    .reduce((sum, t) => sum + Math.abs(t.amount), 0);
+  
+  const projectionMultiplier = timeframe === 'weekly' ? 4 : timeframe === 'monthly' ? 12 : 1;
+  
+  return {
+    projectedAnnualSpending: totalSpent * projectionMultiplier,
+    confidence: 'medium',
+  };
+}
+
+function generatePatternRecommendations(trendAnalysis: any, insights: string[]): string[] {
+  const recommendations: string[] = [];
+  
+  Object.entries(trendAnalysis).forEach(([category, data]: [string, any]) => {
+    if (data.trend === 'increasing' && Math.abs(data.changePercent) >= 15) {
+      recommendations.push(`Monitor ${category} spending - showing significant increase`);
+    }
+  });
+  
+  return recommendations;
+}
+
+function generateVarianceRecommendations(varianceAnalysis: any): string[] {
+  const recommendations: string[] = [];
+  
+  const significantOverages = Object.entries(varianceAnalysis)
+    .filter(([_, data]: [string, any]) => data.status === 'over' && Math.abs(data.percentageVariance) >= 20);
+  
+  if (significantOverages.length > 0) {
+    recommendations.push('Review budget allocations for categories with significant overages');
+    significantOverages.forEach(([category, _]) => {
+      recommendations.push(`Consider increasing budget or reducing spending in ${category}`);
+    });
+  }
+  
+  return recommendations;
+}
+
+// Export tool instances for registration
+export const budgetAnalysis = budgetAnalysisTool;
+export const spendingPatterns = spendingPatternsTool;
+export const varianceCalculation = varianceCalculationTool;
