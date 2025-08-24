@@ -1,4 +1,5 @@
-
+import { tool } from '@openai/agents';
+import { z } from 'zod';
 import { db } from "../../lib/db.js";
 import { logger } from "../../lib/logger.js";
 import { toolRegistry } from "./registry.js";
@@ -9,8 +10,18 @@ import {
   TOOL_CATEGORIES 
 } from "./types.js";
 
-// Envelope Creation Tool
-const envelopeCreationExecute = async (params: any, context: ToolContext): Promise<ToolResult> => {
+// Envelope creation tool
+export const createEnvelopeTool = tool({
+  name: 'create_envelope',
+  description: 'Create a new budget envelope with specified name, target amount, and category.',
+  parameters: z.object({
+    userId: z.string(),
+    name: z.string(),
+    targetAmount: z.number().positive(),
+    category: z.string().optional(),
+    description: z.string().optional(),
+  }),
+}, async (params, context) => {
   try {
     const validatedParams = EnvelopeActionParamsSchema.parse(params);
     const { userId, name, description, targetAmount, category } = validatedParams;
@@ -33,10 +44,11 @@ const envelopeCreationExecute = async (params: any, context: ToolContext): Promi
     });
 
     if (existingEnvelope) {
-      return {
+      return JSON.stringify({
         success: false,
-        error: `Envelope with name "${name}" already exists`
-      };
+        error: `Envelope with name "${name}" already exists`,
+        timestamp: new Date().toISOString()
+      });
     }
 
     // Create the envelope
@@ -51,7 +63,7 @@ const envelopeCreationExecute = async (params: any, context: ToolContext): Promi
       }
     });
 
-    return {
+    return JSON.stringify({
       success: true,
       data: {
         envelope: {
@@ -63,20 +75,34 @@ const envelopeCreationExecute = async (params: any, context: ToolContext): Promi
           category: envelope.category
         }
       },
-      message: `Envelope "${name}" created successfully with target of $${(targetAmount || 0).toFixed(2)}`
-    };
+      message: `Envelope "${name}" created successfully with target of $${(targetAmount || 0).toFixed(2)}`,
+      timestamp: new Date().toISOString()
+    });
 
   } catch (error: any) {
     logger.error({ error: error.message, userId: params.userId }, "Envelope creation failed");
-    return {
-      success: false,
-      error: `Failed to create envelope: ${error.message}`
-    };
-  }
-};
 
-// Fund Allocation Tool
-const fundAllocationExecute = async (params: any, context: ToolContext): Promise<ToolResult> => {
+    return JSON.stringify({
+      success: false,
+      error: `Failed to create envelope: ${error.message}`,
+      message: "Failed to create envelope",
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+// Fund transfer tool
+export const transferFundsTool = tool({
+  name: 'transfer_funds',
+  description: 'Transfer funds between envelopes. Useful for budget reallocation and optimization.',
+  parameters: z.object({
+    userId: z.string(),
+    fromEnvelopeId: z.string(),
+    toEnvelopeId: z.string(),
+    amount: z.number().positive(),
+    reason: z.string().optional(),
+  }),
+}, async (params, context) => {
   try {
     const validatedParams = EnvelopeActionParamsSchema.parse(params);
     const { userId, fromEnvelopeId, toEnvelopeId, amount } = validatedParams;
@@ -104,10 +130,11 @@ const fundAllocationExecute = async (params: any, context: ToolContext): Promise
     const transferAmount = Math.round(amount * 100); // Convert to cents
 
     if (fromEnvelope.balance < transferAmount) {
-      return {
+      return JSON.stringify({
         success: false,
-        error: `Insufficient funds in "${fromEnvelope.name}". Available: $${(fromEnvelope.balance / 100).toFixed(2)}, Requested: $${amount.toFixed(2)}`
-      };
+        error: `Insufficient funds in "${fromEnvelope.name}". Available: $${(fromEnvelope.balance / 100).toFixed(2)}, Requested: $${amount.toFixed(2)}`,
+        timestamp: new Date().toISOString()
+      });
     }
 
     // Perform the transfer using a transaction
@@ -137,7 +164,7 @@ const fundAllocationExecute = async (params: any, context: ToolContext): Promise
       });
     });
 
-    return {
+    return JSON.stringify({
       success: true,
       data: {
         transfer: {
@@ -148,20 +175,30 @@ const fundAllocationExecute = async (params: any, context: ToolContext): Promise
           newToBalance: (toEnvelope.balance + transferAmount) / 100
         }
       },
-      message: `Successfully transferred $${amount.toFixed(2)} from "${fromEnvelope.name}" to "${toEnvelope.name}"`
-    };
+      message: `Successfully transferred $${amount.toFixed(2)} from "${fromEnvelope.name}" to "${toEnvelope.name}"`,
+      timestamp: new Date().toISOString()
+    });
 
   } catch (error: any) {
-    logger.error({ error: error.message, userId: params.userId }, "Fund allocation failed");
-    return {
-      success: false,
-      error: `Fund allocation failed: ${error.message}`
-    };
-  }
-};
+    logger.error({ error: error.message, userId: params.userId }, "Fund transfer failed");
 
-// Category Optimization Tool
-const categoryOptimizationExecute = async (params: any, context: ToolContext): Promise<ToolResult> => {
+    return JSON.stringify({
+      success: false,
+      error: `Fund transfer failed: ${error.message}`,
+      message: "Failed to transfer funds",
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+// Category optimization tool
+export const optimizeCategoriesTool = tool({
+  name: 'optimize_categories',
+  description: 'Analyze envelope categories and suggest optimizations for better budget management.',
+  parameters: z.object({
+    userId: z.string(),
+  }),
+}, async (params, context) => {
   try {
     const { userId } = params;
 
@@ -239,7 +276,7 @@ const categoryOptimizationExecute = async (params: any, context: ToolContext): P
       }
     });
 
-    return {
+    return JSON.stringify({
       success: true,
       data: {
         categoryAnalysis,
@@ -250,50 +287,67 @@ const categoryOptimizationExecute = async (params: any, context: ToolContext): P
           highPriorityRecommendations: recommendations.filter(r => r.priority === 'high').length
         }
       },
-      message: `Category optimization analysis completed with ${recommendations.length} recommendations`
-    };
+      message: `Category optimization analysis completed with ${recommendations.length} recommendations`,
+      timestamp: new Date().toISOString()
+    });
 
   } catch (error: any) {
     logger.error({ error: error.message, userId: params.userId }, "Category optimization failed");
-    return {
+    return JSON.stringify({
       success: false,
-      error: `Category optimization failed: ${error.message}`
-    };
+      error: `Category optimization failed: ${error.message}`,
+      message: "Failed to optimize categories",
+      timestamp: new Date().toISOString()
+    });
   }
-};
+});
 
 // Register envelope tools
 toolRegistry.registerTool({
-  name: "envelope_creation",
-  description: "Create new budget envelopes with specified targets and categories",
+  name: "create_envelope",
+  description: "Create a new budget envelope with specified name, target amount, and category.",
   category: TOOL_CATEGORIES.ENVELOPE,
-  parameters: EnvelopeActionParamsSchema,
-  execute: envelopeCreationExecute,
+  parameters: z.object({
+    userId: z.string(),
+    name: z.string(),
+    targetAmount: z.number().positive(),
+    category: z.string().optional(),
+    description: z.string().optional(),
+  }),
+  execute: async (params, context) => { const result = await createEnvelopeTool.execute(params, context); return JSON.parse(result); },
   requiresAuth: true,
   riskLevel: 'low',
   estimatedDuration: 1000
 });
 
 toolRegistry.registerTool({
-  name: "fund_allocation",
-  description: "Transfer funds between envelopes safely with balance validation",
+  name: "transfer_funds",
+  description: "Transfer funds between envelopes. Useful for budget reallocation and optimization.",
   category: TOOL_CATEGORIES.ENVELOPE,
-  parameters: EnvelopeActionParamsSchema,
-  execute: fundAllocationExecute,
+  parameters: z.object({
+    userId: z.string(),
+    fromEnvelopeId: z.string(),
+    toEnvelopeId: z.string(),
+    amount: z.number().positive(),
+    reason: z.string().optional(),
+  }),
+  execute: async (params, context) => { const result = await transferFundsTool.execute(params, context); return JSON.parse(result); },
   requiresAuth: true,
   riskLevel: 'medium',
   estimatedDuration: 1500
 });
 
 toolRegistry.registerTool({
-  name: "category_optimization",
-  description: "Analyze envelope categories and suggest optimizations for better budget management",
+  name: "optimize_categories",
+  description: "Analyze envelope categories and suggest optimizations for better budget management.",
   category: TOOL_CATEGORIES.ENVELOPE,
-  parameters: EnvelopeActionParamsSchema,
-  execute: categoryOptimizationExecute,
+  parameters: z.object({
+    userId: z.string(),
+  }),
+  execute: async (params, context) => { const result = await optimizeCategoriesTool.execute(params, context); return JSON.parse(result); },
   requiresAuth: true,
   riskLevel: 'low',
   estimatedDuration: 2000
 });
 
-export { envelopeCreationExecute, fundAllocationExecute, categoryOptimizationExecute };
+export { createEnvelopeTool, transferFundsTool, optimizeCategoriesTool };

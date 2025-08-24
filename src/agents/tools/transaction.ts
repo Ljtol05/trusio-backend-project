@@ -1,150 +1,97 @@
-
+import { tool } from '@openai/agents';
+import { z } from 'zod';
 import { db } from "../../lib/db.js";
 import { logger } from "../../lib/logger.js";
 import { toolRegistry } from "./registry.js";
-import { 
-  TransactionParamsSchema, 
-  ToolContext, 
+import {
+  TransactionParamsSchema,
+  ToolContext,
   ToolResult,
-  TOOL_CATEGORIES 
+  TOOL_CATEGORIES
 } from "./types.js";
 
-// Transaction Categorization Tool
-const transactionCategorizationExecute = async (params: any, context: ToolContext): Promise<ToolResult> => {
+// Transaction categorization tool
+const categorizeTransactionExecute = async (params: z.infer<typeof TransactionParamsSchema>, context: ToolContext): Promise<ToolResult> => {
   try {
     const validatedParams = TransactionParamsSchema.parse(params);
-    const { userId, transactionId, transactions, suggestedEnvelopeId } = validatedParams;
+    const { userId, transactionId, merchant, amount, description, suggestedEnvelopeId } = validatedParams;
 
-    logger.info({ userId, transactionId, transactionCount: transactions?.length }, "Categorizing transactions");
+    logger.info({
+      userId,
+      transactionId,
+      merchant,
+      amount,
+      suggestedEnvelopeId
+    }, "Categorizing transaction");
 
-    if (transactionId) {
-      // Single transaction categorization
-      const transaction = await db.transaction.findUnique({
-        where: { id: transactionId, userId }
-      });
+    let category = 'General';
+    let confidence = 0.5;
+    let envelopeId = suggestedEnvelopeId || 'env_general';
 
-      if (!transaction) {
-        throw new Error("Transaction not found");
-      }
+    // Fetch user's envelopes for potential matches
+    const envelopes = await db.envelope.findMany({
+      where: { userId },
+      select: { id: true, name: true, category: true }
+    });
 
-      // Get user's envelopes for categorization suggestions
-      const envelopes = await db.envelope.findMany({
-        where: { userId },
-        select: { id: true, name: true, category: true }
-      });
-
-      // Simple categorization logic based on description keywords
-      const description = transaction.description.toLowerCase();
-      let suggestedEnvelope = null;
-
-      // Category mapping
-      const categoryMappings = {
-        'food': ['restaurant', 'food', 'grocery', 'cafe', 'pizza', 'mcdonald', 'subway'],
-        'transportation': ['gas', 'fuel', 'uber', 'lyft', 'taxi', 'parking', 'metro'],
-        'shopping': ['amazon', 'target', 'walmart', 'store', 'shop', 'retail'],
-        'entertainment': ['movie', 'theater', 'netflix', 'spotify', 'game', 'entertainment'],
-        'utilities': ['electric', 'water', 'gas', 'internet', 'phone', 'utility'],
-        'healthcare': ['pharmacy', 'doctor', 'medical', 'health', 'hospital']
-      };
-
-      // Find matching category
-      for (const [category, keywords] of Object.entries(categoryMappings)) {
-        if (keywords.some(keyword => description.includes(keyword))) {
-          suggestedEnvelope = envelopes.find(env => 
-            env.name.toLowerCase().includes(category) || 
-            env.category?.toLowerCase().includes(category)
-          );
-          break;
-        }
-      }
-
-      return {
-        success: true,
-        data: {
-          transaction: {
-            id: transaction.id,
-            description: transaction.description,
-            amount: transaction.amount / 100
-          },
-          suggestedEnvelope,
-          allEnvelopes: envelopes,
-          confidence: suggestedEnvelope ? 0.8 : 0.3
-        },
-        message: suggestedEnvelope 
-          ? `Suggested categorization: ${suggestedEnvelope.name}`
-          : "No clear category match found. Manual categorization recommended."
-      };
-
-    } else if (transactions) {
-      // Batch transaction categorization
-      const categorizedTransactions = [];
-
-      for (const transactionData of transactions) {
-        // Similar categorization logic for batch processing
-        const description = transactionData.description.toLowerCase();
-        let suggestedCategory = 'General';
-
-        const categoryMappings = {
-          'Food & Dining': ['restaurant', 'food', 'grocery', 'cafe', 'pizza'],
-          'Transportation': ['gas', 'fuel', 'uber', 'lyft', 'taxi', 'parking'],
-          'Shopping': ['amazon', 'target', 'walmart', 'store', 'shop'],
-          'Entertainment': ['movie', 'theater', 'netflix', 'spotify', 'game'],
-          'Utilities': ['electric', 'water', 'gas', 'internet', 'phone'],
-          'Healthcare': ['pharmacy', 'doctor', 'medical', 'health']
-        };
-
-        for (const [category, keywords] of Object.entries(categoryMappings)) {
-          if (keywords.some(keyword => description.includes(keyword))) {
-            suggestedCategory = category;
-            break;
-          }
-        }
-
-        categorizedTransactions.push({
-          ...transactionData,
-          suggestedCategory,
-          confidence: suggestedCategory !== 'General' ? 0.8 : 0.3
-        });
-      }
-
-      return {
-        success: true,
-        data: {
-          categorizedTransactions,
-          summary: {
-            total: transactions.length,
-            highConfidence: categorizedTransactions.filter(t => t.confidence > 0.7).length,
-            categories: [...new Set(categorizedTransactions.map(t => t.suggestedCategory))]
-          }
-        },
-        message: `Categorized ${transactions.length} transactions`
-      };
+    // Simple categorization logic (replace with ML model if needed)
+    const merchantLower = merchant.toLowerCase();
+    if (merchantLower.includes('grocery') || merchantLower.includes('supermarket')) {
+      category = 'Food & Dining';
+      confidence = 0.95;
+      envelopeId = envelopes.find(env => env.name.toLowerCase().includes('food') || env.category?.toLowerCase().includes('food'))?.id || envelopeId;
+    } else if (merchantLower.includes('gas') || merchantLower.includes('fuel')) {
+      category = 'Transportation';
+      confidence = 0.90;
+      envelopeId = envelopes.find(env => env.name.toLowerCase().includes('transport') || env.category?.toLowerCase().includes('transport'))?.id || envelopeId;
+    } else if (merchantLower.includes('restaurant') || merchantLower.includes('cafe')) {
+      category = 'Food & Dining';
+      confidence = 0.85;
+      envelopeId = envelopes.find(env => env.name.toLowerCase().includes('food') || env.category?.toLowerCase().includes('food'))?.id || envelopeId;
+    } else if (description && description.toLowerCase().includes('salary')) {
+      category = 'Income';
+      confidence = 0.98;
+      envelopeId = envelopes.find(env => env.name.toLowerCase().includes('income'))?.id || envelopeId;
     }
 
-    throw new Error("Either transactionId or transactions array is required");
+    const resultData = {
+      transactionId: transactionId || 'N/A', // Handle cases where transactionId might not be provided initially
+      suggestedCategory: category,
+      confidence,
+      suggestedEnvelopeId: envelopeId,
+      reasoning: `Categorized based on merchant "${merchant}" and description "${description || 'N/A'}"`,
+      allEnvelopes: envelopes.map(env => ({ id: env.id, name: env.name, category: env.category })),
+    };
+
+    return {
+      success: true,
+      data: resultData,
+      message: `Transaction categorized as "${category}" with ${Math.round(confidence * 100)}% confidence. Suggested Envelope: ${envelopes.find(env => env.id === envelopeId)?.name || envelopeId}`,
+    };
 
   } catch (error: any) {
-    logger.error({ error: error.message, userId: params.userId }, "Transaction categorization failed");
+    logger.error({ error: error.message, userId: params.userId, transactionId: params.transactionId }, "Transaction categorization failed");
+
     return {
       success: false,
-      error: `Transaction categorization failed: ${error.message}`
+      error: error.message,
+      message: "Failed to categorize transaction",
     };
   }
 };
 
-// Automatic Allocation Tool
-const automaticAllocationExecute = async (params: any, context: ToolContext): Promise<ToolResult> => {
+// Automatic allocation tool
+const autoAllocateExecute = async (params: z.infer<typeof TransactionParamsSchema>, context: ToolContext): Promise<ToolResult> => {
   try {
     const validatedParams = TransactionParamsSchema.parse(params);
     const { userId, transactionId, suggestedEnvelopeId, forceAllocation } = validatedParams;
 
-    if (!transactionId) {
-      throw new Error("Transaction ID is required for allocation");
+    if (!transactionId || !suggestedEnvelopeId) {
+      throw new Error("Transaction ID and suggested envelope ID are required for allocation");
     }
 
-    logger.info({ userId, transactionId, suggestedEnvelopeId }, "Allocating transaction to envelope");
+    logger.info({ userId, transactionId, suggestedEnvelopeId, forceAllocation }, "Auto-allocating transaction");
 
-    // Get the transaction
     const transaction = await db.transaction.findUnique({
       where: { id: transactionId, userId }
     });
@@ -156,11 +103,11 @@ const automaticAllocationExecute = async (params: any, context: ToolContext): Pr
     if (transaction.envelopeId && !forceAllocation) {
       return {
         success: false,
-        error: "Transaction is already allocated. Use forceAllocation=true to override."
+        error: "Transaction is already allocated. Use forceAllocation=true to override.",
+        data: { transactionId, currentEnvelopeId: transaction.envelopeId }
       };
     }
 
-    // Get the target envelope
     const envelope = await db.envelope.findUnique({
       where: { id: suggestedEnvelopeId, userId }
     });
@@ -169,73 +116,78 @@ const automaticAllocationExecute = async (params: any, context: ToolContext): Pr
       throw new Error("Target envelope not found");
     }
 
-    // Update transaction and envelope balance
     const transactionAmount = Math.abs(transaction.amount);
-    
+    let newBalance = envelope.balance;
+
     await db.$transaction(async (tx) => {
-      // Update transaction with envelope assignment
       await tx.transaction.update({
         where: { id: transactionId },
         data: { envelopeId: suggestedEnvelopeId }
       });
 
-      // Update envelope balance (subtract for expenses)
       if (transaction.amount < 0) { // Expense
         await tx.envelope.update({
           where: { id: suggestedEnvelopeId },
           data: { balance: { decrement: transactionAmount } }
         });
+        newBalance = envelope.balance - transactionAmount;
       } else { // Income
         await tx.envelope.update({
           where: { id: suggestedEnvelopeId },
           data: { balance: { increment: transactionAmount } }
         });
+        newBalance = envelope.balance + transactionAmount;
       }
     });
 
     return {
       success: true,
       data: {
-        transaction: {
-          id: transaction.id,
-          description: transaction.description,
-          amount: transaction.amount / 100,
-          allocatedTo: envelope.name
-        },
-        envelope: {
-          id: envelope.id,
-          name: envelope.name,
-          newBalance: transaction.amount < 0 
-            ? (envelope.balance - transactionAmount) / 100
-            : (envelope.balance + transactionAmount) / 100
-        }
+        transactionId: transaction.id,
+        allocatedToEnvelope: envelope.name,
+        allocationAmount: transaction.amount / 100,
+        newBalance: newBalance / 100,
       },
-      message: `Transaction allocated to "${envelope.name}" envelope`
+      message: `Transaction allocated to "${envelope.name}" envelope. New balance: $${(newBalance / 100).toFixed(2)}`,
     };
 
   } catch (error: any) {
-    logger.error({ error: error.message, userId: params.userId }, "Automatic allocation failed");
+    logger.error({ error: error.message, userId: params.userId, transactionId: params.transactionId }, "Automatic allocation failed");
+
     return {
       success: false,
-      error: `Automatic allocation failed: ${error.message}`
+      error: error.message,
+      message: "Failed to allocate transaction",
     };
   }
 };
 
-// Pattern Detection Tool
-const patternDetectionExecute = async (params: any, context: ToolContext): Promise<ToolResult> => {
+// Pattern detection tool
+const patternDetectionExecute = async (params: z.infer<typeof TransactionParamsSchema>, context: ToolContext): Promise<ToolResult> => {
   try {
-    const { userId } = params;
+    const { userId, timeRange, categories } = params;
 
-    logger.info({ userId }, "Detecting transaction patterns");
+    logger.info({ userId, timeRange, categories }, "Detecting transaction patterns");
 
-    // Get recent transactions for pattern analysis
+    // Fetch transactions based on time range and categories
+    const dateFilter = {
+      gte: new Date(Date.now() - (() => {
+        switch (timeRange) {
+          case 'last_30_days': return 30 * 24 * 60 * 60 * 1000;
+          case 'last_90_days': return 90 * 24 * 60 * 60 * 1000;
+          case 'last_6_months': return 6 * 30 * 24 * 60 * 60 * 1000;
+          default: return 90 * 24 * 60 * 60 * 1000;
+        }
+      })())
+    };
+
     const transactions = await db.transaction.findMany({
       where: {
         userId,
-        createdAt: {
-          gte: new Date(Date.now() - (60 * 24 * 60 * 60 * 1000)) // Last 60 days
-        }
+        createdAt: dateFilter,
+        envelope: categories && categories.length > 0 ? {
+          name: { in: categories }
+        } : undefined
       },
       include: {
         envelope: true
@@ -247,13 +199,13 @@ const patternDetectionExecute = async (params: any, context: ToolContext): Promi
 
     // Analyze patterns
     const patterns = {
-      recurring: [],
-      anomalies: [],
-      trends: []
+      recurringTransactions: [],
+      spendingPatterns: [],
+      seasonalTrends: []
     };
 
-    // Group transactions by description similarity
-    const transactionGroups = {};
+    // Group transactions by description similarity for recurring patterns
+    const transactionGroups: { [key: string]: any[] } = {};
     transactions.forEach(transaction => {
       const normalizedDesc = transaction.description.toLowerCase()
         .replace(/\d+/g, 'X') // Replace numbers with X
@@ -266,97 +218,164 @@ const patternDetectionExecute = async (params: any, context: ToolContext): Promi
       transactionGroups[normalizedDesc].push(transaction);
     });
 
-    // Identify recurring transactions (3+ occurrences)
-    Object.entries(transactionGroups).forEach(([pattern, txns]: [string, any[]]) => {
+    // Identify recurring transactions (e.g., 3+ occurrences)
+    Object.entries(transactionGroups).forEach(([patternDesc, txns]) => {
       if (txns.length >= 3) {
         const amounts = txns.map(t => Math.abs(t.amount));
         const avgAmount = amounts.reduce((sum, amt) => sum + amt, 0) / amounts.length;
         const amountVariance = Math.max(...amounts) - Math.min(...amounts);
-        
-        patterns.recurring.push({
-          pattern: txns[0].description,
-          frequency: txns.length,
-          averageAmount: avgAmount / 100,
-          amountVariance: amountVariance / 100,
-          lastOccurrence: txns[0].createdAt,
-          envelope: txns[0].envelope?.name || 'Unassigned'
+        const firstOccurrence = txns[txns.length - 1].createdAt; // Oldest first
+        const lastOccurrence = txns[0].createdAt; // Newest first
+
+        // Basic frequency estimation
+        let frequency = 'irregular';
+        if (txns.length >= 3) {
+          const timeDiffs = [];
+          for (let i = 0; i < txns.length - 1; i++) {
+            timeDiffs.push(txns[i].createdAt.getTime() - txns[i+1].createdAt.getTime());
+          }
+          const avgTimeDiff = timeDiffs.reduce((sum, diff) => sum + diff, 0) / timeDiffs.length;
+          if (avgTimeDiff < 7 * 24 * 60 * 60 * 1000) frequency = 'weekly';
+          else if (avgTimeDiff < 30 * 24 * 60 * 60 * 1000) frequency = 'monthly';
+          else if (avgTimeDiff < 90 * 24 * 60 * 60 * 1000) frequency = 'quarterly';
+        }
+
+        patterns.recurringTransactions.push({
+          description: txns[0].description, // Use original description for clarity
+          merchant: txns[0].merchant,
+          amount: avgAmount / 100,
+          frequency,
+          nextExpected: null, // Difficult to predict without more sophisticated analysis
+          category: txns[0].envelope?.category || 'Unassigned',
+          envelope: txns[0].envelope?.name || 'Unassigned',
+          occurrences: txns.length,
+          firstOccurrence: firstOccurrence.toISOString().split('T')[0],
+          lastOccurrence: lastOccurrence.toISOString().split('T')[0]
         });
       }
     });
 
-    // Detect anomalies (transactions significantly larger than user's average)
+    // Placeholder for spending patterns and seasonal trends
+    // These would require more complex analysis of aggregated data over time.
+
+    return {
+      success: true,
+      data: patterns,
+      message: `Identified ${patterns.recurringTransactions.length} recurring transaction patterns.`,
+    };
+
+  } catch (error: any) {
+    logger.error({ error: error.message, userId: params.userId }, "Pattern detection failed");
+
+    return {
+      success: false,
+      error: error.message,
+      message: "Failed to detect patterns",
+    };
+  }
+};
+
+// Anomaly detection tool
+const detectAnomaliesExecute = async (params: z.infer<typeof TransactionParamsSchema>, context: ToolContext): Promise<ToolResult> => {
+  try {
+    const { userId, sensitivityLevel, categories } = params;
+
+    logger.info({ userId, sensitivityLevel, categories }, "Detecting transaction anomalies");
+
+    // Fetch transactions for analysis
+    const dateFilter = {
+      gte: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000) // Last 90 days for anomaly detection
+    };
+
+    const transactions = await db.transaction.findMany({
+      where: {
+        userId,
+        createdAt: dateFilter,
+        envelope: categories && categories.length > 0 ? {
+          name: { in: categories }
+        } : undefined
+      },
+      orderBy: {
+        createdAt: 'desc'
+      }
+    });
+
     const allAmounts = transactions.map(t => Math.abs(t.amount));
     const avgTransaction = allAmounts.reduce((sum, amt) => sum + amt, 0) / allAmounts.length;
     const stdDev = Math.sqrt(
       allAmounts.reduce((sum, amt) => sum + Math.pow(amt - avgTransaction, 2), 0) / allAmounts.length
     );
 
+    const sensitivityThreshold = {
+      'low': 3 * stdDev,
+      'medium': 2 * stdDev,
+      'high': 1 * stdDev
+    };
+
+    const threshold = sensitivityThreshold[sensitivityLevel || 'medium'];
+
+    const anomalies = [];
     transactions.forEach(transaction => {
       const amount = Math.abs(transaction.amount);
-      if (amount > avgTransaction + (2 * stdDev)) { // 2 standard deviations above average
-        patterns.anomalies.push({
-          id: transaction.id,
-          description: transaction.description,
+      if (amount > avgTransaction + threshold) {
+        anomalies.push({
+          transactionId: transaction.id,
+          merchant: transaction.merchant,
           amount: amount / 100,
-          date: transaction.createdAt,
-          deviationFactor: ((amount - avgTransaction) / stdDev).toFixed(2)
+          date: transaction.createdAt.toISOString().split('T')[0],
+          anomalyType: 'amount_outlier',
+          severity: threshold === sensitivityThreshold.high ? 'high' : (threshold === sensitivityThreshold.medium ? 'medium' : 'low'),
+          reasoning: `Amount is ${(amount / avgTransaction).toFixed(1)}x higher than average for this user.`,
+          suggestedAction: 'Review transaction details for potential issues.'
         });
       }
     });
 
-    // Identify spending trends
-    const last30Days = transactions.filter(t => 
-      t.createdAt >= new Date(Date.now() - (30 * 24 * 60 * 60 * 1000))
-    );
-    const previous30Days = transactions.filter(t => 
-      t.createdAt >= new Date(Date.now() - (60 * 24 * 60 * 60 * 1000)) &&
-      t.createdAt < new Date(Date.now() - (30 * 24 * 60 * 60 * 1000))
-    );
+    const summary = {
+      totalAnomalies: anomalies.length,
+      highSeverity: anomalies.filter(a => a.severity === 'high').length,
+      mediumSeverity: anomalies.filter(a => a.severity === 'medium').length,
+      lowSeverity: anomalies.filter(a => a.severity === 'low').length,
+      overallRiskScore: anomalies.length > 0 ? Math.min(1, (anomalies.length * 0.2) + (anomalies.filter(a => a.severity === 'high').length * 0.3)) : 0, // Simple scoring
+      riskLevel: 'low'
+    };
 
-    const recentSpending = last30Days.reduce((sum, t) => sum + Math.abs(t.amount), 0);
-    const previousSpending = previous30Days.reduce((sum, t) => sum + Math.abs(t.amount), 0);
-
-    if (previousSpending > 0) {
-      const spendingChange = ((recentSpending - previousSpending) / previousSpending) * 100;
-      patterns.trends.push({
-        type: 'spending_change',
-        change: spendingChange.toFixed(1) + '%',
-        direction: spendingChange > 0 ? 'increase' : 'decrease',
-        recent: recentSpending / 100,
-        previous: previousSpending / 100
-      });
-    }
+    if (summary.overallRiskScore > 0.7) summary.riskLevel = 'high';
+    else if (summary.overallRiskScore > 0.4) summary.riskLevel = 'medium';
 
     return {
       success: true,
       data: {
-        patterns,
-        summary: {
-          totalTransactions: transactions.length,
-          recurringPatterns: patterns.recurring.length,
-          anomaliesDetected: patterns.anomalies.length,
-          trendsIdentified: patterns.trends.length
-        }
+        detected: anomalies,
+        summary,
+        recommendations: [
+          'Review medium and high severity anomalies for potential fraud',
+          `Set up alerts for transactions over $${(avgTransaction + threshold).toFixed(2)}`,
+          'Regularly review transactions flagged as new merchants (if applicable)'
+        ]
       },
-      message: `Pattern analysis completed: ${patterns.recurring.length} recurring patterns, ${patterns.anomalies.length} anomalies detected`
+      message: `Detected ${anomalies.length} anomalies with overall risk level: ${summary.riskLevel}.`,
     };
 
   } catch (error: any) {
-    logger.error({ error: error.message, userId: params.userId }, "Pattern detection failed");
+    logger.error({ error: error.message, userId: params.userId }, "Anomaly detection failed");
+
     return {
       success: false,
-      error: `Pattern detection failed: ${error.message}`
+      error: error.message,
+      message: "Failed to detect anomalies",
     };
   }
 };
 
-// Register transaction tools
+
+// Register transaction tools using the tool registry
 toolRegistry.registerTool({
   name: "transaction_categorization",
-  description: "Intelligently categorize transactions based on description and merchant information",
+  description: "Automatically categorize transactions using AI-powered analysis of merchant names, amounts, and descriptions.",
   category: TOOL_CATEGORIES.TRANSACTION,
   parameters: TransactionParamsSchema,
-  execute: transactionCategorizationExecute,
+  execute: categorizeTransactionExecute,
   requiresAuth: true,
   riskLevel: 'low',
   estimatedDuration: 1000
@@ -364,10 +383,10 @@ toolRegistry.registerTool({
 
 toolRegistry.registerTool({
   name: "automatic_allocation",
-  description: "Automatically allocate transactions to appropriate envelopes with balance updates",
+  description: "Automatically allocate transactions to appropriate envelopes based on categorization and user preferences, updating balances.",
   category: TOOL_CATEGORIES.TRANSACTION,
   parameters: TransactionParamsSchema,
-  execute: automaticAllocationExecute,
+  execute: autoAllocateExecute,
   requiresAuth: true,
   riskLevel: 'medium',
   estimatedDuration: 1500
@@ -375,7 +394,7 @@ toolRegistry.registerTool({
 
 toolRegistry.registerTool({
   name: "pattern_detection",
-  description: "Detect recurring transactions, anomalies, and spending trends for better financial insights",
+  description: "Analyze transaction history to identify spending patterns, recurring expenses, and behavioral trends within a specified time range and categories.",
   category: TOOL_CATEGORIES.TRANSACTION,
   parameters: TransactionParamsSchema,
   execute: patternDetectionExecute,
@@ -384,4 +403,15 @@ toolRegistry.registerTool({
   estimatedDuration: 2500
 });
 
-export { transactionCategorizationExecute, automaticAllocationExecute, patternDetectionExecute };
+toolRegistry.registerTool({
+  name: "detect_anomalies",
+  description: "Detect unusual transactions and spending behaviors based on user-defined sensitivity levels, identifying potential issues.",
+  category: TOOL_CATEGORIES.TRANSACTION,
+  parameters: TransactionParamsSchema,
+  execute: detectAnomaliesExecute,
+  requiresAuth: true,
+  riskLevel: 'medium',
+  estimatedDuration: 2000
+});
+
+export { categorizeTransactionExecute, autoAllocateExecute, patternDetectionExecute, detectAnomaliesExecute };

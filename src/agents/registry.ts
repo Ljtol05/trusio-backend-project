@@ -315,13 +315,68 @@ export const ensureRegistryReady = (): boolean => {
 
 // Function to get tools for a specific agent role
 function getToolsForAgent(role: AGENT_ROLES): any[] {
-  // Placeholder: In a real implementation, this would dynamically
-  // import and return tools based on the role from a tool registry.
-  // For now, we'll return an empty array.
-  // Example:
-  // if (role === AGENT_ROLES.FINANCIAL_COACH) {
-  //   const { getFinancialCoachTools } = await import('./tools/financialCoachTools.js');
-  //   return getFinancialCoachTools();
-  // }
-  return [];
+  const { toolRegistry } = require('./tools/registry.js');
+  const allTools = toolRegistry.getAllTools();
+  
+  // Define which tools each agent should have access to
+  const agentToolMappings: Record<AGENT_ROLES, string[]> = {
+    [AGENT_ROLES.TRIAGE]: [
+      'agent_handoff'
+    ],
+    [AGENT_ROLES.FINANCIAL_COACH]: [
+      'generate_recommendations',
+      'identify_opportunities', 
+      'track_achievements',
+      'agent_handoff'
+    ],
+    [AGENT_ROLES.BUDGET_ANALYZER]: [
+      'budget_analysis',
+      'spending_patterns',
+      'variance_calculation',
+      'analyze_spending_patterns',
+      'analyze_budget_variance',
+      'agent_handoff'
+    ],
+    [AGENT_ROLES.ENVELOPE_MANAGER]: [
+      'create_envelope',
+      'transfer_funds',
+      'manage_balance',
+      'optimize_categories',
+      'agent_handoff'
+    ],
+    [AGENT_ROLES.TRANSACTION_PROCESSOR]: [
+      'categorize_transaction',
+      'auto_allocate',
+      'recognize_patterns',
+      'detect_anomalies',
+      'agent_handoff'
+    ],
+    [AGENT_ROLES.INSIGHT_GENERATOR]: [
+      'analyze_trends',
+      'analyze_goal_progress',
+      'generate_recommendations',
+      'identify_opportunities',
+      'detect_warnings',
+      'track_achievements',
+      'agent_handoff'
+    ]
+  };
+
+  const toolNames = agentToolMappings[role] || [];
+  const agentTools: any[] = [];
+
+  for (const toolName of toolNames) {
+    const toolInfo = allTools[toolName];
+    if (toolInfo && toolInfo.tool) {
+      agentTools.push(toolInfo.tool);
+    }
+  }
+
+  logger.debug({ 
+    role, 
+    assignedTools: toolNames,
+    foundTools: agentTools.length 
+  }, "Retrieved tools for agent");
+
+  return agentTools;
 }

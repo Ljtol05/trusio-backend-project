@@ -1,38 +1,88 @@
 
-import { tool } from "@openai/agents";
-import { FinancialTool, ToolExecutionResult, TOOL_CATEGORIES } from "./types.js";
+import { TOOL_CATEGORIES } from "./types.js";
 import { logger } from "../../lib/logger.js";
 
+// Import all tools created with the OpenAI Agents SDK
+import { budgetAnalysisTool, spendingPatternsTool, varianceCalculationTool } from './budget.js';
+import { createEnvelopeTool, transferFundsTool, manageBalanceTool, optimizeCategoriesTool } from './envelope.js';
+import { categorizeTransactionTool, autoAllocateTool, recognizePatternsTool, detectAnomaliesTool } from './transaction.js';
+import { analyzeSpendingPatternsTool, analyzeBudgetVarianceTool, analyzeTrendsTool, analyzeGoalProgressTool } from './analysis.js';
+import { generateRecommendationsTool, identifyOpportunitiesTool, detectWarningsTool, trackAchievementsTool } from './insight.js';
+import { agentHandoffTool } from './handoff.js';
+
 export class ToolRegistry {
-  private tools: Map<string, FinancialTool> = new Map();
-  private executionHistory: ToolExecutionResult[] = [];
+  private tools: Map<string, any> = new Map();
+  private executionHistory: any[] = [];
 
-  registerTool(financialTool: FinancialTool): void {
+  constructor() {
+    this.initializeAllTools();
+  }
+
+  private initializeAllTools(): void {
     try {
-      // Create OpenAI Agents SDK tool with automatic schema generation
-      const sdkTool = tool({
-        name: financialTool.name,
-        description: financialTool.description,
-        parameters: financialTool.parameters,
-      }, financialTool.execute);
+      // Register budget tools
+      this.registerSDKTool(budgetAnalysisTool, TOOL_CATEGORIES.BUDGET);
+      this.registerSDKTool(spendingPatternsTool, TOOL_CATEGORIES.BUDGET);
+      this.registerSDKTool(varianceCalculationTool, TOOL_CATEGORIES.BUDGET);
 
-      // Store the financial tool definition
-      this.tools.set(financialTool.name, {
-        ...financialTool,
-        execute: sdkTool // Store the SDK-wrapped version
-      });
+      // Register envelope tools
+      this.registerSDKTool(createEnvelopeTool, TOOL_CATEGORIES.ENVELOPE);
+      this.registerSDKTool(transferFundsTool, TOOL_CATEGORIES.ENVELOPE);
+      this.registerSDKTool(manageBalanceTool, TOOL_CATEGORIES.ENVELOPE);
+      this.registerSDKTool(optimizeCategoriesTool, TOOL_CATEGORIES.ENVELOPE);
+
+      // Register transaction tools
+      this.registerSDKTool(categorizeTransactionTool, TOOL_CATEGORIES.TRANSACTION);
+      this.registerSDKTool(autoAllocateTool, TOOL_CATEGORIES.TRANSACTION);
+      this.registerSDKTool(recognizePatternsTool, TOOL_CATEGORIES.TRANSACTION);
+      this.registerSDKTool(detectAnomaliesTool, TOOL_CATEGORIES.TRANSACTION);
+
+      // Register analysis tools
+      this.registerSDKTool(analyzeSpendingPatternsTool, TOOL_CATEGORIES.ANALYSIS);
+      this.registerSDKTool(analyzeBudgetVarianceTool, TOOL_CATEGORIES.ANALYSIS);
+      this.registerSDKTool(analyzeTrendsTool, TOOL_CATEGORIES.ANALYSIS);
+      this.registerSDKTool(analyzeGoalProgressTool, TOOL_CATEGORIES.ANALYSIS);
+
+      // Register insight tools
+      this.registerSDKTool(generateRecommendationsTool, TOOL_CATEGORIES.INSIGHT);
+      this.registerSDKTool(identifyOpportunitiesTool, TOOL_CATEGORIES.INSIGHT);
+      this.registerSDKTool(detectWarningsTool, TOOL_CATEGORIES.INSIGHT);
+      this.registerSDKTool(trackAchievementsTool, TOOL_CATEGORIES.INSIGHT);
+
+      // Register handoff tool
+      this.registerSDKTool(agentHandoffTool, TOOL_CATEGORIES.HANDOFF);
 
       logger.info({ 
-        toolName: financialTool.name,
-        category: financialTool.category,
-        riskLevel: financialTool.riskLevel
-      }, "Financial tool registered successfully");
+        totalTools: this.tools.size,
+        toolNames: Array.from(this.tools.keys())
+      }, "All financial tools registered successfully");
+
+    } catch (error) {
+      logger.error({ error: error.message }, "Failed to initialize financial tools");
+      throw error;
+    }
+  }
+
+  private registerSDKTool(sdkTool: any, category: string): void {
+    try {
+      // Extract tool name from the SDK tool
+      const toolName = sdkTool.name || sdkTool.toString().match(/name:\s*["']([^"']+)["']/)?.[1] || 'unknown';
+      
+      this.tools.set(toolName, {
+        tool: sdkTool,
+        category,
+        registeredAt: new Date()
+      });
+
+      logger.debug({ 
+        toolName,
+        category
+      }, "SDK tool registered");
 
     } catch (error) {
       logger.error({ 
-        toolName: financialTool.name, 
         error: error.message 
-      }, "Failed to register financial tool");
+      }, "Failed to register SDK tool");
       throw error;
     }
   }
