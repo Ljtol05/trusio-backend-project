@@ -1,389 +1,280 @@
-import { Agent, setDefaultOpenAIKey, setDefaultOpenAIClient } from "@openai/agents";
-import { AgentConfig, AgentInstance, AgentRegistry as AgentManagerRegistry, AgentMetrics, AGENT_ROLES } from "./types.js";
-import { agentConfigManager } from "./config.js";
-import { openai, MODELS } from "../lib/openai.js";
-import { env } from "../config/env.js";
-import { logger } from "../lib/logger.js";
 
-// Re-import AgentRegistry from the new structure
-import { agentRegistry as newAgentRegistry } from './agentRegistry.js'; // Assuming the new AgentRegistry is in agentRegistry.js
+import { logger } from '../lib/logger.js';
+import { agentRegistry } from './agentRegistry.js';
+import { toolRegistry } from './tools/registry.js';
+import type { FinancialContext, AgentExecutionResult, AgentInteraction } from './types.js';
 
 export class AgentManager {
-  // Use the new AgentRegistry type for the registry property
-  private registry: AgentManagerRegistry = {};
   private initialized = false;
+  private readonly initializationPromise: Promise<boolean>;
 
   constructor() {
-    // Ensure OpenAI is configured for agents
-    if (env.OPENAI_API_KEY && openai) {
-      setDefaultOpenAIKey(env.OPENAI_API_KEY);
-      setDefaultOpenAIClient(openai);
-    }
+    this.initializationPromise = this.initialize();
   }
 
-  async initialize(): Promise<void> {
+  async initialize(): Promise<boolean> {
     if (this.initialized) {
-      logger.info("Agent manager already initialized");
-      return;
-    }
-
-    if (!env.OPENAI_API_KEY || !openai) {
-      throw new Error("OpenAI configuration required for agent initialization");
+      return true;
     }
 
     try {
-      const configs = agentConfigManager.getActiveConfigs();
-      logger.info({ count: configs.length }, "Initializing agents");
+      logger.info('Initializing Agent Management System...');
 
-      for (const config of configs) {
-        // Check if the role is recognized by the new agentRegistry
-        if (!newAgentRegistry.getAgent(config.role)) {
-          logger.warn({ role: config.role }, "Skipping agent initialization: Role not found in new registry");
-          continue;
-        }
-        await this.initializeAgent(config);
+      // Initialize tools first
+      await this.initializeTools();
+
+      // Initialize agent registry
+      await agentRegistry.initialize();
+
+      // Verify system integrity
+      if (!this.validateSystem()) {
+        throw new Error('Agent system validation failed');
       }
-
-      // Configure handoffs after all agents are initialized
-      await this.configureHandoffs();
 
       this.initialized = true;
-      logger.info({
-        initialized: Object.keys(this.registry).length,
-        roles: Object.keys(this.registry)
-      }, "Agent manager initialized successfully");
+      logger.info('Agent Management System initialized successfully');
 
+      return true;
     } catch (error) {
-      logger.error({ error }, "Failed to initialize agent manager");
-      throw error;
+      logger.error({ error }, 'Failed to initialize Agent Management System');
+      this.initialized = false;
+      return false;
     }
   }
 
-  private async initializeAgent(config: AgentConfig): Promise<void> {
+  private async initializeTools(): Promise<boolean> {
     try {
-      // Get the agent instance from the new registry
-      const agentInstance = newAgentRegistry.getAgent(config.role);
-
-      if (!agentInstance) {
-        throw new Error(`Agent with role "${config.role}" not found in the new registry.`);
+      // The tool registry initializes itself in its constructor
+      const toolCount = toolRegistry.getToolCount();
+      
+      if (toolCount === 0) {
+        throw new Error('No tools were initialized');
       }
 
-      // Initialize metrics
-      const metrics: AgentMetrics = {
-        agentName: config.name,
-        totalInteractions: 0,
-        successfulInteractions: 0,
-        averageResponseTime: 0,
-        averageConfidence: 0,
-        lastUsed: new Date().toISOString(),
-        errorCount: 0,
-        handoffCount: 0,
-      };
-
-      // Create agent instance using the agent from the new registry
-      const instance: AgentInstance = {
-        config,
-        agent: agentInstance, // Use the agent from the new registry
-        isInitialized: true,
-        lastUsed: new Date(),
-        metrics,
-      };
-
-      this.registry[config.role] = instance;
-      logger.info({
-        role: config.role,
-        name: config.name,
-        model: config.model || MODELS.agentic
-      }, "Agent initialized successfully");
-
+      logger.info({ toolCount }, 'Financial tools initialized');
+      return true;
     } catch (error) {
-      logger.error({
-        role: config.role,
-        name: config.name,
-        error
-      }, "Failed to initialize agent");
-      throw error;
+      logger.error({ error }, 'Failed to initialize tools');
+      return false;
     }
   }
 
-  getAgent(role: string): AgentInstance | null {
-    return this.registry[role] || null;
-  }
+  private validateSystem(): boolean {
+    try {
+      // Check agent registry
+      const agents = agentRegistry.getAllAgents();
+      if (agents.length === 0) {
+        logger.error('No agents available in registry');
+        return false;
+      }
 
-  getAllAgents(): AgentManagerRegistry {
-    return { ...this.registry };
-  }
+      // Check tool registry
+      const toolCount = toolRegistry.getToolCount();
+      if (toolCount === 0) {
+        logger.error('No tools available in registry');
+        return false;
+      }
 
-  getActiveAgents(): AgentInstance[] {
-    return Object.values(this.registry).filter(
-      instance => instance.config.isActive && instance.isInitialized
-    );
-  }
-
-  async getTriageAgent(): Promise<AgentInstance> {
-    const triageAgent = this.getAgent(AGENT_ROLES.TRIAGE);
-    if (!triageAgent) {
-      throw new Error("Triage agent not initialized");
-    }
-    return triageAgent;
-  }
-
-  async updateAgentMetrics(
-    role: string,
-    update: Partial<AgentMetrics>
-  ): Promise<void> {
-    const instance = this.registry[role];
-    if (!instance) {
-      logger.warn({ role }, "Attempted to update metrics for non-existent agent");
-      return;
-    }
-
-    instance.metrics = {
-      ...instance.metrics,
-      ...update,
-      lastUsed: new Date().toISOString(),
-    };
-
-    instance.lastUsed = new Date();
-
-    logger.debug({
-      role,
-      metrics: instance.metrics
-    }, "Updated agent metrics");
-  }
-
-  async recordInteraction(
-    role: string,
-    success: boolean,
-    responseTime: number,
-    confidence?: number
-  ): Promise<void> {
-    const instance = this.registry[role];
-    if (!instance) return;
-
-    const metrics = instance.metrics;
-    const newTotal = metrics.totalInteractions + 1;
-    const newSuccessful = success ? metrics.successfulInteractions + 1 : metrics.successfulInteractions;
-    const newErrorCount = success ? metrics.errorCount : metrics.errorCount + 1;
-
-    // Calculate running averages
-    const newAvgResponseTime = (
-      (metrics.averageResponseTime * metrics.totalInteractions) + responseTime
-    ) / newTotal;
-
-    let newAvgConfidence = metrics.averageConfidence;
-    if (confidence !== undefined) {
-      newAvgConfidence = (
-        (metrics.averageConfidence * metrics.totalInteractions) + confidence
-      ) / newTotal;
-    }
-
-    await this.updateAgentMetrics(role, {
-      totalInteractions: newTotal,
-      successfulInteractions: newSuccessful,
-      averageResponseTime: Math.round(newAvgResponseTime),
-      averageConfidence: Math.round(newAvgConfidence),
-      errorCount: newErrorCount,
-    });
-  }
-
-  async recordHandoff(fromRole: string, toRole: string): Promise<void> {
-    await this.updateAgentMetrics(fromRole, {
-      handoffCount: (this.registry[fromRole]?.metrics.handoffCount || 0) + 1
-    });
-
-    logger.info({ fromRole, toRole }, "Agent handoff recorded");
-  }
-
-  getAgentHealth(): Record<string, any> {
-    const health: Record<string, any> = {};
-
-    Object.entries(this.registry).forEach(([role, instance]) => {
-      const metrics = instance.metrics;
-      const successRate = metrics.totalInteractions > 0
-        ? (metrics.successfulInteractions / metrics.totalInteractions) * 100
-        : 100;
-
-      health[role] = {
-        isActive: instance.config.isActive,
-        isInitialized: instance.isInitialized,
-        lastUsed: instance.lastUsed,
-        totalInteractions: metrics.totalInteractions,
-        successRate: Math.round(successRate),
-        averageResponseTime: metrics.averageResponseTime,
-        averageConfidence: metrics.averageConfidence,
-        errorCount: metrics.errorCount,
-        handoffCount: metrics.handoffCount,
-      };
-    });
-
-    return health;
-  }
-
-  private async configureHandoffs(): Promise<void> {
-    // Configure handoffs between agents based on their config
-    const configs = agentConfigManager.getActiveConfigs();
-
-    for (const config of configs) {
-      const instance = this.registry[config.role];
-      if (!instance || !config.handoffs) continue;
-
-      const handoffTargets: Record<string, Agent> = {};
-
-      for (const targetRole of config.handoffs) {
-        const targetInstance = this.registry[targetRole];
-        if (targetInstance) {
-          handoffTargets[targetRole] = targetInstance.agent;
+      // Verify core agents exist
+      const requiredAgents = ['financial_advisor', 'budget_coach', 'transaction_analyst', 'insight_generator'];
+      for (const agentName of requiredAgents) {
+        const agent = agentRegistry.getAgent(agentName);
+        if (!agent) {
+          logger.error({ agentName }, 'Required agent not found');
+          return false;
         }
       }
 
-      // Set the handoff targets on the agent
-      // Note: This will be properly implemented when tools are added in Task 3
-      logger.debug({
-        fromRole: config.role,
-        toRoles: Object.keys(handoffTargets)
-      }, "Configured agent handoffs");
+      logger.info({
+        agentCount: agents.length,
+        toolCount,
+        requiredAgents: requiredAgents.length
+      }, 'Agent system validation passed');
+
+      return true;
+    } catch (error) {
+      logger.error({ error }, 'System validation failed');
+      return false;
     }
   }
 
-  async shutdown(): Promise<void> {
-    logger.info("Shutting down agent manager");
+  async processUserMessage(
+    userId: string,
+    message: string,
+    options: {
+      agentName?: string;
+      sessionId?: string;
+      context?: Partial<FinancialContext>;
+      previousInteractions?: AgentInteraction[];
+    } = {}
+  ): Promise<AgentExecutionResult> {
+    const startTime = Date.now();
 
-    // Log final metrics
-    Object.entries(this.registry).forEach(([role, instance]) => {
-      logger.info({
-        role,
-        metrics: instance.metrics
-      }, "Final agent metrics");
-    });
+    try {
+      // Ensure system is initialized
+      await this.initializationPromise;
+      if (!this.initialized) {
+        throw new Error('Agent system not properly initialized');
+      }
 
-    this.registry = {};
-    this.initialized = false;
+      const sessionId = options.sessionId || `session_${Date.now()}`;
+      
+      logger.info({ 
+        userId, 
+        sessionId,
+        agentName: options.agentName,
+        messageLength: message.length 
+      }, 'Processing user message');
 
-    logger.info("Agent manager shutdown complete");
+      // Determine which agent to use
+      const targetAgentName = options.agentName || this.routeMessage(message);
+      const agent = agentRegistry.getAgent(targetAgentName);
+
+      if (!agent) {
+        throw new Error(`Agent '${targetAgentName}' not available`);
+      }
+
+      // Build complete context
+      const context: FinancialContext = {
+        userId,
+        ...options.context,
+      };
+
+      // Execute the agent
+      const response = await agentRegistry.runAgent(targetAgentName, message, {
+        ...context,
+        sessionId,
+        timestamp: new Date(),
+        previousInteractions: options.previousInteractions || [],
+      });
+
+      const duration = Date.now() - startTime;
+
+      const result: AgentExecutionResult = {
+        success: true,
+        response,
+        agentName: targetAgentName,
+        sessionId,
+        timestamp: new Date(),
+        duration,
+      };
+
+      logger.info({ 
+        userId, 
+        agentName: targetAgentName,
+        duration,
+        responseLength: response.length 
+      }, 'Message processed successfully');
+
+      return result;
+
+    } catch (error: any) {
+      const duration = Date.now() - startTime;
+      
+      logger.error({ 
+        error, 
+        userId, 
+        duration,
+        agentName: options.agentName 
+      }, 'Failed to process user message');
+
+      return {
+        success: false,
+        response: 'I apologize, but I encountered an error processing your request. Please try again.',
+        agentName: options.agentName || 'unknown',
+        sessionId: options.sessionId || `error_${Date.now()}`,
+        timestamp: new Date(),
+        duration,
+        error: error.message,
+      };
+    }
+  }
+
+  private routeMessage(message: string): string {
+    // Use the agent registry's routing logic
+    const agent = agentRegistry.routeToAgent(message);
+    return agent.name || 'financial_advisor';
+  }
+
+  async executeDirectTool(
+    userId: string,
+    toolName: string,
+    parameters: Record<string, unknown>,
+    context: Partial<FinancialContext> = {}
+  ): Promise<any> {
+    try {
+      await this.initializationPromise;
+      if (!this.initialized) {
+        throw new Error('Agent system not properly initialized');
+      }
+
+      logger.info({ userId, toolName }, 'Executing tool directly');
+
+      const executionContext = {
+        userId,
+        sessionId: `direct_${Date.now()}`,
+        agentName: 'direct_execution',
+        timestamp: new Date(),
+      };
+
+      const result = await toolRegistry.executeTool(
+        toolName,
+        { ...parameters, userId },
+        { ...context, ...executionContext }
+      );
+
+      return result;
+    } catch (error) {
+      logger.error({ error, userId, toolName }, 'Direct tool execution failed');
+      throw error;
+    }
+  }
+
+  getSystemStatus(): Record<string, any> {
+    return {
+      initialized: this.initialized,
+      agents: {
+        count: agentRegistry.getAllAgents().length,
+        available: Array.from(agentRegistry.getAgentNames()),
+        metrics: agentRegistry.getAgentMetrics(),
+      },
+      tools: {
+        count: toolRegistry.getToolCount(),
+        metrics: toolRegistry.getToolMetrics(),
+        recentExecutions: toolRegistry.getExecutionHistory(5),
+      },
+      timestamp: new Date().toISOString(),
+    };
   }
 
   isInitialized(): boolean {
     return this.initialized;
   }
 
-  getInitializedCount(): number {
-    return Object.values(this.registry).filter(
-      instance => instance.isInitialized
-    ).length;
+  isRegistryReady(): boolean {
+    return this.initialized && 
+           agentRegistry.isInitialized() && 
+           toolRegistry.getToolCount() > 0;
+  }
+
+  async reinitialize(): Promise<boolean> {
+    logger.info('Reinitializing agent management system');
+    this.initialized = false;
+    return await this.initialize();
   }
 }
 
-// Singleton instance
+// Create singleton instance
 export const agentManager = new AgentManager();
 
-// Export the new agent registry as the primary registry
-export { agentRegistry } from './agentRegistry.js';
-
-// Helper function to ensure agents are initialized
-export async function ensureAgentsInitialized(): Promise<void> {
-  if (!agentManager.isInitialized()) {
-    await agentManager.initialize();
-  }
-}
-
-// Helper functions for common operations
-export const getTriageAgent = () => agentManager.getAgent(AGENT_ROLES.TRIAGE);
-export const getFinancialCoachAgent = () => agentManager.getAgent(AGENT_ROLES.FINANCIAL_COACH);
-export const getBudgetAnalyzerAgent = () => agentManager.getAgent(AGENT_ROLES.BUDGET_ANALYZER);
-export const getEnvelopeManagerAgent = () => agentManager.getAgent(AGENT_ROLES.ENVELOPE_MANAGER);
-export const getTransactionProcessorAgent = () => agentManager.getAgent(AGENT_ROLES.TRANSACTION_PROCESSOR);
-export const getInsightGeneratorAgent = () => agentManager.getAgent(AGENT_ROLES.INSIGHT_GENERATOR);
-
-// Validate registry is ready
-export const ensureRegistryReady = (): boolean => {
-  if (!agentManager.isInitialized()) {
-    logger.error('Agent manager not initialized');
+// Helper function for route validation
+export function ensureRegistryReady(): boolean {
+  if (!agentManager.isRegistryReady()) {
+    logger.error('Agent registry not ready');
     return false;
   }
-
-  const activeAgents = agentManager.getActiveAgents();
-  const requiredRoles = Object.values(AGENT_ROLES);
-
-  const missingAgents = requiredRoles.filter(role =>
-    !activeAgents.some(agent => agent.config.role === role)
-  );
-
-  if (missingAgents.length > 0) {
-    logger.error({ missingAgents }, 'Required agents missing from registry');
-    return false;
-  }
-
   return true;
-};
-
-// Function to get tools for a specific agent role
-function getToolsForAgent(role: AGENT_ROLES): any[] {
-  const { toolRegistry } = require('./tools/registry.js');
-  const allTools = toolRegistry.getAllTools();
-
-  // Define which tools each agent should have access to
-  const agentToolMappings: Record<AGENT_ROLES, string[]> = {
-    [AGENT_ROLES.TRIAGE]: [
-      'agent_handoff'
-    ],
-    [AGENT_ROLES.FINANCIAL_COACH]: [
-      'generate_recommendations',
-      'identify_opportunities',
-      'track_achievements',
-      'agent_handoff'
-    ],
-    [AGENT_ROLES.BUDGET_ANALYZER]: [
-      'budget_analysis',
-      'spending_patterns',
-      'variance_calculation',
-      'analyze_spending_patterns',
-      'analyze_budget_variance',
-      'agent_handoff'
-    ],
-    [AGENT_ROLES.ENVELOPE_MANAGER]: [
-      'create_envelope',
-      'transfer_funds',
-      'manage_balance',
-      'optimize_categories',
-      'agent_handoff'
-    ],
-    [AGENT_ROLES.TRANSACTION_PROCESSOR]: [
-      'categorize_transaction',
-      'auto_allocate',
-      'recognize_patterns',
-      'detect_anomalies',
-      'agent_handoff'
-    ],
-    [AGENT_ROLES.INSIGHT_GENERATOR]: [
-      'analyze_trends',
-      'analyze_goal_progress',
-      'generate_recommendations',
-      'identify_opportunities',
-      'detect_warnings',
-      'track_achievements',
-      'agent_handoff'
-    ]
-  };
-
-  const toolNames = agentToolMappings[role] || [];
-  const agentTools: any[] = [];
-
-  for (const toolName of toolNames) {
-    const toolInfo = allTools[toolName];
-    if (toolInfo && toolInfo.tool) {
-      agentTools.push(toolInfo.tool);
-    }
-  }
-
-  logger.debug({
-    role,
-    assignedTools: toolNames,
-    foundTools: agentTools.length
-  }, "Retrieved tools for agent");
-
-  return agentTools;
 }
 
-// Import the new AgentRegistry
-import { agentRegistry as newAgentRegistry } from './agentRegistry.js';
+// Export for backwards compatibility
+export { agentRegistry, toolRegistry };

@@ -1,3 +1,8 @@
+` tag. Include all necessary functions and modifications based on the intention," and the fact that the edited snippet is not a complete replacement, I will reconstruct the file by including the parts from the original that are not present in the edited snippet, and incorporating the changes from the edited snippet.
+
+This approach ensures that all the necessary agent types and configurations are preserved while incorporating the new definitions from the edited snippet.
+
+<replit_final_file>
 import { z } from "zod";
 import { Agent, RunContext, ToolFunction } from "@openai/agents";
 
@@ -199,6 +204,17 @@ export const FinancialContextSchema = z.object({
 
 export type FinancialContext = z.infer<typeof FinancialContextSchema>;
 
+// Agent interaction history
+export const AgentInteractionSchema = z.object({
+  role: z.enum(['user', 'assistant', 'system']),
+  content: z.string(),
+  timestamp: z.string(),
+  agentName: z.string().optional(),
+  metadata: z.record(z.unknown()).optional(),
+});
+
+export type AgentInteraction = z.infer<typeof AgentInteractionSchema>;
+
 // Extended run context for financial agents
 export interface FinancialRunContext extends RunContext<FinancialContext> {
   sessionId: string;
@@ -206,37 +222,31 @@ export interface FinancialRunContext extends RunContext<FinancialContext> {
   previousInteractions: AgentInteraction[];
 }
 
-// Agent interaction tracking
-export const AgentInteractionSchema = z.object({
-  id: z.string(),
-  sessionId: z.string(),
-  agentName: z.string(),
-  userMessage: z.string(),
-  agentResponse: z.string(),
-  timestamp: z.date(),
-  confidence: z.number().min(0).max(100).optional(),
-  followUpSuggestions: z.array(z.string()).optional(),
-  handoffReason: z.string().optional(),
-  handoffTarget: z.string().optional(),
-});
+// Agent execution result
+export interface AgentExecutionResult {
+  success: boolean;
+  response: string;
+  agentName: string;
+  sessionId: string;
+  timestamp: Date;
+  duration: number;
+  error?: string;
+  metadata?: Record<string, unknown>;
+}
 
-export type AgentInteraction = z.infer<typeof AgentInteractionSchema>;
-
-// Agent capability definition
+// Agent capabilities
 export interface AgentCapability {
   name: string;
   description: string;
-  parameters: z.ZodSchema<any>;
-  execute: ToolFunction;
-  requiresApproval?: boolean;
-  riskLevel?: 'low' | 'medium' | 'high';
+  category: string;
+  complexity: 'low' | 'medium' | 'high';
 }
 
-// Multi-agent coordination interfaces
-export interface AgentHandoff {
-  fromAgent: string;
-  toAgent: string;
-  reason: string;
-  context: Record<string, any>;
-  priority: 'low' | 'medium' | 'high';
+// Agent metrics
+export interface AgentMetrics {
+  totalInteractions: number;
+  successfulInteractions: number;
+  averageResponseTime: number;
+  lastInteraction?: Date;
+  errorRate: number;
 }

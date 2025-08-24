@@ -30,6 +30,8 @@ model User {
   routingConfig            RoutingConfig?
   userMemories             UserMemory[]
   serviceAccounts          ServiceAccount[]
+  goals                    Goal[]
+  conversations            Conversation[]
 }
 
 model Envelope {
@@ -189,4 +191,34 @@ model ServiceAccount {
   updatedAt   DateTime @updatedAt
 
   @@unique([userId, name])
+}
+
+model Goal {
+  id            String   @id @default(cuid())
+  userId        String
+  description   String
+  targetAmount  Float
+  currentAmount Float?   @default(0)
+  targetDate    DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("goals")
+}
+
+model Conversation {
+  id        String   @id @default(cuid())
+  userId    String
+  sessionId String
+  role      String   // 'user', 'assistant', 'system'
+  content   String
+  agentName String?  // which agent handled this message
+  metadata  Json?    // additional metadata like tool calls, handoffs, etc.
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, sessionId])
+  @@index([sessionId])
+  @@map("conversations")
 }

@@ -1,1479 +1,586 @@
+
 import { Router } from 'express';
 import { z } from 'zod';
-import { db } from '../lib/db.js';
 import { logger } from '../lib/logger.js';
-import { authenticateToken } from './auth.js';
-import { authenticateServiceAccount } from './service-accounts.js';
-import { chatJSON, isAIEnabled, createAgentResponse, MODELS } from '../lib/openai.js';
-import {
-  AICoachRequestSchema,
-  RoutingExplanationRequestSchema,
-} from '../types/dto.js';
+import { auth } from '../services/auth.js';
+import { agentRegistry } from '../agents/agentRegistry.js';
+import { agentManager } from '../agents/registry.js';
+import { toolRegistry } from '../agents/tools/registry.js';
+import { db } from '../lib/db.js';
+import type { FinancialContext } from '../agents/tools/types.js';
 
 const router = Router();
 
-/**
- * Health check (no auth) – comprehensive OpenAI validation
- */
-router.get('/health', async (_req, res) => {
-  try {
-    const { openaiPing, MODELS } = await import('../lib/openai.js');
-    const { env } = await import('../config/env.js');
-    
-    // Test primary model
-    const primaryTest = await openaiPing(MODELS.primary);
-    
-    // Test fallback model
-    const fallbackTest = await openaiPing(MODELS.fallback);
-    
-    // Configuration status
-    const configStatus = {
-      hasApiKey: !!env.OPENAI_API_KEY,
-      hasProjectId: !!env.OPENAI_PROJECT_ID,
-      primaryModel: MODELS.primary,
-      fallbackModel: MODELS.fallback,
-      agenticModel: MODELS.agentic,
-      projectId: env.OPENAI_PROJECT_ID ? `${env.OPENAI_PROJECT_ID.substring(0, 8)}...` : 'missing'
-    };
-
-    const overallHealth = primaryTest.ok || fallbackTest.ok;
-
-    res.status(overallHealth ? 200 : 503).json({ 
-      status: overallHealth ? 'healthy' : 'degraded',
-      config: configStatus,
-      models: {
-        primary: primaryTest,
-        fallback: fallbackTest
-      },
-      recommendations: !overallHealth ? [
-        'Verify OPENAI_API_KEY is set in Replit Secrets',
-        'Verify OPENAI_PROJECT_ID is set in Replit Secrets',
-        'Check project has access to selected models',
-        'Review OpenAI API usage limits'
-      ] : [],
-      timestamp: new Date().toISOString()
-    });
-  } catch (error: any) {
-    res.status(500).json({ 
-      status: 'error',
-      error: 'OpenAI health check failed', 
-      details: error?.message ?? 'Unknown error',
-      timestamp: new Date().toISOString()
-    });
-  }
+// Request schemas for agent interactions
+const AgentChatSchema = z.object({
+  message: z.string().min(1, 'Message is required'),
+  agentName: z.enum(['financial_advisor', 'budget_coach', 'transaction_analyst', 'insight_generator']).optional(),
+  sessionId: z.string().optional(),
+  context: z.object({
+    includeHistory: z.boolean().default(true),
+    maxHistory: z.number().min(1).max(50).default(10),
+    includeFinancialData: z.boolean().default(true),
+  }).optional()
 });
 
-/**
- * Simple test (no auth) – calls chatJSON and expects a JSON object back.
- */
-router.post('/test', async (req, res) => {
-  try {
-    const { prompt = 'Say hello in JSON format' } = req.body ?? {};
-    const result = await chatJSON({
-      user: prompt,
-      schemaName: 'testResponse',
-      temperature: 0.1,
-    });
-    res.json({ success: true, result, timestamp: new Date().toISOString() });
-  } catch (error: any) {
-    if (error?.code === 'NO_KEY') {
-      return res.status(503).json({
-        error: 'OpenAI API key not configured',
-        message: 'Please set OPENAI_API_KEY in Replit Secrets',
-      });
-    }
-    res
-      .status(500)
-      .json({ error: 'OpenAI test failed', details: error?.message ?? 'Unknown error' });
-  }
+const ToolExecutionSchema = z.object({
+  toolName: z.string().min(1, 'Tool name is required'),
+  parameters: z.record(z.unknown()),
+  agentContext: z.object({
+    agentName: z.string().optional(),
+    sessionId: z.string().optional(),
+  }).optional()
 });
 
-// Apply JWT authentication to all routes except MCP endpoints
-router.use((req, res, next) => {
-  // Skip JWT auth for MCP endpoints - they use service account auth
-  if (req.path.startsWith('/mcp/')) {
-    return next();
-  }
-  return authenticateToken(req, res, next);
+const AgentHandoffSchema = z.object({
+  fromAgent: z.string().min(1, 'Source agent is required'),
+  toAgent: z.string().min(1, 'Target agent is required'),
+  message: z.string().min(1, 'Message is required'),
+  reason: z.string().min(1, 'Handoff reason is required'),
+  context: z.record(z.unknown()).optional(),
+  priority: z.enum(['low', 'medium', 'high']).default('medium')
 });
 
-/**
- * Helper: cents → "12.34"
- */
-const toDollars = (cents: number | null | undefined) =>
-  typeof cents === 'number' ? (cents / 100).toFixed(2) : '0.00';
-
-/**
- * AI budgeting coach with envelope management capabilities
- */
-router.post('/coach', async (req: any, res) => {
+// Helper to build financial context for agents
+async function buildFinancialContext(userId: string): Promise<FinancialContext> {
   try {
-    if (!isAIEnabled()) {
-      return res
-        .status(503)
-        .json({ 
-          error: 'AI service not available', 
-          message: 'OpenAI API key and project ID must be configured in Replit Secrets',
-          requiredSecrets: ['OPENAI_API_KEY', 'OPENAI_PROJECT_ID']
-        });
-    }
-
-    const { question, context } = AICoachRequestSchema.parse(req.body);
-
-    // Get comprehensive user data including memories
-    const [envelopes, recentTransactions, transfers, userMemories] = await Promise.all([
-      db.envelope.findMany({
-        where: { userId: req.user.id },
-        select: {
-          id: true,
-          name: true,
-          icon: true,
-          color: true,
-          balanceCents: true,
-          spentThisMonth: true,
-          order: true,
-        },
-        orderBy: { order: 'asc' },
-      }),
-      db.transaction.findMany({
-        where: { userId: req.user.id },
-        take: 10,
-        orderBy: { createdAt: 'desc' },
-        select: {
-          amountCents: true,
-          merchant: true,
-          mcc: true,
-          location: true,
-          envelope: { select: { name: true } },
-          createdAt: true,
-        },
-      }),
-      db.transfer.findMany({
-        where: { userId: req.user.id },
-        take: 5,
-        orderBy: { createdAt: 'desc' },
-        select: {
-          amountCents: true,
-          note: true,
-          fromEnvelope: { select: { name: true } },
-          toEnvelope: { select: { name: true } },
-          createdAt: true,
-        },
-      }),
-      // Get recent user memories for context
-      db.userMemory?.findMany({
-        where: { userId: req.user.id },
-        orderBy: { createdAt: 'desc' },
-        take: 10
-      }).catch(() => []) || Promise.resolve([])
-    ]);
-
-    const envelopeContext = envelopes.map((e) => ({
-      id: e.id,
-      name: e.name,
-      icon: e.icon,
-      color: e.color,
-      balance: toDollars(e.balanceCents),
-      spentThisMonth: toDollars(e.spentThisMonth),
-      balanceCents: e.balanceCents,
-    }));
-
-    // Calculate analytics with null checks
-    const totalBalance = envelopeContext.length > 0 
-      ? envelopeContext.reduce((sum, env) => sum + env.balanceCents, 0)
-      : 0;
-    const totalSpent = envelopeContext.length > 0 
-      ? envelopeContext.reduce((sum, env) => sum + parseFloat(env.spentThisMonth), 0)
-      : 0;
-    const avgSpendingPerEnvelope = envelopeContext.length > 0 ? totalSpent / envelopeContext.length : 0;
-
-    // Find highest/lowest spending categories with defaults
-    const highestSpendingEnv = envelopeContext.length > 0 
-      ? envelopeContext.reduce((max, env) => 
-          parseFloat(env.spentThisMonth) > parseFloat(max.spentThisMonth) ? env : max
-        )
-      : { name: 'No envelopes', spentThisMonth: '0.00', balanceCents: 0, balance: '0.00' };
-
-    const lowestBalanceEnv = envelopeContext.length > 0 
-      ? envelopeContext.reduce((min, env) => 
-          env.balanceCents < min.balanceCents ? env : min
-        )
-      : { name: 'No envelopes', balance: '0.00', balanceCents: 0 };
-
-    // Enhanced handling for new users with no envelopes
-    if (envelopeContext.length === 0) {
-      // Extract context for personalized response
-      const monthlyIncome = context?.monthly_income || context?.monthlyIncome || 0;
-      const experienceLevel = context?.experience_level || context?.experienceLevel || 'beginner';
-      const problemAreas = context?.problem_areas || context?.problemAreas || [];
-      const personality = context?.personality || 'standard';
-      const fixedExpenses = context?.fixed_expenses || context?.fixedExpenses || 0;
-      const goals = context?.goals || [];
-
-      // Calculate personalized allocations based on income
-      let personalizedResponse = "Welcome to envelope budgeting! ";
-      let suggestedEnvelopes = [];
-
-      if (monthlyIncome > 0) {
-        // Use 50/30/20 rule as base with adjustments for personality/problems
-        const needs = Math.round(monthlyIncome * 0.5);
-        const wants = Math.round(monthlyIncome * 0.3);
-        const savings = Math.round(monthlyIncome * 0.2);
-
-        // Adjust for specific problems and personality
-        let groceries, bills, dining, emergency, misc;
-
-        if (fixedExpenses > 0) {
-          bills = fixedExpenses;
-          const remaining = needs - bills;
-          groceries = Math.round(remaining * 0.6);
-          misc = remaining - groceries;
-        } else {
-          bills = Math.round(needs * 0.6);
-          groceries = Math.round(needs * 0.4);
-          misc = Math.round(wants * 0.3);
-        }
-
-        // Personality-based adjustments
-        if (personality === 'impulsive spender' || problemAreas.includes('impulse spending')) {
-          dining = Math.round(wants * 0.4); // Smaller dining budget for impulse spenders
-          emergency = Math.round(savings * 1.2); // Bigger emergency fund
-          personalizedResponse += `Since you mentioned being an impulsive spender, I've designed a system with smaller discretionary budgets and a larger emergency fund. `;
-        } else {
-          dining = Math.round(wants * 0.5);
-          emergency = savings;
-        }
-
-        // Problem-specific adjustments
-        if (problemAreas.includes('food overspending') || problemAreas.includes('impulse purchases')) {
-          const totalFood = groceries + dining;
-          groceries = Math.round(totalFood * 0.75); // More for groceries
-          dining = Math.round(totalFood * 0.25); // Less for dining
-          personalizedResponse += `I've allocated more to groceries ($${groceries}) and less to dining ($${dining}) to help control food overspending. `;
-        }
-
-        personalizedResponse += `Based on your $${monthlyIncome} monthly income, here's a personalized envelope system:\n\n`;
-        personalizedResponse += `💰 **Your Custom Budget:**\n`;
-        personalizedResponse += `• Bills/Rent: $${bills} (${Math.round(bills/monthlyIncome*100)}%)\n`;
-        personalizedResponse += `• Groceries: $${groceries} (${Math.round(groceries/monthlyIncome*100)}%)\n`;
-        personalizedResponse += `• Dining: $${dining} (${Math.round(dining/monthlyIncome*100)}%)\n`;
-        personalizedResponse += `• Emergency: $${emergency} (${Math.round(emergency/monthlyIncome*100)}%)\n`;
-        personalizedResponse += `• Miscellaneous: $${misc} (${Math.round(misc/monthlyIncome*100)}%)\n\n`;
-
-        if (problemAreas.includes('no savings') || goals.includes('build emergency fund')) {
-          personalizedResponse += `🎯 **Emergency Fund Priority:** Start with just $${Math.min(emergency, 500)} this month. Your goal is 3-6 months of expenses ($${Math.round((bills + groceries) * 3)}-${Math.round((bills + groceries) * 6)}).\n\n`;
-        }
-
-        // Specific advice for their situation
-        if (experienceLevel === 'beginner') {
-          personalizedResponse += `📚 **Beginner Tips:**\n• Start with these 5 envelopes first\n• Track spending for 2 weeks before adjusting\n• Use the "envelope test" - if money runs out, stop spending in that category\n\n`;
-        }
-
-        personalizedResponse += `Would you like me to create these envelopes with your personalized amounts?`;
-
-        suggestedEnvelopes = [
-          { name: 'Bills', amount: bills, icon: 'home', color: 'blue' },
-          { name: 'Groceries', amount: groceries, icon: 'cart', color: 'green' },
-          { name: 'Dining', amount: dining, icon: 'utensils', color: 'amber' },
-          { name: 'Emergency', amount: emergency, icon: 'shield', color: 'red' },
-          { name: 'Miscellaneous', amount: misc, icon: 'dots', color: 'gray' }
-        ];
-      } else {
-        personalizedResponse += "I'd love to create a personalized budget for you! To give you specific dollar amounts for each envelope, could you tell me your monthly take-home income? ";
-        personalizedResponse += "I'll use proven budgeting principles to create the perfect envelope system for your situation.";
-
-        suggestedEnvelopes = [
-          { name: 'Groceries', amount: 300, icon: 'cart', color: 'green' },
-          { name: 'Bills', amount: 800, icon: 'home', color: 'blue' },
-          { name: 'Dining', amount: 150, icon: 'utensils', color: 'amber' },
-          { name: 'Emergency', amount: 200, icon: 'shield', color: 'red' }
-        ];
-      }
-
-      return res.json({
-        response: personalizedResponse,
-        suggestedActions: [{
-          type: 'create_envelopes_batch',
-          description: `Create personalized envelope system${monthlyIncome > 0 ? ` for $${monthlyIncome} budget` : ''}`,
-          params: { 
-            envelopes: suggestedEnvelopes,
-            totalBudget: monthlyIncome || suggestedEnvelopes.reduce((sum, env) => sum + env.amount, 0),
-            isPersonalized: true
-          }
-        }],
-        analytics: { 
-          totalBalance: '0.00', 
-          totalSpent: '0.00', 
-          envelopeCount: 0,
-          needsSetup: true,
-          budgetAnalyzed: monthlyIncome > 0,
-          personalityConsidered: !!personality,
-          problemsAddressed: problemAreas.length
-        },
-        isNewUser: true,
-        processingTime: 'Personalized Analysis Complete',
-        budgetBreakdown: monthlyIncome > 0 ? {
-          income: monthlyIncome,
-          needsPercent: 50,
-          wantsPercent: 30,
-          savingsPercent: 20,
-          customAdjustments: problemAreas.length > 0 || personality !== 'standard'
-        } : null
-      });
-    }
-
-    const systemPrompt = `You are an expert financial advisor specializing in envelope budgeting. Analyze the user's specific situation and provide personalized, actionable advice.
-
-CURRENT FINANCIAL STATE:
-Total Balance: $${toDollars(totalBalance)}
-Total Spent This Month: $${totalSpent.toFixed(2)}
-Number of Envelopes: ${envelopeContext.length}
-
-ENVELOPE BREAKDOWN:
-${envelopeContext.map(e => `• ${e.name}: $${e.balance} available (spent $${e.spentThisMonth} this month)`).join('\n')}
-
-SPENDING INSIGHTS:
-• Highest spending: ${highestSpendingEnv.name} ($${highestSpendingEnv.spentThisMonth || '0.00'})
-• Lowest balance: ${lowestBalanceEnv.name} ($${lowestBalanceEnv.balance})
-• Average per category: $${avgSpendingPerEnvelope.toFixed(2)}
-• Budget utilization: ${(totalSpentThisMonth / (totalBalance / 100) * 100).toFixed(0)}% of available funds used
-
-RECENT ACTIVITY:
-${recentTransactions.slice(0, 5).map(t => `• $${toDollars(Math.abs(t.amountCents))} at ${t.merchant || 'Unknown'} → ${t.envelope?.name || 'Unassigned'}`).join('\n')}
-
-USER CONTEXT: ${JSON.stringify(context || {})}
-USER QUESTION: "${question}"
-
-RESPONSE GUIDELINES:
-1. Address their exact question with specific dollar amounts and envelope names
-2. Consider their emotional state and experience level in your tone
-3. Provide 1-3 concrete actionable steps with precise amounts
-4. If suggesting transfers, explain why and include safety buffers
-5. For complex questions, break down into immediate vs. long-term actions
-6. Reference their actual spending patterns and envelope balances
-7. Be encouraging but realistic about their financial situation
-
-Respond in JSON format:
-{
-  "advice": "Personalized advice addressing their question, referencing specific envelopes and amounts. Use an encouraging but practical tone.",
-  "actions": [
-    {
-      "type": "transfer|create_envelope|rebalance", 
-      "description": "Specific action with exact amounts and reasoning", 
-      "params": {
-        "fromEnvelope": "Exact envelope name",
-        "toEnvelope": "Exact envelope name", 
-        "amount": 100,
-        "reasoning": "Why this specific amount and timing"
-      }
-    }
-  ]
-}
-
-Be conversational and reference their actual envelope names. Match your tone to their experience level and emotional state.`;
-
-    let result;
-    let aiSuccess = false;
-
-    try {
-      // Use enhanced agent response for better conversational experience
-      result = await Promise.race([
-        chatJSON({
-          system: systemPrompt,
-          user: question,
-          schemaName: 'coachResponse',
-          model: MODELS.primary, // Use the best available model
-          temperature: 0.3, // Slightly higher for more natural responses
-          validate: (obj: any) => {
-            if (obj && typeof obj === 'object') {
-              // Handle both wrapped and unwrapped responses
-              let responseData = obj.coachResponse || obj;
-              
-              const advice = responseData.advice || responseData.response || responseData.recommendation || responseData.suggestion;
-              const actions = responseData.actions || responseData.suggestions || responseData.recommendations || [];
-
-              if (typeof advice === 'string' && advice.trim()) {
-                return { 
-                  advice: advice.trim(),
-                  actions: Array.isArray(actions) ? actions : []
-                };
-              }
-              
-              // Try to extract any meaningful text response
-              const stringValues = Object.values(responseData).filter(v => typeof v === 'string' && v.trim());
-              if (stringValues.length > 0) {
-                return {
-                  advice: stringValues[0],
-                  actions: Array.isArray(actions) ? actions : []
-                };
-              }
-            }
-            throw new Error('Invalid AI response format - no valid advice field found');
-          },
-        }),
-        new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('AI timeout - using smart fallback')), 15000) // Reduced timeout for faster fallback
-        )
-      ]);
-
-      aiSuccess = true;
-      logger.info({ 
-        userId: req.user.id, 
-        model: MODELS.primary,
-        questionLength: question.length 
-      }, "AI coach response successful");
-    } catch (aiError) {
-      logger.warn({ err: aiError, question }, 'AI Coach timeout/error, using smart fallback');
-
-      // Enhanced smart fallback using actual user data
-      let contextualAdvice = '';
-      let suggestedActions = [];
-      const questionLower = question.toLowerCase();
-
-      // Analyze user's actual financial state for smarter recommendations
-      const hasLowBalances = envelopeContext.filter(env => env.balanceCents < 2000).length;
-      const hasHighBalances = envelopeContext.filter(env => env.balanceCents > 10000);
-      const totalSpentThisMonth = envelopeContext.length > 0 
-        ? envelopeContext.reduce((sum, env) => sum + parseFloat(env.spentThisMonth), 0)
-        : 0;
-      const avgBalance = envelopeContext.length > 0 ? totalBalance / 100 / envelopeContext.length : 0;
-
-      if (questionLower.includes('raise') || questionLower.includes('income') || questionLower.includes('money')) {
-        // Handle income/raise questions
-        const suggestedAmount = Math.min(1000, avgBalance * 2); // Base on current avg
-        contextualAdvice = `With your current $${toDollars(totalBalance)} across ${envelopeContext.length} envelopes (avg: $${avgBalance.toFixed(0)} each), I'd allocate new income strategically: 40% to ${lowestBalanceEnv.name} (currently $${lowestBalanceEnv.balance}), 35% to ${highestSpendingEnv.name} (your top spending at $${highestSpendingEnv.spentThisMonth}), and 25% to emergency savings.`;
-        suggestedActions = [{
-          type: 'transfer',
-          description: `Boost ${lowestBalanceEnv.name} with 40% of new income`,
-          params: { fromEnvelope: 'Income Allocation', toEnvelope: lowestBalanceEnv.name, amount: suggestedAmount * 0.4 }
-        }];
-      } else if (questionLower.includes('car') || questionLower.includes('repair') || questionLower.includes('emergency')) {
-        // Handle emergency/repair questions with real envelope analysis
-        const neededAmount = 800; // Default repair amount
-        const fundingSources = envelopeContext.filter(env => env.balanceCents > 5000).sort((a, b) => b.balanceCents - a.balanceCents);
-        
-        if (fundingSources.length > 0) {
-          const primarySource = fundingSources[0];
-          const canCoverAmount = Math.min(neededAmount, primarySource.balanceCents / 100 * 0.4);
-          contextualAdvice = `For the $${neededAmount} repair: Pull $${canCoverAmount.toFixed(0)} from ${primarySource.name} ($${primarySource.balance} available). ${fundingSources.length > 1 ? `Additional backup: ${fundingSources[1].name} ($${fundingSources[1].balance}).` : ''} Consider setting aside $${(totalBalance / 100 * 0.1).toFixed(0)}/month for future emergencies.`;
-          suggestedActions = [{
-            type: 'transfer',
-            description: `Use ${primarySource.name} for repair ($${canCoverAmount.toFixed(0)})`,
-            params: { fromEnvelope: primarySource.name, toEnvelope: 'Emergency Repair', amount: canCoverAmount }
-          }];
-        } else {
-          contextualAdvice = `For the $${neededAmount} repair, you'll need to combine multiple envelopes. Your top options: ${envelopeContext.slice(0, 3).map(e => `${e.name} ($${e.balance})`).join(', ')}. Total available: $${toDollars(totalBalance)}.`;
-        }
-
-        const emergencyFundAmount = Math.max(50, totalBalance / 100 * 0.05);
-        contextualAdvice += ` Start building an emergency fund with $${emergencyFundAmount.toFixed(0)}/month.`;
-      } else if (questionLower.includes('dining') || questionLower.includes('food') || questionLower.includes('restaurant') || questionLower.includes('overspending')) {
-        // Enhanced dining/food overspending analysis
-        const diningEnv = envelopeContext.find(env => 
-          env.name.toLowerCase().includes('dining') || 
-          env.name.toLowerCase().includes('food') || 
-          env.name.toLowerCase().includes('restaurant')
-        );
-        const groceryEnv = envelopeContext.find(env => 
-          env.name.toLowerCase().includes('grocery') || 
-          env.name.toLowerCase().includes('groceries')
-        );
-
-        const currentDiningSpending = parseFloat(diningEnv?.spentThisMonth || '0');
-        const currentDiningBalance = parseFloat(diningEnv?.balance || '0');
-        const currentGrocerySpending = parseFloat(groceryEnv?.spentThisMonth || '0');
-
-        const totalFoodSpending = currentDiningSpending + currentGrocerySpending;
-        const suggestedFoodBudget = Math.max(avgBalance * 1.5, 250); // 1.5x average for total food
-        const suggestedDiningLimit = suggestedFoodBudget * 0.3; // 30% for dining out
-        const suggestedGroceryBudget = suggestedFoodBudget * 0.7; // 70% for groceries
-
-        contextualAdvice = `Food spending analysis: Total $${totalFoodSpending.toFixed(2)} this month (Dining: $${currentDiningSpending.toFixed(2)}, Groceries: $${currentGrocerySpending.toFixed(2)}). `;
-
-        if (totalFoodSpending > suggestedFoodBudget) {
-          contextualAdvice += `You're over budget by $${(totalFoodSpending - suggestedFoodBudget).toFixed(2)}. `;
-        }
-
-        contextualAdvice += `Recommended split: $${suggestedGroceryBudget.toFixed(0)} groceries, $${suggestedDiningLimit.toFixed(0)} dining. `;
-
-        if (currentDiningSpending > suggestedDiningLimit) {
-          const overspend = currentDiningSpending - suggestedDiningLimit;
-          contextualAdvice += `Try meal prep 4x/week to save ~$${overspend.toFixed(0)}/month. `;
-
-          if (currentDiningBalance > 50) {
-            const transferAmount = Math.min(currentDiningBalance * 0.4, overspend);
-            contextualAdvice += `Consider moving $${transferAmount.toFixed(0)} from ${diningEnv?.name || 'dining'} to ${groceryEnv?.name || lowestBalanceEnv.name} for meal ingredients.`;
-
-            suggestedActions = [{
-              type: 'transfer',
-              description: `Move excess dining budget to groceries for meal prep`,
-              params: { 
-                fromEnvelope: diningEnv?.name || 'Dining', 
-                toEnvelope: groceryEnv?.name || lowestBalanceEnv.name, 
-                amount: transferAmount,
-                reasoning: `Reduce dining overspend and boost grocery budget for meal prep`
-              }
-            }];
-          }
-        } else {
-          contextualAdvice += `Good job staying within dining budget! `;
-        }
-
-        contextualAdvice += `Weekly targets: $${(suggestedGroceryBudget / 4).toFixed(0)} groceries, $${(suggestedDiningLimit / 4).toFixed(0)} dining.`;
-      } else if (questionLower.includes('vacation') || questionLower.includes('save') || questionLower.includes('trip')) {
-        // Handle vacation/savings questions
-        const targetAmount = questionLower.match(/\$?(\d+)/)?.[1] ? parseInt(questionLower.match(/\$?(\d+)/)?.[1] || '2000') : 2000;
-        const timeframe = questionLower.match(/(\d+)\s*(month|week)/)?.[1] ? parseInt(questionLower.match(/(\d+)\s*(month|week)/)?.[1] || '6') : 6;
-        const monthlyNeeded = targetAmount / timeframe;
-        const canContribute = envelopeContext.filter(env => env.balanceCents > 5000);
-
-        contextualAdvice = `For $${targetAmount} in ${timeframe} months, save $${monthlyNeeded.toFixed(0)}/month. With your $${toDollars(totalBalance)} total, ${canContribute.length > 0 ? `transfer $${(canContribute.reduce((sum, env) => sum + env.balanceCents, 0) / 100 * 0.15).toFixed(0)} from higher-balance envelopes (${canContribute.map(e => e.name).join(', ')}) to start.` : `reduce spending by $${monthlyNeeded.toFixed(0)}/month across all categories.`}`;
-
-        if (canContribute.length > 0) {
-          suggestedActions = [{
-            type: 'create_envelope',
-            description: `Create vacation fund with initial $${(canContribute[0].balanceCents / 100 * 0.2).toFixed(0)}`,
-            params: { name: 'Vacation Fund', initialAmount: canContribute[0].balanceCents / 100 * 0.2, icon: 'gift', color: 'purple' }
-          }];
-        }
-      } else {
-        // Enhanced general advice based on spending patterns and balance distribution
-        const needsAttention = envelopeContext.filter(env => env.balanceCents < avgBalance * 50); // Below 50% of average
-        const overFunded = envelopeContext.filter(env => env.balanceCents > avgBalance * 200); // Above 200% of average
-        const topSpenders = envelopeContext.sort((a, b) => parseFloat(b.spentThisMonth) - parseFloat(a.spentThisMonth)).slice(0, 3);
-
-        contextualAdvice = `Your $${toDollars(totalBalance)} budget analysis: Average $${avgBalance.toFixed(0)} per envelope. `;
-
-        if (needsAttention.length > 0 && overFunded.length > 0) {
-          const rebalanceAmount = Math.min(avgBalance, overFunded[0].balanceCents / 100 * 0.25);
-          contextualAdvice += `Rebalancing opportunity: ${needsAttention.map(env => `${env.name} ($${env.balance})`).join(', ')} are underfunded. Transfer $${rebalanceAmount.toFixed(0)} from ${overFunded[0].name} ($${overFunded[0].balance}). `;
-          suggestedActions = [{
-            type: 'transfer',
-            description: `Rebalance $${rebalanceAmount.toFixed(0)} from ${overFunded[0].name} to ${needsAttention[0].name}`,
-            params: { fromEnvelope: overFunded[0].name, toEnvelope: needsAttention[0].name, amount: rebalanceAmount }
-          }];
-        } else if (topSpenders.length > 0) {
-          contextualAdvice += `Top spending: ${topSpenders.map(env => `${env.name} ($${env.spentThisMonth})`).join(', ')}. `;
-        }
-
-        // Add specific budget health insights
-        const budgetHealth = totalSpentThisMonth / (totalBalance / 100) * 100;
-        if (budgetHealth > 50) {
-          contextualAdvice += `You've spent ${budgetHealth.toFixed(0)}% of available funds this month - consider slowing discretionary spending.`;
-        } else {
-          contextualAdvice += `Good spending pace at ${budgetHealth.toFixed(0)}% of budget used this month.`;
-        }
-      }
-
-      result = { advice: contextualAdvice, actions: suggestedActions };
-
-      result = contextualAdvice;
-    }
-
-    res.json({ 
-      response: result?.advice || result,
-      suggestedActions: result?.actions || [],
-      analytics: {
-        totalBalance: toDollars(totalBalance),
-        totalSpent: totalSpent.toFixed(2),
-        envelopeCount: envelopeContext.length,
-        highestSpending: highestSpendingEnv.name,
-        lowestBalance: lowestBalanceEnv.name,
-        averageBalance: avgBalance.toFixed(0),
-        budgetUtilization: (totalSpentThisMonth / (totalBalance / 100) * 100).toFixed(0) + '%'
-      },
-      isAiFallback: !aiSuccess,
-      confidence: aiSuccess ? 90 : 80, // Higher confidence for data-driven fallbacks
-      processingTime: aiSuccess ? 'AI response' : 'Smart fallback (AI timeout)',
-      recommendations: result?.actions?.length > 0 ? 'Actions available' : 'Informational only'
-    });
-  } catch (error: any) {
-    if (error instanceof z.ZodError) {
-      return res.status(400).json({ error: 'Validation failed', details: error.errors });
-    }
-
-    logger.error({ err: error }, 'Error in AI coach');
-
-    if (error?.code === 'NO_KEY' || error?.code === 'NO_CONFIG') {
-      return res.status(503).json({
-        error: 'AI service not configured',
-        message: 'Please set OPENAI_API_KEY and OPENAI_PROJECT_ID in Replit Secrets',
-        requiredSecrets: ['OPENAI_API_KEY', 'OPENAI_PROJECT_ID']
-      });
-    }
-
-    res.status(500).json({ 
-      error: 'AI service temporarily unavailable',
-      message: 'Please try again in a moment or rephrase your question.'
-    });
-  }
-});
-
-/**
- * Auto-routing explanation - optimized for approval workflow
- */
-router.post('/explain-routing', async (req: any, res) => {
-  try {
-    const { transactionData } = RoutingExplanationRequestSchema.parse(req.body);
-
-    // Get active rules and envelopes for routing decision
-    const [rules, envelopes] = await Promise.all([
-      db.rule.findMany({
-        where: { userId: req.user.id, enabled: true },
-        orderBy: { priority: 'asc' },
-        select: { id: true, priority: true, mcc: true, merchant: true, geofence: true, envelope: { select: { id: true, name: true, icon: true, color: true } } },
-      }),
-      db.envelope.findMany({
-        where: { userId: req.user.id, isActive: true },
-        select: { id: true, name: true, icon: true, color: true },
-        orderBy: { order: 'asc' },
-      }),
-    ]);
-
-    if (envelopes.length === 0) {
-      return res.status(404).json({ error: 'No active envelopes found' });
-    }
-
-    // Find matching rule
-    let matchedRule: any = null;
-    let targetEnvelope: any = null;
-
-    for (const rule of rules) {
-      let matches = true;
-
-      if (rule.mcc && transactionData.mcc && rule.mcc !== transactionData.mcc) {
-        matches = false;
-      }
-
-      if (
-        rule.merchant &&
-        transactionData.merchant &&
-        !transactionData.merchant.toLowerCase().includes(rule.merchant.toLowerCase())
-      ) {
-        matches = false;
-      }
-
-      if (
-        rule.geofence &&
-        transactionData.location &&
-        !transactionData.location.toLowerCase().includes(rule.geofence.toLowerCase())
-      ) {
-        matches = false;
-      }
-
-      if (matches && rule.envelope) {
-        matchedRule = { id: rule.id, priority: rule.priority };
-        targetEnvelope = rule.envelope;
-        break;
-      }
-    }
-
-    if (!targetEnvelope) {
-      // Use 'Misc' envelope as default, or first available
-      targetEnvelope = envelopes.find(e => e.name === 'Misc') || envelopes[0];
-    }
-
-    // Generate concise explanation if AI is available
-    let explanation = `Routed to ${targetEnvelope.name}`;
-
-    if (isAIEnabled()) {
-      try {
-        const result = await chatJSON({
-          system: `Explain why this $${Math.abs(Number(transactionData.amountCents || 0)) / 100} transaction at ${transactionData.merchant || 'Unknown'} was routed to ${targetEnvelope.name}. ${matchedRule ? 'A rule matched.' : 'No rules matched, using default.'} Keep it to 1 sentence. Return JSON only.`,
-          user: 'Explain this routing decision briefly.',
-          schemaName: 'explanationResponse',
-          temperature: 0.1,
-          validate: (obj: any) => {
-            if (obj && typeof obj.explanation === 'string' && obj.explanation.trim()) {
-              return obj;
-            }
-            return { explanation };
-          },
-        });
-        explanation = result.explanation;
-      } catch (aiError) {
-        // Fallback to simple explanation if AI fails
-        explanation = matchedRule 
-          ? `Routed to ${targetEnvelope.name} based on your routing rules`
-          : `Routed to ${targetEnvelope.name} (default category)`;
-      }
-    }
-
-    // Return optimized response for approval workflow
-    res.json({
-      envelope: {
-        id: targetEnvelope.id,
-        name: targetEnvelope.name,
-        icon: targetEnvelope.icon,
-        color: targetEnvelope.color,
-      },
-      rule: matchedRule,
-      explanation,
-      confidence: matchedRule ? 85 : 45, // Higher confidence when rule matched
-      amount: toDollars(Math.abs(Number(transactionData.amountCents || 0))),
-      merchant: transactionData.merchant || 'Unknown Merchant',
-      alternativeEnvelopes: envelopes.filter(e => e.id !== targetEnvelope.id).map(e => ({
-        ...e,
-        availableBalance: toDollars(e.balanceCents || 0)
-      })),
-      canAfford: (targetEnvelope.balanceCents || 0) >= Math.abs(Number(transactionData.amountCents || 0)),
-    });
-  } catch (error: any) {
-    if (error instanceof z.ZodError) {
-      return res.status(400).json({ error: 'Validation failed', details: error.errors });
-    }
-
-    logger.error({ err: error }, 'Error explaining routing');
-    res.status(500).json({ error: 'Failed to process routing explanation' });
-  }
-});
-
-/**
- * AI Agent for onboarding conversations - handles personalized financial coaching
- */
-router.post('/agent-chat', async (req: any, res) => {
-  try {
-    if (!isAIEnabled()) {
-      return res.status(503).json({ 
-        error: 'AI agent not available',
-        message: 'OpenAI configuration required for agent functionality',
-        requiredSecrets: ['OPENAI_API_KEY', 'OPENAI_PROJECT_ID']
-      });
-    }
-
-    const { message, conversationHistory = [], userContext = {}, sessionId } = req.body;
-
-    if (!message || typeof message !== 'string') {
-      return res.status(400).json({ error: 'Message is required for agent conversation' });
-    }
-
-    // Get current user's financial state for context
-    const [envelopes, recentTransactions, userProfile] = await Promise.all([
-      db.envelope.findMany({
-        where: { userId: req.user.id, isActive: true },
-        select: { name: true, balanceCents: true, spentThisMonth: true, icon: true, color: true }
-      }),
-      db.transaction.findMany({
-        where: { userId: req.user.id },
-        take: 20,
-        orderBy: { postedAt: 'desc' },
-        select: { merchant: true, amountCents: true, envelope: { select: { name: true } } }
-      }),
-      db.user.findUnique({
-        where: { id: req.user.id },
-        select: { name: true, email: true, emailVerified: true, phoneVerified: true, kycApproved: true }
-      })
-    ]);
-
-    const financialContext = {
-      user: {
-        name: userProfile?.name || 'User',
-        isNewUser: envelopes.length === 0,
-        verificationStatus: {
-          email: userProfile?.emailVerified || false,
-          phone: userProfile?.phoneVerified || false,
-          kyc: userProfile?.kycApproved || false
-        }
-      },
-      envelopes: envelopes.map(e => ({
-        name: e.name,
-        balance: e.balanceCents / 100,
-        spent: (e.spentThisMonth || 0) / 100,
-        icon: e.icon,
-        color: e.color
-      })),
-      recentActivity: recentTransactions.slice(0, 5).map(t => ({
-        merchant: t.merchant,
-        amount: Math.abs(t.amountCents) / 100,
-        category: t.envelope?.name || 'Uncategorized'
-      })),
-      totalBalance: envelopes.reduce((sum, e) => sum + e.balanceCents, 0) / 100,
-      ...userContext
-    };
-
-    const agentSystemPrompt = `You are Emma, an expert financial AI agent specializing in envelope budgeting and personal finance. You're helping users set up and manage their budgeting system through conversational onboarding.
-
-CURRENT USER CONTEXT:
-${JSON.stringify(financialContext, null, 2)}
-
-YOUR ROLE AS AN AGENT:
-1. **Conversational Onboarding**: Guide new users through envelope setup with natural conversation
-2. **Financial Analysis**: Analyze spending patterns and provide personalized insights
-3. **Action Planning**: Suggest specific actions (create envelopes, transfer funds, adjust budgets)
-4. **Continuous Learning**: Remember user preferences and adapt recommendations
-
-CONVERSATION GUIDELINES:
-- Be warm, encouraging, and personable (you're Emma, their financial coach)
-- Ask follow-up questions to understand their financial goals and habits
-- For new users: focus on gathering income, expenses, and financial priorities
-- For existing users: analyze current patterns and suggest optimizations
-- Always provide specific, actionable recommendations with dollar amounts
-- Reference their actual financial data when making suggestions
-
-AVAILABLE ACTIONS YOU CAN SUGGEST:
-- Create envelope with specific budget allocation
-- Transfer money between envelopes
-- Set up automatic rules for transaction routing
-- Adjust budget allocations based on spending patterns
-
-CONVERSATION FLOW FOR NEW USERS:
-1. Welcome and understand their financial situation
-2. Gather monthly income and fixed expenses
-3. Understand spending priorities and problem areas
-4. Suggest personalized envelope structure
-5. Help them take first steps with specific actions
-
-Be conversational and natural - you're having a real conversation, not just answering questions.`;
-
-    try {
-      const agentResponse = await createAgentResponse(
-        agentSystemPrompt,
-        message,
-        conversationHistory,
-        {
-          temperature: 0.4, // More natural conversation
-          maxTokens: 2000,
-          useAdvancedModel: false // Start with primary model, can escalate if needed
-        }
-      );
-
-      // Analyze response for suggested actions
-      const suggestedActions = [];
-      const responseWords = agentResponse.toLowerCase();
-      
-      // Simple action detection - could be enhanced with more sophisticated NLP
-      if (responseWords.includes('create') && responseWords.includes('envelope')) {
-        suggestedActions.push({
-          type: 'create_envelope',
-          description: 'Set up personalized envelope system',
-          confidence: 0.8
-        });
-      }
-      if (responseWords.includes('transfer') && responseWords.includes('money')) {
-        suggestedActions.push({
-          type: 'transfer_funds',
-          description: 'Optimize envelope allocations',
-          confidence: 0.7
-        });
-      }
-
-      logger.info({
-        userId: req.user.id,
-        sessionId,
-        messageLength: message.length,
-        responseLength: agentResponse.length,
-        actionsDetected: suggestedActions.length
-      }, 'Agent conversation completed');
-
-      res.json({
-        response: agentResponse,
-        suggestedActions,
-        conversationId: sessionId || `conv_${Date.now()}`,
-        userContext: financialContext,
-        agentCapabilities: [
-          'envelope_creation',
-          'budget_analysis', 
-          'fund_transfers',
-          'spending_insights',
-          'financial_planning'
-        ],
-        nextSteps: financialContext.user.isNewUser 
-          ? ['gather_income', 'understand_expenses', 'create_envelopes']
-          : ['analyze_spending', 'optimize_allocations', 'set_goals']
-      });
-
-    } catch (agentError: any) {
-      logger.error({
-        error: agentError.message,
-        status: agentError.status,
-        userId: req.user.id,
-        sessionId
-      }, 'Agent conversation failed');
-
-      // Fallback response for agent failures
-      const fallbackResponse = financialContext.user.isNewUser
-        ? `Hi ${financialContext.user.name}! I'm Emma, your financial coach. I'm here to help you set up a personalized envelope budgeting system. To get started, could you tell me about your monthly income and main expenses? This will help me create the perfect budget structure for you.`
-        : `Hi ${financialContext.user.name}! I can see you have $${financialContext.totalBalance.toFixed(2)} across ${financialContext.envelopes.length} envelopes. What would you like to work on with your budget today?`;
-
-      res.json({
-        response: fallbackResponse,
-        isFailsafe: true,
-        suggestedActions: [],
-        error: 'Agent temporarily unavailable, using basic response'
-      });
-    }
-
-  } catch (error: any) {
-    logger.error({ err: error, userId: req.user?.id }, 'Agent chat endpoint error');
-    res.status(500).json({ 
-      error: 'Agent conversation failed',
-      message: 'Please try again or contact support'
-    });
-  }
-});
-
-/**
- * AI-powered envelope setup for new users
- */
-router.post('/setup-envelopes', async (req: any, res) => {
-  try {
-    if (!isAIEnabled()) {
-      return res.status(503).json({ error: 'AI service not available' });
-    }
-
-    const { totalBudget, goals, lifestyle } = req.body;
-
-    if (!totalBudget || totalBudget <= 0) {
-      return res.status(400).json({ error: 'Valid total budget required' });
-    }
-
-    // Check current envelope count
-    const existingCount = await db.envelope.count({ where: { userId: req.user.id } });
-    if (existingCount >= 8) {
-      return res.status(400).json({ error: 'Maximum 8 envelopes allowed' });
-    }
-
-    const systemPrompt = `You are a financial advisor setting up envelope budgets. The user has $${totalBudget} to allocate across envelopes.
-
-USER PROFILE:
-- Total Budget: $${totalBudget}
-- Goals: ${goals || 'Not specified'}
-- Lifestyle: ${lifestyle || 'Not specified'}
-- Current Envelopes: ${existingCount}
-- Max Envelopes: 8
-
-Create an optimal envelope structure. Consider:
-1. Essential categories (housing, utilities, groceries, transportation)
-2. Lifestyle categories (dining, entertainment)
-3. Savings/emergency fund
-4. User's specific goals
-
-Return JSON with "envelopes" array, each containing:
-- "name": clear category name
-- "percentage": % of total budget (all must sum to 100)
-- "description": why this amount/category
-- "icon": one of [cart, utensils, home, car, fuel, shield, heart, bank, gift, phone]
-- "color": one of [blue, green, amber, red, purple, teal, pink, gray]
-
-Also include "rationale" explaining the allocation strategy.`;
-
-    const result = await chatJSON({
-      system: systemPrompt,
-      user: `Set up my envelopes with $${totalBudget} budget. Goals: ${goals || 'general budgeting'}. Lifestyle: ${lifestyle || 'moderate'}`,
-      schemaName: 'envelopeSetup',
-      temperature: 0.3,
-      validate: (obj: any) => {
-        if (obj?.envelopes && Array.isArray(obj.envelopes) && obj.envelopes.length > 0) {
-          const totalPercentage = obj.envelopes.reduce((sum: number, env: any) => sum + (env.percentage || 0), 0);
-          if (Math.abs(totalPercentage - 100) < 5) { // Allow 5% tolerance
-            return obj;
-          }
-        }
-
-        // Fallback envelope structure
-        return {
-          envelopes: [
-            { name: 'Groceries', percentage: 25, description: 'Food and household essentials', icon: 'cart', color: 'green' },
-            { name: 'Bills', percentage: 30, description: 'Utilities and fixed expenses', icon: 'home', color: 'blue' },
-            { name: 'Dining', percentage: 15, description: 'Restaurants and takeout', icon: 'utensils', color: 'amber' },
-            { name: 'Gas', percentage: 10, description: 'Transportation fuel', icon: 'fuel', color: 'teal' },
-            { name: 'Emergency', percentage: 20, description: 'Emergency savings buffer', icon: 'shield', color: 'red' }
-          ],
-          rationale: 'Balanced allocation focusing on essentials with emergency savings'
-        };
-      },
-    });
-
-    res.json({
-      proposedEnvelopes: result.envelopes.map((env: any) => ({
-        ...env,
-        allocatedAmount: Math.round((totalBudget * env.percentage) / 100 * 100) / 100
-      })),
-      rationale: result.rationale,
-      totalBudget,
-      needsApproval: true
-    });
-  } catch (error: any) {
-    logger.error({ err: error }, 'Error in AI envelope setup');
-    res.status(500).json({ error: 'Failed to generate envelope setup' });
-  }
-});
-
-/**
- * Execute AI-suggested actions (transfers, envelope creation)
- */
-router.post('/execute-action', async (req: any, res) => {
-  try {
-    const { actionType, params, approved } = req.body;
-
-    if (!approved) {
-      return res.status(400).json({ error: 'Action not approved' });
-    }
-
-    switch (actionType) {
-      case 'transfer': {
-        const { fromEnvelope, toEnvelope, amount } = params;
-        const amountCents = Math.round(amount * 100);
-
-        const [fromEnv, toEnv] = await Promise.all([
-          db.envelope.findFirst({ where: { userId: req.user.id, name: fromEnvelope } }),
-          db.envelope.findFirst({ where: { userId: req.user.id, name: toEnvelope } })
-        ]);
-
-        if (!fromEnv || !toEnv) {
-          return res.status(404).json({ error: 'Envelope not found' });
-        }
-
-        if (fromEnv.balanceCents < amountCents) {
-          return res.status(400).json({ error: 'Insufficient funds' });
-        }
-
-        const transfer = await db.$transaction(async (tx) => {
-          await tx.envelope.update({
-            where: { id: fromEnv.id },
-            data: { balanceCents: { decrement: amountCents } }
-          });
-
-          await tx.envelope.update({
-            where: { id: toEnv.id },
-            data: { balanceCents: { increment: amountCents } }
-          });
-
-          return tx.transfer.create({
-            data: {
-              userId: req.user.id,
-              fromId: fromEnv.id,
-              toId: toEnv.id,
-              amountCents,
-              note: `AI Coach suggestion: Move $${amount} from ${fromEnvelope} to ${toEnvelope}`
-            }
-          });
-        });
-
-        res.json({ success: true, transfer, message: `Transferred $${amount} from ${fromEnvelope} to ${toEnvelope}` });
-        break;
-      }
-
-      case 'create_envelope': {
-        const { name, initialAmount, icon, color } = params;
-        const amountCents = Math.round((initialAmount || 0) * 100);
-
-        const envelopeCount = await db.envelope.count({ where: { userId: req.user.id } });
-        if (envelopeCount >= 8) {
-          return res.status(400).json({ error: 'Maximum 8 envelopes allowed' });
-        }
-
-        const envelope = await db.envelope.create({
-          data: {
-            userId: req.user.id,
-            name,
-            balanceCents: amountCents,
-            icon: icon || 'dots',
-            color: color || 'gray',
-            order: envelopeCount + 1
-          }
-        });
-
-        res.json({ success: true, envelope, message: `Created ${name} envelope with $${initialAmount || 0}` });
-        break;
-      }
-
-      case 'create_envelopes_batch': {
-        const { envelopes, totalBudget } = params;
-        const envelopeCount = await db.envelope.count({ where: { userId: req.user.id } });
-
-        if (envelopeCount + envelopes.length > 8) {
-          return res.status(400).json({ error: 'Would exceed maximum 8 envelopes' });
-        }
-
-        const created = await db.$transaction(async (tx) => {
-          const results = [];
-          for (let i = 0; i < envelopes.length; i++) {
-            const env = envelopes[i];
-            const allocatedAmount = Math.round((totalBudget * env.percentage) / 100 * 100);
-
-            const envelope = await tx.envelope.create({
-              data: {
-                userId: req.user.id,
-                name: env.name,
-                balanceCents: allocatedAmount,
-                icon: env.icon || 'dots',
-                color: env.color || 'gray',
-                order: envelopeCount + i + 1
-              }
-            });
-            results.push(envelope);
-          }
-          return results;
-        });
-
-        res.json({ 
-          success: true, 
-          envelopes: created, 
-          message: `Created ${created.length} envelopes with total budget $${totalBudget}` 
-        });
-        break;
-      }
-
-      default:
-        res.status(400).json({ error: 'Unknown action type' });
-    }
-  } catch (error: any) {
-    logger.error({ err: error }, 'Error executing AI action');
-    res.status(500).json({ error: 'Failed to execute action' });
-  }
-});
-
-/**
- * Get pending transactions for approval workflow
- */
-router.get('/pending-approvals', async (req: any, res) => {
-  try {
-    const pendingTransactions = await db.transaction.findMany({
-      where: { 
-        userId: req.user.id, 
-        status: 'PENDING' 
-      },
-      include: {
-        envelope: { select: { id: true, name: true, icon: true, color: true } }
-      },
-      orderBy: { createdAt: 'desc' },
-      take: 10
-    });
-
-    // Get alternative envelopes for each transaction
-    const allEnvelopes = await db.envelope.findMany({
-      where: { userId: req.user.id, isActive: true },
-      select: { id: true, name: true, icon: true, color: true, balanceCents: true }
-    });
-
-    const pendingWithAlternatives = pendingTransactions.map(tx => ({
-      ...tx,
-      amount: toDollars(Math.abs(tx.amountCents)),
-      assignedEnvelope: tx.envelope,
-      alternativeEnvelopes: allEnvelopes.filter(env => env.id !== tx.envelopeId)
-    }));
-
-    res.json({ pendingTransactions: pendingWithAlternatives });
-  } catch (error: any) {
-    logger.error({ err: error }, 'Error fetching pending approvals');
-    res.status(500).json({ error: 'Failed to fetch pending transactions' });
-  }
-});
-
-/**
- * Approve or reassign pending transaction
- */
-router.post('/approve-transaction/:id', async (req: any, res) => {
-  try {
-    const transactionId = parseInt(req.params.id);
-    const { approved, newEnvelopeId } = req.body;
-
-    const transaction = await db.transaction.findFirst({
-      where: { id: transactionId, userId: req.user.id, status: 'PENDING' },
-      include: { envelope: true }
-    });
-
-    if (!transaction) {
-      return res.status(404).json({ error: 'Pending transaction not found' });
-    }
-
-    const targetEnvelopeId = approved ? transaction.envelopeId : newEnvelopeId;
-
-    if (!targetEnvelopeId) {
-      return res.status(400).json({ error: 'Target envelope required' });
-    }
-
-    const updatedTransaction = await db.$transaction(async (tx) => {
-      // Update transaction status and envelope if reassigned
-      const updated = await tx.transaction.update({
-        where: { id: transactionId },
-        data: { 
-          status: 'SETTLED',
-          envelopeId: targetEnvelopeId,
-          reason: approved ? transaction.reason : 'User reassigned category'
-        },
-        include: { envelope: { select: { id: true, name: true, icon: true, color: true } } }
-      });
-
-      // Deduct from envelope balance
-      await tx.envelope.update({
-        where: { id: targetEnvelopeId },
-        data: { 
-          balanceCents: { decrement: Math.abs(transaction.amountCents) },
-          spentThisMonth: { increment: Math.abs(transaction.amountCents) }
-        }
-      });
-
-      return updated;
-    });
-
-    res.json({ 
-      success: true, 
-      transaction: updatedTransaction,
-      message: approved ? 'Transaction approved' : 'Transaction reassigned and approved'
-    });
-  } catch (error: any) {
-    logger.error({ err: error }, 'Error approving transaction');
-    res.status(500).json({ error: 'Failed to approve transaction' });
-  }
-});
-
-// MCP-specific endpoints with service account authentication
-const mcpRouter = Router();
-
-// GET /api/mcp/envelopes - Get user envelopes for MCP
-mcpRouter.get('/envelopes', authenticateServiceAccount, async (req: any, res) => {
-  try {
-    const hasReadPermission = req.serviceAccount.permissions.includes('mcp:read') || 
-                              req.serviceAccount.permissions.includes('api:read');
-    if (!hasReadPermission) {
-      return res.status(403).json({ error: 'Insufficient permissions' });
-    }
-
+    // Get user's envelopes
     const envelopes = await db.envelope.findMany({
-      where: { userId: req.user.id, isActive: true },
+      where: { userId },
       select: {
         id: true,
         name: true,
-        icon: true,
-        color: true,
-        balanceCents: true,
-        spentThisMonth: true,
-        order: true,
-      },
-      orderBy: { order: 'asc' }
-    });
-
-    // Map to expected MCP format with correct field names
-    const mappedEnvelopes = envelopes.map(env => ({
-      id: env.id,
-      name: env.name,
-      icon: env.icon,
-      color: env.color,
-      balanceCents: env.balanceCents,
-      spentThisMonth: env.spentThisMonth,
-      order: env.order,
-      // Add computed fields for MCP compatibility
-      currentAmountCents: env.balanceCents,
-      budgetAmountCents: env.balanceCents + (env.spentThisMonth || 0)
-    }));
-
-    res.json({ envelopes: mappedEnvelopes });
-  } catch (error) {
-    logger.error(error, 'MCP envelopes fetch error');
-    res.status(500).json({ error: 'Failed to fetch envelopes' });
-  }
-});
-
-// GET /api/mcp/transactions - Get recent transactions for MCP
-mcpRouter.get('/transactions', authenticateServiceAccount, async (req: any, res) => {
-  try {
-    const hasReadPermission = req.serviceAccount.permissions.includes('mcp:read') || 
-                              req.serviceAccount.permissions.includes('api:read');
-    if (!hasReadPermission) {
-      return res.status(403).json({ error: 'Insufficient permissions' });
-    }
-
-    const limit = Math.min(parseInt(req.query.limit as string) || 50, 200);
-    
-    const transactions = await db.transaction.findMany({
-      where: { userId: req.user.id },
-      include: {
-        envelope: {
-          select: { name: true, icon: true, color: true }
-        }
-      },
-      orderBy: { postedAt: 'desc' },
-      take: limit
-    });
-
-    res.json({ transactions });
-  } catch (error) {
-    logger.error(error, 'MCP transactions fetch error');
-    res.status(500).json({ error: 'Failed to fetch transactions' });
-  }
-});
-
-// POST /api/mcp/chat - MCP chat endpoint
-mcpRouter.post('/chat', authenticateServiceAccount, async (req: any, res) => {
-  try {
-    const hasReadPermission = req.serviceAccount.permissions.includes('mcp:read') || 
-                              req.serviceAccount.permissions.includes('api:read');
-    if (!hasReadPermission) {
-      return res.status(403).json({ error: 'Insufficient permissions' });
-    }
-
-    // Validate request body
-    const validationResult = z.object({
-      message: z.string().min(1, 'Message is required'),
-    }).safeParse(req.body);
-
-    if (!validationResult.success) {
-      return res.status(400).json({ 
-        error: 'Validation failed', 
-        details: validationResult.error.errors 
-      });
-    }
-
-    const { message } = validationResult.data;
-
-    // Get user context for AI with correct field names
-    const [envelopes, recentTransactions] = await Promise.all([
-      db.envelope.findMany({
-        where: { userId: req.user.id, isActive: true },
-        select: { 
-          name: true, 
-          balanceCents: true, 
-          spentThisMonth: true 
-        }
-      }),
-      db.transaction.findMany({
-        where: { userId: req.user.id },
-        take: 20,
-        orderBy: { postedAt: 'desc' },
-        select: { 
-          merchant: true, 
-          amountCents: true, 
-          envelope: { select: { name: true } } 
-        }
-      })
-    ]);
-
-    const context = {
-      envelopes: envelopes.map(e => ({
-        name: e.name,
-        balance: e.balanceCents,
-        budget: e.balanceCents + (e.spentThisMonth || 0),
-        spent: e.spentThisMonth
-      })),
-      recentTransactions: recentTransactions.map(t => ({
-        merchant: t.merchant,
-        amount: t.amountCents,
-        envelope: t.envelope?.name
-      }))
-    };
-
-    let aiResponse;
-    let aiSuccess = false;
-    
-    try {
-      // Try with the primary model first
-      const response = await chatJSON({
-        system: `You are a financial AI assistant. The user has the following financial context: ${JSON.stringify(context)}. Provide helpful financial insights and advice based on their envelopes and spending patterns. Keep responses conversational and helpful.`,
-        user: message,
-        schemaName: "chatResponse",
-        model: MODELS.primary,
-        temperature: 0.3,
-        validate: (obj: any) => {
-          if (obj && typeof obj === 'object') {
-            // Handle both wrapped and unwrapped responses
-            let response;
-            
-            if (obj.chatResponse) {
-              // Wrapped in schema name
-              const wrapped = obj.chatResponse;
-              response = wrapped.response || wrapped.message || wrapped.reply || wrapped.answer || wrapped.advice;
-            } else {
-              // Direct response object
-              response = obj.response || obj.message || obj.reply || obj.answer || obj.advice;
-            }
-            
-            if (typeof response === 'string' && response.trim()) {
-              return { response: response.trim() };
-            }
-            
-            // If we can't find a proper response field, try to extract any string value
-            const values = Object.values(obj);
-            const stringValue = values.find(v => typeof v === 'string' && v.trim());
-            if (stringValue) {
-              return { response: stringValue.trim() };
-            }
-          }
-          throw new Error('Invalid AI response format - no valid response field found');
-        }
-      });
-      aiResponse = response.response;
-      aiSuccess = true;
-      
-      logger.info({ 
-        userId: req.user.id,
-        model: MODELS.primary,
-        responseLength: aiResponse.length 
-      }, 'MCP AI response successful');
-      
-    } catch (aiError: any) {
-      logger.warn({ 
-        err: aiError.message, 
-        status: aiError.status,
-        model: MODELS.primary,
-        message: message.substring(0, 100) 
-      }, 'MCP AI chat failed, using smart fallback');
-      
-      // Enhanced contextual fallback based on user's actual data
-      const totalBalance = context.envelopes.reduce((sum, env) => sum + env.balance, 0);
-      const topEnvelope = context.envelopes.length > 0 
-        ? context.envelopes.reduce((max, env) => env.balance > max.balance ? env : max)
-        : null;
-      
-      const messageLower = message.toLowerCase();
-      
-      if (messageLower.includes('budget') || messageLower.includes('envelope')) {
-        aiResponse = `I can see you have ${context.envelopes.length} envelopes with a total of $${totalBalance.toFixed(2)}. ${topEnvelope ? `Your largest envelope is ${topEnvelope.name} with $${topEnvelope.balance.toFixed(2)}.` : ''} What would you like to know about your budget?`;
-      } else if (messageLower.includes('spend') || messageLower.includes('money')) {
-        aiResponse = `Looking at your spending patterns across ${context.envelopes.length} envelopes, I can help you analyze where your money is going. What specific spending category are you curious about?`;
-      } else if (messageLower.includes('save') || messageLower.includes('goal')) {
-        aiResponse = `With your current $${totalBalance.toFixed(2)} across envelopes, I can help you set up a savings strategy. What are your financial goals?`;
-      } else {
-        aiResponse = `I'm here to help with your budget! You have ${context.envelopes.length} envelopes totaling $${totalBalance.toFixed(2)}. I can help with spending analysis, budget adjustments, or financial planning. What would you like to explore?`;
+        balance: true,
+        targetAmount: true,
+        category: true,
       }
-    }
+    });
+
+    // Get recent transactions
+    const transactions = await db.transaction.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+      select: {
+        id: true,
+        amount: true,
+        description: true,
+        category: true,
+        createdAt: true,
+      }
+    });
+
+    // Get user's financial goals
+    const goals = await db.goal.findMany({
+      where: { userId },
+      select: {
+        id: true,
+        description: true,
+        targetAmount: true,
+        currentAmount: true,
+        targetDate: true,
+      }
+    });
+
+    // Calculate totals
+    const totalIncome = transactions
+      .filter(t => t.amount > 0)
+      .reduce((sum, t) => sum + t.amount, 0);
+
+    const totalExpenses = transactions
+      .filter(t => t.amount < 0)
+      .reduce((sum, t) => sum + Math.abs(t.amount), 0);
+
+    return {
+      userId,
+      totalIncome,
+      totalExpenses,
+      envelopes: envelopes.map(e => ({
+        id: e.id,
+        name: e.name,
+        balance: e.balance,
+        target: e.targetAmount || 0,
+        category: e.category || 'general',
+      })),
+      transactions: transactions.map(t => ({
+        id: t.id,
+        amount: t.amount,
+        description: t.description,
+        category: t.category || 'uncategorized',
+        date: t.createdAt.toISOString(),
+      })),
+      goals: goals.map(g => ({
+        id: g.id,
+        description: g.description,
+        targetAmount: g.targetAmount,
+        currentAmount: g.currentAmount || 0,
+        deadline: g.targetDate?.toISOString(),
+      })),
+    };
+  } catch (error) {
+    logger.error({ error, userId }, 'Failed to build financial context');
+    return { userId };
+  }
+}
+
+// POST /api/ai/chat - Main chat endpoint for agent interactions
+router.post('/chat', auth, async (req, res) => {
+  try {
+    const { message, agentName, sessionId, context } = AgentChatSchema.parse(req.body);
+    const userId = req.user!.id;
 
     logger.info({ 
-      userId: req.user.id,
-      serviceAccountId: req.serviceAccount.id,
-      model: MODELS.primary,
-      messageLength: message.length,
-      aiSuccess 
-    }, 'MCP chat request processed');
+      userId, 
+      agentName, 
+      sessionId,
+      messageLength: message.length 
+    }, 'Processing agent chat request');
 
-    res.json({ 
-      response: aiResponse,
-      success: true,
-      aiEnabled: aiSuccess,
-      fallback: !aiSuccess,
-      envelopeCount: context.envelopes.length,
-      totalBalance: context.envelopes.reduce((sum, env) => sum + env.balance, 0).toFixed(2)
+    // Build financial context
+    const financialContext = await buildFinancialContext(userId);
+
+    // Route to appropriate agent or use default routing
+    const targetAgent = agentName ? 
+      agentRegistry.getAgent(agentName) : 
+      agentRegistry.routeToAgent(message);
+
+    if (!targetAgent) {
+      return res.status(400).json({
+        ok: false,
+        error: 'Agent not available',
+        code: 'AGENT_UNAVAILABLE'
+      });
+    }
+
+    // Get conversation history if requested
+    let conversationHistory: any[] = [];
+    if (context?.includeHistory && sessionId) {
+      // Retrieve conversation history from database or session store
+      const historyRecords = await db.conversation.findMany({
+        where: { userId, sessionId },
+        orderBy: { createdAt: 'desc' },
+        take: context.maxHistory || 10,
+        select: {
+          role: true,
+          content: true,
+          createdAt: true,
+        }
+      });
+
+      conversationHistory = historyRecords.reverse().map(h => ({
+        role: h.role,
+        content: h.content,
+        timestamp: h.createdAt.toISOString(),
+      }));
+    }
+
+    // Run the agent with the user message
+    const agentResponse = await agentRegistry.runAgent(
+      agentName || 'financial_advisor',
+      message,
+      {
+        ...financialContext,
+        sessionId: sessionId || `session_${Date.now()}`,
+        timestamp: new Date(),
+        previousInteractions: conversationHistory,
+      }
+    );
+
+    // Save conversation history
+    if (sessionId) {
+      await db.conversation.createMany({
+        data: [
+          {
+            userId,
+            sessionId,
+            role: 'user',
+            content: message,
+            agentName: agentName || 'financial_advisor',
+          },
+          {
+            userId,
+            sessionId,
+            role: 'assistant',
+            content: agentResponse,
+            agentName: agentName || 'financial_advisor',
+          }
+        ]
+      });
+    }
+
+    res.json({
+      ok: true,
+      response: agentResponse,
+      agentName: agentName || 'financial_advisor',
+      sessionId: sessionId || `session_${Date.now()}`,
+      timestamp: new Date().toISOString(),
     });
+
   } catch (error: any) {
-    logger.error({ 
-      error: error.message, 
-      stack: error.stack,
-      userId: req.user?.id,
-      serviceAccountId: req.serviceAccount?.id 
-    }, 'MCP chat error');
+    logger.error({ error, userId: req.user?.id }, 'Agent chat failed');
     
-    if (error.name === 'PrismaClientValidationError') {
-      return res.status(400).json({ 
-        error: 'Database validation error', 
-        message: 'Invalid data format in request' 
+    if (error.name === 'ZodError') {
+      return res.status(400).json({
+        ok: false,
+        error: 'Invalid request format',
+        details: error.errors,
+        code: 'VALIDATION_ERROR'
       });
     }
-    
-    if (error instanceof z.ZodError) {
-      return res.status(400).json({ 
-        error: 'Request validation failed', 
-        details: error.errors 
-      });
-    }
-    
-    res.status(500).json({ 
+
+    res.status(500).json({
+      ok: false,
       error: 'Failed to process chat request',
-      message: 'Please try again or contact support if the issue persists'
+      code: 'AGENT_ERROR'
     });
   }
 });
 
-router.use('/mcp', mcpRouter);
+// POST /api/ai/tools/execute - Direct tool execution endpoint
+router.post('/tools/execute', auth, async (req, res) => {
+  try {
+    const { toolName, parameters, agentContext } = ToolExecutionSchema.parse(req.body);
+    const userId = req.user!.id;
+
+    logger.info({ 
+      userId, 
+      toolName, 
+      agentName: agentContext?.agentName 
+    }, 'Executing tool directly');
+
+    // Build execution context
+    const financialContext = await buildFinancialContext(userId);
+    const executionContext = {
+      userId,
+      sessionId: agentContext?.sessionId || `direct_${Date.now()}`,
+      agentName: agentContext?.agentName || 'direct_execution',
+      timestamp: new Date(),
+      userProfile: {
+        id: userId,
+        name: req.user!.name || undefined,
+        email: req.user!.email || undefined,
+      },
+    };
+
+    // Execute the tool
+    const result = await toolRegistry.executeTool(
+      toolName,
+      { ...parameters, userId },
+      { ...financialContext, ...executionContext }
+    );
+
+    res.json({
+      ok: true,
+      toolName,
+      result: result.result,
+      success: result.success,
+      duration: result.duration,
+      timestamp: result.timestamp,
+      error: result.error,
+    });
+
+  } catch (error: any) {
+    logger.error({ error, userId: req.user?.id }, 'Tool execution failed');
+    
+    if (error.name === 'ZodError') {
+      return res.status(400).json({
+        ok: false,
+        error: 'Invalid tool execution request',
+        details: error.errors,
+        code: 'VALIDATION_ERROR'
+      });
+    }
+
+    res.status(500).json({
+      ok: false,
+      error: 'Failed to execute tool',
+      code: 'TOOL_EXECUTION_ERROR'
+    });
+  }
+});
+
+// POST /api/ai/handoff - Agent handoff endpoint
+router.post('/handoff', auth, async (req, res) => {
+  try {
+    const { fromAgent, toAgent, message, reason, context, priority } = AgentHandoffSchema.parse(req.body);
+    const userId = req.user!.id;
+
+    logger.info({ 
+      userId, 
+      fromAgent, 
+      toAgent, 
+      reason,
+      priority 
+    }, 'Processing agent handoff');
+
+    // Verify both agents exist
+    const sourceAgent = agentRegistry.getAgent(fromAgent);
+    const targetAgent = agentRegistry.getAgent(toAgent);
+
+    if (!sourceAgent || !targetAgent) {
+      return res.status(400).json({
+        ok: false,
+        error: 'Invalid agent names for handoff',
+        code: 'INVALID_AGENTS'
+      });
+    }
+
+    // Build financial context
+    const financialContext = await buildFinancialContext(userId);
+
+    // Execute handoff using the handoff tool
+    const handoffResult = await toolRegistry.executeTool(
+      'agent_handoff',
+      {
+        fromAgent,
+        toAgent,
+        reason,
+        context: context || {},
+        priority,
+        userMessage: message,
+      },
+      {
+        ...financialContext,
+        userId,
+        sessionId: `handoff_${Date.now()}`,
+        agentName: fromAgent,
+        timestamp: new Date(),
+      }
+    );
+
+    if (!handoffResult.success) {
+      return res.status(500).json({
+        ok: false,
+        error: 'Handoff failed',
+        details: handoffResult.error,
+        code: 'HANDOFF_ERROR'
+      });
+    }
+
+    // Run the target agent with the handoff message
+    const agentResponse = await agentRegistry.runAgent(
+      toAgent,
+      message,
+      {
+        ...financialContext,
+        sessionId: `handoff_${Date.now()}`,
+        timestamp: new Date(),
+        previousInteractions: [{
+          role: 'system',
+          content: `Handoff from ${fromAgent}: ${reason}`,
+          timestamp: new Date().toISOString(),
+        }],
+      }
+    );
+
+    res.json({
+      ok: true,
+      handoffCompleted: true,
+      fromAgent,
+      toAgent,
+      response: agentResponse,
+      handoffReason: reason,
+      timestamp: new Date().toISOString(),
+    });
+
+  } catch (error: any) {
+    logger.error({ error, userId: req.user?.id }, 'Agent handoff failed');
+    
+    if (error.name === 'ZodError') {
+      return res.status(400).json({
+        ok: false,
+        error: 'Invalid handoff request',
+        details: error.errors,
+        code: 'VALIDATION_ERROR'
+      });
+    }
+
+    res.status(500).json({
+      ok: false,
+      error: 'Failed to process handoff',
+      code: 'HANDOFF_ERROR'
+    });
+  }
+});
+
+// GET /api/ai/agents - List available agents and their capabilities
+router.get('/agents', auth, async (req, res) => {
+  try {
+    const userId = req.user!.id;
+    
+    logger.info({ userId }, 'Fetching available agents');
+
+    const agentMetrics = agentRegistry.getAgentMetrics();
+    const agentNames = Array.from(agentRegistry.getAgentNames());
+
+    const agents = agentNames.map(name => ({
+      name,
+      displayName: name.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()),
+      capabilities: agentRegistry.getAgentCapabilities(name),
+      isAvailable: agentMetrics[name]?.isAvailable || false,
+      toolCount: agentMetrics[name]?.toolCount || 0,
+    }));
+
+    res.json({
+      ok: true,
+      agents,
+      totalAgents: agents.length,
+      defaultAgent: 'financial_advisor',
+    });
+
+  } catch (error: any) {
+    logger.error({ error, userId: req.user?.id }, 'Failed to fetch agents');
+    
+    res.status(500).json({
+      ok: false,
+      error: 'Failed to fetch available agents',
+      code: 'AGENT_FETCH_ERROR'
+    });
+  }
+});
+
+// GET /api/ai/tools - List available tools
+router.get('/tools', auth, async (req, res) => {
+  try {
+    const userId = req.user!.id;
+    const { category } = req.query;
+    
+    logger.info({ userId, category }, 'Fetching available tools');
+
+    const allTools = toolRegistry.getAllTools();
+    const toolMetrics = toolRegistry.getToolMetrics();
+
+    let tools = Object.entries(allTools).map(([name, tool]) => ({
+      name,
+      description: tool.description || 'No description available',
+      category: tool.category,
+      riskLevel: tool.riskLevel || 'low',
+      requiresAuth: tool.requiresAuth || false,
+      estimatedDuration: tool.estimatedDuration || 1000,
+      metrics: toolRegistry.getToolMetrics(name),
+    }));
+
+    // Filter by category if specified
+    if (category && typeof category === 'string') {
+      tools = tools.filter(tool => tool.category === category);
+    }
+
+    const categories = [...new Set(tools.map(t => t.category))];
+
+    res.json({
+      ok: true,
+      tools,
+      categories,
+      totalTools: tools.length,
+      overallMetrics: toolMetrics,
+    });
+
+  } catch (error: any) {
+    logger.error({ error, userId: req.user?.id }, 'Failed to fetch tools');
+    
+    res.status(500).json({
+      ok: false,
+      error: 'Failed to fetch available tools',
+      code: 'TOOL_FETCH_ERROR'
+    });
+  }
+});
+
+// GET /api/ai/sessions/:sessionId/history - Get conversation history
+router.get('/sessions/:sessionId/history', auth, async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+    const userId = req.user!.id;
+    const { limit = '20', offset = '0' } = req.query;
+
+    logger.info({ userId, sessionId }, 'Fetching conversation history');
+
+    const history = await db.conversation.findMany({
+      where: { userId, sessionId },
+      orderBy: { createdAt: 'desc' },
+      skip: parseInt(offset as string),
+      take: parseInt(limit as string),
+      select: {
+        id: true,
+        role: true,
+        content: true,
+        agentName: true,
+        createdAt: true,
+      }
+    });
+
+    const totalCount = await db.conversation.count({
+      where: { userId, sessionId }
+    });
+
+    res.json({
+      ok: true,
+      history: history.reverse(), // Return in chronological order
+      pagination: {
+        total: totalCount,
+        limit: parseInt(limit as string),
+        offset: parseInt(offset as string),
+        hasMore: totalCount > parseInt(offset as string) + parseInt(limit as string)
+      },
+      sessionId,
+    });
+
+  } catch (error: any) {
+    logger.error({ error, userId: req.user?.id }, 'Failed to fetch conversation history');
+    
+    res.status(500).json({
+      ok: false,
+      error: 'Failed to fetch conversation history',
+      code: 'HISTORY_FETCH_ERROR'
+    });
+  }
+});
+
+// GET /api/ai/status - System status and health check
+router.get('/status', auth, async (req, res) => {
+  try {
+    const userId = req.user!.id;
+    
+    logger.info({ userId }, 'Checking AI system status');
+
+    // Check agent registry status
+    const agentStatus = {
+      initialized: agentRegistry.isInitialized(),
+      agentCount: agentRegistry.getAllAgents().length,
+      availableAgents: Array.from(agentRegistry.getAgentNames()),
+    };
+
+    // Check tool registry status
+    const toolStatus = {
+      toolCount: toolRegistry.getToolCount(),
+      recentExecutions: toolRegistry.getExecutionHistory(5),
+      overallMetrics: toolRegistry.getToolMetrics(),
+    };
+
+    // Check agent manager status
+    const managerStatus = {
+      initialized: agentManager.isInitialized(),
+      registryReady: agentManager.isRegistryReady(),
+    };
+
+    res.json({
+      ok: true,
+      status: 'operational',
+      agents: agentStatus,
+      tools: toolStatus,
+      manager: managerStatus,
+      timestamp: new Date().toISOString(),
+    });
+
+  } catch (error: any) {
+    logger.error({ error, userId: req.user?.id }, 'Failed to get AI system status');
+    
+    res.status(500).json({
+      ok: false,
+      error: 'Failed to check system status',
+      code: 'STATUS_CHECK_ERROR'
+    });
+  }
+});
 
 export default router;
