@@ -195,7 +195,7 @@ model ServiceAccount {
 
 model Goal {
   id            String   @id @default(cuid())
-  userId        String
+  userId        Int
   description   String
   targetAmount  Float
   currentAmount Float?   @default(0)
@@ -209,12 +209,12 @@ model Goal {
 
 model Conversation {
   id        String   @id @default(cuid())
-  userId    String
+  userId    Int
   sessionId String
   role      String   // 'user', 'assistant', 'system'
   content   String
   agentName String?  // which agent handled this message
-  metadata  Json?    // additional metadata like tool calls, handoffs, etc.
+  metadata  String?  // additional metadata like tool calls, handoffs, etc. (JSON string for SQLite)
   createdAt DateTime @default(now())
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
