@@ -16,10 +16,11 @@ const envSchema = z.object({
   // OpenAI - Optional for AI agent functionality
   OPENAI_API_KEY: z.string().optional(),
   OPENAI_PROJECT_ID: z.string().optional(), 
-  OPENAI_MODEL_PRIMARY: z.string().default('gpt-3.5-turbo'), // Universally available
-  OPENAI_MODEL_FALLBACK: z.string().default('gpt-3.5-turbo-0125'), // Reliable fallback
-  OPENAI_MODEL_AGENTIC: z.string().default('gpt-4-turbo-preview'), // For complex agentic tasks
-  OPENAI_MODEL_EMBEDDING: z.string().default('text-embedding-3-small'),
+  OPENAI_ORG_ID: z.string().optional(), // Organization ID for legacy compatibility
+  OPENAI_MODEL_PRIMARY: z.string().default('gpt-3.5-turbo'), // Most reliable model
+  OPENAI_MODEL_FALLBACK: z.string().default('gpt-3.5-turbo'), // Same as primary for consistency
+  OPENAI_MODEL_AGENTIC: z.string().default('gpt-3.5-turbo'), // Use reliable model for agents too
+  OPENAI_MODEL_EMBEDDING: z.string().default('text-embedding-ada-002'), // More widely available
 
   //timeouts/retries - optimized for agent interactions
   OPENAI_TIMEOUT_MS: z.string().default('90000').transform(Number), // Longer for complex agent responses
@@ -46,13 +47,13 @@ const rawEnv = {
 export const env = envSchema.parse(rawEnv);
 
 // Validate OpenAI configuration for agent functionality
-if (!env.OPENAI_API_KEY || !env.OPENAI_PROJECT_ID) {
+if (!env.OPENAI_API_KEY) {
   console.warn("[env] OpenAI configuration incomplete:");
-  if (!env.OPENAI_API_KEY) console.warn("  - OPENAI_API_KEY missing from Replit Secrets");
-  if (!env.OPENAI_PROJECT_ID) console.warn("  - OPENAI_PROJECT_ID missing from Replit Secrets"); 
-  console.warn("AI features will be disabled. Set these in Replit Secrets to enable AI functionality.");
+  console.warn("  - OPENAI_API_KEY missing from Replit Secrets");
+  console.warn("AI features will be disabled. Set OPENAI_API_KEY in Replit Secrets to enable AI functionality.");
 } else {
   console.log("[env] ✅ OpenAI configured successfully");
-  console.log("[env] Project ID:", env.OPENAI_PROJECT_ID);
+  if (env.OPENAI_PROJECT_ID) console.log("[env] Project ID:", env.OPENAI_PROJECT_ID);
+  if (env.OPENAI_ORG_ID) console.log("[env] Org ID:", env.OPENAI_ORG_ID);
   console.log("[env] API Key:", env.OPENAI_API_KEY ? `${env.OPENAI_API_KEY.substring(0, 7)}...` : 'missing');
 }

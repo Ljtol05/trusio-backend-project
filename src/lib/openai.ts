@@ -13,16 +13,26 @@ export const MODELS = {
 let openaiClient: OpenAI | null = null;
 
 try {
-  if (env.OPENAI_API_KEY && env.OPENAI_PROJECT_ID) {
-    openaiClient = new OpenAI({
+  if (env.OPENAI_API_KEY) {
+    const clientConfig: any = {
       apiKey: env.OPENAI_API_KEY,
-      project: env.OPENAI_PROJECT_ID, // Required for model access
       timeout: env.OPENAI_TIMEOUT_MS,
       maxRetries: env.OPENAI_MAX_RETRIES,
-    });
+    };
+
+    // Add project or organization ID if available
+    if (env.OPENAI_PROJECT_ID) {
+      clientConfig.project = env.OPENAI_PROJECT_ID;
+    } else if (env.OPENAI_ORG_ID) {
+      clientConfig.organization = env.OPENAI_ORG_ID;
+    }
+
+    openaiClient = new OpenAI(clientConfig);
     console.log("[openai] ✅ Client initialized successfully");
+    if (env.OPENAI_PROJECT_ID) console.log("[openai] Using Project ID:", env.OPENAI_PROJECT_ID);
+    if (env.OPENAI_ORG_ID) console.log("[openai] Using Org ID:", env.OPENAI_ORG_ID);
   } else {
-    console.log("[openai] ⚠️  Client not initialized - missing configuration");
+    console.log("[openai] ⚠️  Client not initialized - missing OPENAI_API_KEY");
   }
 } catch (error) {
   console.error("[openai] ❌ Failed to initialize client:", error);
@@ -55,12 +65,9 @@ export async function chatJSON<T = unknown>({
   model,
   validate,
 }: ChatJSONParams<T>): Promise<T> {
-  if (!env.OPENAI_API_KEY || !env.OPENAI_PROJECT_ID || !openai) {
-    const missingConfig = [];
-    if (!env.OPENAI_API_KEY) missingConfig.push("OPENAI_API_KEY");
-    if (!env.OPENAI_PROJECT_ID) missingConfig.push("OPENAI_PROJECT_ID");
+  if (!env.OPENAI_API_KEY || !openai) {
     throw Object.assign(
-      new Error(`Missing OpenAI configuration: ${missingConfig.join(", ")}`), 
+      new Error("Missing OpenAI API key"), 
       { code: "NO_CONFIG" }
     );
   }
@@ -144,11 +151,11 @@ export async function chatJSON<T = unknown>({
 }
 
 export async function openaiPing(model = MODELS.primary) {
-  if (!env.OPENAI_API_KEY || !env.OPENAI_PROJECT_ID || !openai) {
+  if (!env.OPENAI_API_KEY || !openai) {
     return { 
       ok: false, 
       reason: "NO_CONFIG" as const,
-      project: env.OPENAI_PROJECT_ID || "missing"
+      project: env.OPENAI_PROJECT_ID || env.OPENAI_ORG_ID || "missing"
     };
   }
   
@@ -227,7 +234,7 @@ export const createAgentResponse = async (
     useAdvancedModel?: boolean;
   } = {}
 ) => {
-  if (!env.OPENAI_API_KEY || !env.OPENAI_PROJECT_ID || !openai) {
+  if (!env.OPENAI_API_KEY || !openai) {
     throw Object.assign(
       new Error("OpenAI not properly configured for agent functionality"), 
       { code: "NO_CONFIG" }
