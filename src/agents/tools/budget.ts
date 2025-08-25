@@ -1,9 +1,8 @@
-
 import { tool } from '@openai/agents';
 import { z } from 'zod';
 import { db } from '../../lib/db.js';
 import { logger } from '../../lib/logger.js';
-import type { ToolExecutionContext } from '../core/ToolRegistry.js';
+import type { ToolExecutionContext } from './types.js';
 
 const budgetAnalysisSchema = z.object({
   userId: z.string(),
@@ -59,18 +58,6 @@ export const budgetAnalysisTool = tool({
 
       const totalBudgeted = envelopes.reduce((sum, e) => sum + e.budgetAmount, 0);
       const totalSpent = analysis.reduce((sum, a) => sum + a.spent, 0);
-      
-      const insights = [];
-      const overBudgetCategories = analysis.filter(a => a.status === 'over_budget');
-      if (overBudgetCategories.length > 0) {
-        insights.push(`You're over budget in ${overBudgetCategories.length} categories: ${overBudgetCategories.map(c => c.category).join(', ')}`);
-      }
-
-      const topSpendingCategory = analysis.reduce((max, current) => 
-        current.spent > max.spent ? current : max
-      );
-
-      insights.push(`Your highest spending category is ${topSpendingCategory.category} at $${topSpendingCategory.spent.toFixed(2)}`);
 
       return JSON.stringify({
         success: true,
@@ -80,11 +67,9 @@ export const budgetAnalysisTool = tool({
         totalRemaining: totalBudgeted - totalSpent,
         overallUsage: Math.round((totalSpent / totalBudgeted) * 100),
         categoryBreakdown: analysis,
-        insights,
-        recommendations: [
-          'Review over-budget categories and consider adjusting spending habits',
-          'Consider reallocating funds from under-utilized categories',
-          'Set up alerts for when you reach 80% of any budget category'
+        insights: [
+          `Total spent: $${totalSpent.toFixed(2)} of $${totalBudgeted.toFixed(2)}`,
+          `You have ${analysis.filter(a => a.status === 'over_budget').length} categories over budget`
         ]
       });
 

@@ -1,165 +1,104 @@
-// Re-export types from core for convenience
-export type {
-  ToolMetrics,
-  Tool,
-  ToolExecutionResult,
-  ToolExecutionContext,
-} from '../core/ToolRegistry.js';
 
-// Financial tool types and interfaces
+import { z } from 'zod';
+
+// Base tool execution context
+export interface ToolExecutionContext {
+  userId: string;
+  sessionId?: string;
+  agentName?: string;
+  timestamp?: Date;
+  timeout?: number;
+  userProfile?: {
+    id: string;
+    name?: string;
+    email?: string;
+  };
+}
+
+// Financial context for tools
 export interface FinancialContext {
   userId: string;
-  currentBalance?: number;
-  monthlyIncome?: number;
-  financialGoals?: string[];
+  totalIncome?: number;
+  totalExpenses?: number;
+  envelopes?: Array<{
+    id: string;
+    name: string;
+    balance: number;
+    target?: number;
+    category?: string;
+  }>;
+  transactions?: Array<{
+    id: string;
+    amount: number;
+    description: string;
+    category?: string;
+    date: string;
+  }>;
+  goals?: Array<{
+    id: string;
+    description: string;
+    targetAmount: number;
+    currentAmount: number;
+    deadline: string;
+  }>;
   riskTolerance?: 'low' | 'medium' | 'high';
 }
 
-export interface BudgetAnalysisParams {
-  period: 'monthly' | 'quarterly' | 'yearly';
-  categories?: string[];
-}
-
-export interface TransactionCategorizationParams {
-  amount: number;
-  description: string;
-  merchant?: string;
-  date?: string;
-}
-
-export interface EnvelopeParams {
-  name: string;
-  budgetAmount: number;
-  category: string;
-}
-
-export interface TransferParams {
-  fromEnvelope: string;
-  toEnvelope: string;
-  amount: number;
-}
-
-export interface RecommendationParams {
-  analysisType: 'spending' | 'saving' | 'investment';
-  timeframe?: string;
-}
-
-export interface AgentHandoffParams {
-  targetAgent: 'budget_coach' | 'transaction_analyst' | 'insight_generator';
-  context: string;
-  priority?: 'low' | 'normal' | 'high';
-}
-
-// Tool execution result types
-export interface ToolResult {
+// Tool execution result
+export interface ToolExecutionResult {
   success: boolean;
-  data?: any;
+  result?: any;
   error?: string;
-  recommendations?: string[];
-}
-
-// Budget analysis result
-export interface BudgetAnalysisResult extends ToolResult {
-  data?: {
-    totalBudget: number;
-    totalSpent: number;
-    remaining: number;
-    categoryBreakdown: Record<string, {
-      budgeted: number;
-      spent: number;
-      remaining: number;
-    }>;
-    alerts?: string[];
-  };
-}
-
-// Transaction categorization result
-export interface TransactionResult extends ToolResult {
-  data?: {
-    category: string;
-    confidence: number;
-    suggestedEnvelope?: string;
-    reasoning: string;
-  };
-}
-
-// Envelope management result
-export interface EnvelopeResult extends ToolResult {
-  data?: {
-    envelopeId: string;
-    name: string;
-    balance: number;
-    budgetAmount: number;
-    category: string;
-  };
-}
-
-// Recommendation result
-export interface RecommendationResult extends ToolResult {
-  data?: {
-    recommendations: Array<{
-      type: string;
-      priority: 'low' | 'medium' | 'high';
-      description: string;
-      estimatedImpact: string;
-      actionRequired: string;
-    }>;
-    insights: string[];
-  };
-}
-
-// Agent handoff result
-export interface HandoffResult extends ToolResult {
-  data?: {
-    targetAgent: string;
-    handoffReason: string;
-    contextPassed: string;
-    nextSteps: string[];
-  };
-}
-
-// Financial insights and patterns
-export interface SpendingPattern {
-  category: string;
-  averageMonthly: number;
-  trend: 'increasing' | 'decreasing' | 'stable';
-  seasonality?: string;
-}
-
-export interface FinancialGoal {
-  id: string;
-  name: string;
-  targetAmount: number;
-  currentAmount: number;
-  targetDate: string;
-  priority: 'low' | 'medium' | 'high';
-}
-
-export interface BudgetVariance {
-  category: string;
-  budgeted: number;
-  actual: number;
-  variance: number;
-  variancePercentage: number;
-}
-
-// Agent execution types
-export interface AgentExecutionResult {
-  success: boolean;
-  response: string;
-  agentName: string;
-  sessionId: string;
   timestamp: Date;
   duration: number;
-  error?: string;
 }
 
-export interface AgentInteraction {
-  id: string;
-  sessionId: string;
-  agentName: string;
-  userMessage: string;
-  agentResponse: string;
-  timestamp: Date;
-  metadata?: Record<string, any>;
+// Tool definition interface
+export interface Tool {
+  name: string;
+  description: string;
+  category: string;
+  riskLevel: 'low' | 'medium' | 'high';
+  requiresAuth: boolean;
+  estimatedDuration: number;
+  schema?: any;
+  execute: (parameters: any, context: ToolExecutionContext) => Promise<any>;
 }
+
+// Tool metrics
+export interface ToolMetrics {
+  executionCount: number;
+  averageExecutionTime: number;
+  successRate: number;
+  totalErrors: number;
+  lastExecution?: Date;
+}
+
+// Validation schemas
+export const FinancialContextSchema = z.object({
+  userId: z.string().min(1),
+  totalIncome: z.number().nonnegative().optional(),
+  totalExpenses: z.number().nonnegative().optional(),
+  envelopes: z.array(z.object({
+    id: z.string(),
+    name: z.string(),
+    balance: z.number(),
+    target: z.number().optional(),
+    category: z.string().optional(),
+  })).optional(),
+  riskTolerance: z.enum(['low', 'medium', 'high']).optional(),
+});
+
+export const AgentResponseSchema = z.object({
+  response: z.string().min(1),
+  confidence: z.number().min(0).max(100),
+  suggestedActions: z.array(z.object({
+    type: z.enum(['create_envelope', 'transfer_funds', 'analyze_spending', 'set_goal']),
+    description: z.string(),
+    parameters: z.record(z.any()).optional(),
+    priority: z.enum(['low', 'medium', 'high']).optional(),
+  })).optional(),
+  handoffTarget: z.string().optional(),
+  followUpQuestions: z.array(z.string()).optional(),
+  metadata: z.record(z.any()).optional(),
+});
