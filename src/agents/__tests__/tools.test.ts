@@ -1,6 +1,7 @@
+
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { ToolRegistry } from '../tools/registry.js';
-import { registerTransactionTools } from '../tools/transaction.js';
+import { ToolRegistry } from '../core/ToolRegistry.js';
+import { registerTransactionTools } from '../tools/transaction-tools.js';
 import type { FinancialContext, ToolExecutionContext } from '../tools/types.js';
 
 // Setup mocks before any imports
@@ -62,10 +63,10 @@ describe('Financial Tools', () => {
   let mockContext: ToolExecutionContext;
 
   beforeEach(() => {
-    // Create a fresh registry for each test
+    // Create a fresh registry for each test - no circular imports
     testRegistry = new ToolRegistry();
 
-    // Register transaction tools for testing
+    // Register only transaction tools for testing
     registerTransactionTools(testRegistry);
 
     mockContext = {
@@ -78,27 +79,6 @@ describe('Financial Tools', () => {
         name: 'Test User',
         email: 'test@example.com',
       },
-      totalIncome: 5000,
-      totalExpenses: 3000,
-      envelopes: [
-        {
-          id: 'env-1',
-          name: 'Groceries',
-          balance: 500,
-          target: 600,
-          category: 'food',
-        },
-      ],
-      transactions: [
-        {
-          id: 'txn-1',
-          amount: -50,
-          description: 'Grocery Store',
-          category: 'food',
-          date: '2024-01-15T10:00:00Z',
-        },
-      ],
-      goals: [],
     };
 
     // Reset all mocks
@@ -106,7 +86,7 @@ describe('Financial Tools', () => {
   });
 
   describe('Tool Registry', () => {
-    it('should have all required tools registered', () => {
+    it('should have all required transaction tools registered', () => {
       const tools = testRegistry.getAllTools();
 
       // Transaction tools that should be registered
@@ -118,30 +98,30 @@ describe('Financial Tools', () => {
 
     it('should return correct tool count', () => {
       const count = testRegistry.getToolCount();
-      expect(count).toBeGreaterThan(0);
+      expect(count).toBeGreaterThan(3);
     });
   });
 
   describe('Budget Tools', () => {
     it('should execute budget analysis tool successfully', async () => {
-      // For now, skip this test since budget tools aren't refactored yet
+      // Skip until budget tools are refactored
       expect(true).toBe(true);
     });
 
     it('should handle budget analysis errors gracefully', async () => {
-      // For now, skip this test since budget tools aren't refactored yet
+      // Skip until budget tools are refactored
       expect(true).toBe(true);
     });
   });
 
   describe('Envelope Tools', () => {
     it('should create envelope successfully', async () => {
-      // For now, skip this test since envelope tools aren't refactored yet
+      // Skip until envelope tools are refactored
       expect(true).toBe(true);
     });
 
     it('should transfer funds between envelopes', async () => {
-      // For now, skip this test since envelope tools aren't refactored yet
+      // Skip until envelope tools are refactored
       expect(true).toBe(true);
     });
   });
@@ -184,26 +164,26 @@ describe('Financial Tools', () => {
 
   describe('Analysis Tools', () => {
     it('should analyze budget variance', async () => {
-      // For now, skip this test since analysis tools aren't refactored yet
+      // Skip until analysis tools are refactored
       expect(true).toBe(true);
     });
   });
 
   describe('Insight Tools', () => {
     it('should generate personalized recommendations', async () => {
-      // For now, skip this test since insight tools aren't refactored yet
+      // Skip until insight tools are refactored
       expect(true).toBe(true);
     });
 
     it('should identify financial opportunities', async () => {
-      // For now, skip this test since insight tools aren't refactored yet
+      // Skip until insight tools are refactored
       expect(true).toBe(true);
     });
   });
 
   describe('Agent Handoff Tool', () => {
     it('should execute agent handoff successfully', async () => {
-      // For now, skip this test since handoff tools aren't refactored yet
+      // Skip until handoff tools are refactored
       expect(true).toBe(true);
     });
   });

@@ -1,178 +1,87 @@
+
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
-import { rateLimit } from 'express-rate-limit';
+import rateLimit from 'express-rate-limit';
 import { logger } from './lib/logger.js';
 import { env } from './config/env.js';
-import { createApiRouter } from './routes/routing.js';
-import { db } from './lib/db.js';
-import { authenticateToken } from './routes/auth.js';
+import { initializeAgentSystem } from './agents/bootstrap.js';
 
 // Import routes
 import authRoutes from './routes/auth.js';
-import verifyEmailRoutes from './routes/verify-email.js';
-import envelopeRoutes from './routes/envelopes.js';
-import transferRoutes from './routes/transfers.js';
-import transactionRoutes from './routes/transactions.js';
-import ruleRoutes from './routes/rules.js';
-import cardRoutes from './routes/cards.js';
-import routingRoutes from './routes/routing.js';
 import aiRoutes from './routes/ai.js';
-import eventRoutes from './routes/events.js';
-import webhookRoutes from './routes/webhooks.js';
-import kycRoutes from './routes/kyc.js';
-import serviceAccountRoutes from './routes/service-accounts.js';
-
-// Import the agent API integration module
-import { initializeApiIntegration } from './agents/apiIntegration.js';
+import envelopeRoutes from './routes/envelopes.js';
+import transactionRoutes from './routes/transactions.js';
 
 const app = express();
 
-// CORS configuration to allow requests from frontend
+// Security middleware
+app.use(helmet());
 app.use(cors({
-  origin: [
-    'http://localhost:5173', // Vite dev server
-    'https://localhost:5173',
-    /^https:\/\/.*\.replit\.dev$/, // Any replit.dev domain
-    /^https:\/\/.*\.repl\.co$/, // Any repl.co domain
-  ],
+  origin: env.NODE_ENV === 'production' ? env.FRONTEND_URL : true,
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: [
-    'Content-Type',
-    'Authorization',
-    'Accept',
-    'x-replit-user-id',
-    'x-replit-user-name'
-  ],
-  exposedHeaders: ['Authorization']
 }));
-app.use(express.json({ limit: '1mb' }));
-app.use(express.urlencoded({ extended: false }));
 
-// Request logging
-app.use((req, res, next) => {
-  logger.info({
-    method: req.method,
-    url: req.url,
-    ip: req.ip,
-    userAgent: req.get('User-Agent'),
-  }, 'HTTP Request');
-  next();
+// Rate limiting
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // limit each IP to 100 requests per windowMs
+});
+app.use(limiter);
+
+// Body parsing middleware
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true }));
+
+// Health check endpoint
+app.get('/api/healthz', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// Health check endpoint (no auth required)
-app.get('/healthz', (req, res) => {
-  res.json({
-    status: 'ok',
-    timestamp: new Date().toISOString(),
-    service: 'envelopes-backend'
+// Routes
+app.use('/api/auth', authRoutes);
+app.use('/api/ai', aiRoutes);
+app.use('/api/envelopes', envelopeRoutes);
+app.use('/api/transactions', transactionRoutes);
+
+// Error handling middleware
+app.use((error: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  logger.error({ error: error.message, stack: error.stack }, 'Unhandled error');
+  
+  res.status(error.status || 500).json({
+    error: {
+      message: env.NODE_ENV === 'production' ? 'Internal server error' : error.message,
+      ...(env.NODE_ENV !== 'production' && { stack: error.stack }),
+    },
   });
 });
 
-// API routes
-// Public routes (no authentication required)
-app.use('/api/auth', authRoutes);
-app.use('/api/webhooks', webhookRoutes);
-
-// Protected routes (authentication required)
-app.use('/api/envelopes', authenticateToken, envelopeRoutes);
-app.use('/api/transactions', authenticateToken, transactionRoutes);
-app.use('/api/transfers', authenticateToken, transferRoutes);
-app.use('/api/rules', authenticateToken, ruleRoutes); // Corrected rulesRoutes to ruleRoutes
-app.use('/api/routing', authenticateToken, routingRoutes);
-app.use('/api/cards', authenticateToken, cardRoutes);
-app.use('/api/kyc', authenticateToken, kycRoutes);
-app.use('/api/ai', aiRoutes);
-app.use('/api/events', eventRoutes);
-app.use('/api/service-accounts', serviceAccountRoutes);
-
 // 404 handler
-app.use((req, res) => {
-  res.status(404).json({ error: 'Endpoint not found' });
+app.use('*', (req, res) => {
+  res.status(404).json({ error: 'Not Found' });
 });
 
-// Error handler
-app.use((error: any, req: any, res: any, next: any) => {
-  // Add more specific error logging for authentication issues
-  if (error.name === 'UnauthorizedError' || error.statusCode === 401) {
-    logger.warn({ error: error.message, ip: req.ip, url: req.url }, 'Authentication Error');
-  } else if (error.name === 'ForbiddenError' || error.statusCode === 403) {
-    logger.warn({ error: error.message, ip: req.ip, url: req.url }, 'Authorization Error');
-  } else {
-    logger.error(error, 'Unhandled error');
-  }
+const PORT = env.PORT || 5000;
 
-  // Send appropriate status code based on error type
-  if (error.statusCode) {
-    res.status(error.statusCode).json({
-      error: 'API Error',
-      message: env.NODE_ENV === 'development' ? error.message : undefined,
-    });
-  } else {
-    res.status(500).json({
-      error: 'Internal server error',
-      message: env.NODE_ENV === 'development' ? error.message : undefined,
-    });
-  }
-});
-
-// Start server
-const startServer = async () => {
+async function startServer() {
   try {
-    // Test database connection
-    await db.$connect();
-    logger.info('Database connected successfully');
+    // Initialize agent system first
+    const agentSystemReady = await initializeAgentSystem();
+    if (!agentSystemReady) {
+      throw new Error('Failed to initialize agent system');
+    }
 
-    const server = app.listen(env.PORT, '0.0.0.0', () => {
-      // Auto-detect Replit external URL
-      const replitUrl = process.env.REPLIT_DEV_DOMAIN
-        ? `https://${process.env.REPLIT_DEV_DOMAIN}`
-        : `http://localhost:${env.PORT}`;
-
-      logger.info({
-        port: env.PORT,
-        host: '0.0.0.0',
-        env: env.NODE_ENV,
-        aiEnabled: !!env.OPENAI_API_KEY,
-        internalUrl: `http://0.0.0.0:${env.PORT}`,
-        externalUrl: replitUrl,
-        corsEnabled: true,
-      }, 'Server started successfully');
-
-      // Display the URL prominently for easy copying
-      console.log('\n🚀 API Server Ready!');
-      console.log(`📡 External URL: ${replitUrl}`);
-      console.log(`🔗 Health Check: ${replitUrl}/healthz`);
-      console.log(`🔐 Auth Endpoints: ${replitUrl}/api/auth/*`);
-      console.log('\n');
+    app.listen(PORT, '0.0.0.0', () => {
+      logger.info({ port: PORT }, 'Server started successfully');
     });
-
-    // Graceful shutdown
-    const shutdown = async (signal: string) => {
-      logger.info(`Received ${signal}, starting graceful shutdown...`);
-
-      server.close(async () => {
-        logger.info('HTTP server closed');
-        await db.$disconnect();
-        logger.info('Database disconnected');
-        process.exit(0);
-      });
-
-      // Force shutdown after 10 seconds
-      setTimeout(() => {
-        logger.error('Forced shutdown due to timeout');
-        process.exit(1);
-      }, 10000);
-    };
-
-    process.on('SIGTERM', () => shutdown('SIGTERM'));
-    process.on('SIGINT', () => shutdown('SIGINT'));
-
   } catch (error) {
-    logger.error(error, 'Failed to start server');
+    logger.error({ error }, 'Failed to start server');
     process.exit(1);
   }
-};
+}
 
-startServer();
+if (import.meta.url === `file://${process.argv[1]}`) {
+  startServer();
+}
+
+export default app;

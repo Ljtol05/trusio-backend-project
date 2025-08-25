@@ -1,8 +1,8 @@
 
 import { logger } from '../lib/logger.js';
 import { agentRegistry } from './agentRegistry.js';
-import { toolRegistry } from './tools/registry.js';
-import type { FinancialContext, AgentExecutionResult, AgentInteraction } from './types.js';
+import { toolRegistry } from './core/ToolRegistry.js';
+import type { FinancialContext, AgentExecutionResult, AgentInteraction } from './tools/types.js';
 
 export class AgentManager {
   private initialized = false;
@@ -20,9 +20,6 @@ export class AgentManager {
     try {
       logger.info('Initializing Agent Management System...');
 
-      // Initialize tools first
-      await this.initializeTools();
-
       // Initialize agent registry
       await agentRegistry.initialize();
 
@@ -38,23 +35,6 @@ export class AgentManager {
     } catch (error) {
       logger.error({ error }, 'Failed to initialize Agent Management System');
       this.initialized = false;
-      return false;
-    }
-  }
-
-  private async initializeTools(): Promise<boolean> {
-    try {
-      // The tool registry initializes itself in its constructor
-      const toolCount = toolRegistry.getToolCount();
-      
-      if (toolCount === 0) {
-        throw new Error('No tools were initialized');
-      }
-
-      logger.info({ toolCount }, 'Financial tools initialized');
-      return true;
-    } catch (error) {
-      logger.error({ error }, 'Failed to initialize tools');
       return false;
     }
   }
