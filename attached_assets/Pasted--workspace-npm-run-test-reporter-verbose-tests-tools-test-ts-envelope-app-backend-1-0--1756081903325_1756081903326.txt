@@ -1,0 +1,312 @@
+~/workspace$ npm run test -- --reporter=verbose __tests__/tools.test.ts
+
+> envelope-app-backend@1.0.0 test
+> vitest run --reporter=verbose __tests__/tools.test.ts
+
+
+ RUN  v1.6.1 /home/runner/workspace
+
+stdout | src/config/env.ts:57:11
+[env] ✅ OpenAI configured successfully
+
+stdout | src/config/env.ts:58:38
+[env] Project ID: proj_0oB7cBSGNAFJaUlNQVw9LZro
+
+stdout | src/config/env.ts:59:34
+[env] Org ID: org-ieazhDvHBbXEfUHFDyEBcnz4
+
+stdout | src/config/env.ts:60:11
+[env] API Key: sk-svca...
+
+stderr | src/lib/openai.ts:53:11
+[openai] ❌ Failed to initialize client: Error: [vitest] No "setOpenAIAPI" export is defined on the "@openai/agents" mock. Did you forget to return it from "vi.mock"?
+If you need to partially mock a module, you can use "importOriginal" helper inside:
+
+    at VitestMocker.createError (file:///home/runner/workspace/node_modules/vitest/dist/vendor/execute.fL3szUAI.js:79:19)
+    at Object.get (file:///home/runner/workspace/node_modules/vitest/dist/vendor/execute.fL3szUAI.js:153:22)
+    at /home/runner/workspace/src/lib/openai.ts:36:5
+    at VitestExecutor.runModule (file:///home/runner/workspace/node_modules/vite-node/dist/client.mjs:362:5)
+    at VitestExecutor.directRequest (file:///home/runner/workspace/node_modules/vite-node/dist/client.mjs:346:5)
+    at VitestExecutor.cachedRequest (file:///home/runner/workspace/node_modules/vite-node/dist/client.mjs:189:14)
+    at VitestExecutor.dependencyRequest (file:///home/runner/workspace/node_modules/vite-node/dist/client.mjs:233:12)
+    at /home/runner/workspace/src/agents/agentRegistry.ts:3:31
+    at VitestExecutor.runModule (file:///home/runner/workspace/node_modules/vite-node/dist/client.mjs:362:5)
+    at VitestExecutor.directRequest (file:///home/runner/workspace/node_modules/vite-node/dist/client.mjs:346:5) {
+  codeFrame: 'vi\x1B[33m.\x1B[39m\x1B[34mmock\x1B[39m(\x1B[32m"@openai/agents"\x1B[39m\x1B[33m,\x1B[39m \x1B[35masync\x1B[39m (importOriginal) \x1B[33m=>\x1B[39m {\n' +
+    '  \x1B[35mconst\x1B[39m actual \x1B[33m=\x1B[39m \x1B[35mawait\x1B[39m \x1B[34mimportOriginal\x1B[39m()\n' +
+    '  \x1B[35mreturn\x1B[39m {\n' +
+    '    \x1B[33m...\x1B[39mactual\x1B[33m,\x1B[39m\n' +
+    '    \x1B[90m// your mocked methods\x1B[39m\n' +
+    '  }\n' +
+    '})'
+}
+
+stdout | src/agents/tools/index.ts:60:9
+Initialized 1 financial tools
+
+ ❯ src/agents/__tests__/tools.test.ts (14)
+   ❯ Financial Tools (14)
+     ❯ Tool Registry (2)
+       × should have all required tools registered
+       × should return correct tool count
+     ❯ Budget Tools (2)
+       × should execute budget analysis tool successfully
+       × should handle budget analysis errors gracefully
+     ❯ Envelope Tools (2)
+       × should create envelope successfully
+       × should transfer funds between envelopes
+     ❯ Transaction Tools (2)
+       × should categorize transactions correctly
+       × should analyze spending patterns
+     ❯ Analysis Tools (1)
+       × should analyze budget variance
+     ❯ Insight Tools (2)
+       × should generate personalized recommendations
+       × should identify financial opportunities
+     ❯ Agent Handoff Tool (1)
+       × should execute agent handoff successfully
+     ❯ Tool Error Handling (2)
+       ✓ should handle non-existent tool gracefully
+       × should handle tool execution timeout
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ Failed Tests 13 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/agents/__tests__/tools.test.ts > Financial Tools > Tool Registry > should have all required tools registered
+AssertionError: expected { Object (undefined) } to have property "budget_analysis"
+ ❯ src/agents/__tests__/tools.test.ts:102:21
+    100|       
+    101|       // Budget tools
+    102|       expect(tools).toHavePrope…
+       |                     ^
+    103|       expect(tools).toHavePrope…
+    104|       expect(tools).toHavePrope…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/13]⎯
+
+ FAIL  src/agents/__tests__/tools.test.ts > Financial Tools > Tool Registry > should return correct tool count
+AssertionError: expected 1 to be greater than 10
+ ❯ src/agents/__tests__/tools.test.ts:131:21
+    129|     it('should return correct t…
+    130|       const count = toolRegistr…
+    131|       expect(count).toBeGreater…
+       |                     ^
+    132|     });
+    133|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/13]⎯
+
+ FAIL  src/agents/__tests__/tools.test.ts > Financial Tools > Budget Tools > should execute budget analysis tool successfully
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/agents/__tests__/tools.test.ts:148:30
+    146|       );
+    147| 
+    148|       expect(result.success).to…
+       |                              ^
+    149|       expect(result.result).toB…
+    150|       expect(mockDb.envelope.fi…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/13]⎯
+
+ FAIL  src/agents/__tests__/tools.test.ts > Financial Tools > Budget Tools > should handle budget analysis errors gracefully
+AssertionError: expected 'Tool not found: budget_analysis' to contain 'Database error'
+
+- Expected
++ Received
+
+- Database error
++ Tool not found: budget_analysis
+
+ ❯ src/agents/__tests__/tools.test.ts:165:28
+    163| 
+    164|       expect(result.success).to…
+    165|       expect(result.error).toCo…
+       |                            ^
+    166|     });
+    167|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/13]⎯
+
+ FAIL  src/agents/__tests__/tools.test.ts > Financial Tools > Envelope Tools > should create envelope successfully
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/agents/__tests__/tools.test.ts:189:30
+    187|       );
+    188| 
+    189|       expect(result.success).to…
+       |                              ^
+    190|       expect(result.result).toH…
+    191|       expect(mockDb.envelope.cr…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/13]⎯
+
+ FAIL  src/agents/__tests__/tools.test.ts > Financial Tools > Envelope Tools > should transfer funds between envelopes
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/agents/__tests__/tools.test.ts:214:30
+    212|       );
+    213| 
+    214|       expect(result.success).to…
+       |                              ^
+    215|       expect(mockDb.envelope.up…
+    216|     });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/13]⎯
+
+ FAIL  src/agents/__tests__/tools.test.ts > Financial Tools > Transaction Tools > should categorize transactions correctly
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/agents/__tests__/tools.test.ts:231:30
+    229|       );
+    230| 
+    231|       expect(result.success).to…
+       |                              ^
+    232|       expect(result.result).toH…
+    233|       expect(result.result).toH…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/13]⎯
+
+ FAIL  src/agents/__tests__/tools.test.ts > Financial Tools > Transaction Tools > should analyze spending patterns
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/agents/__tests__/tools.test.ts:249:30
+    247|       );
+    248| 
+    249|       expect(result.success).to…
+       |                              ^
+    250|       expect(result.result).toH…
+    251|       expect(result.result).toH…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/13]⎯
+
+ FAIL  src/agents/__tests__/tools.test.ts > Financial Tools > Analysis Tools > should analyze budget variance
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/agents/__tests__/tools.test.ts:268:30
+    266|       );
+    267| 
+    268|       expect(result.success).to…
+       |                              ^
+    269|       expect(result.result).toH…
+    270|       expect(result.result).toH…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/13]⎯
+
+ FAIL  src/agents/__tests__/tools.test.ts > Financial Tools > Insight Tools > should generate personalized recommendations
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/agents/__tests__/tools.test.ts:282:30
+    280|       );
+    281| 
+    282|       expect(result.success).to…
+       |                              ^
+    283|       expect(result.result).toH…
+    284|       expect(Array.isArray(resu…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/13]⎯
+
+ FAIL  src/agents/__tests__/tools.test.ts > Financial Tools > Insight Tools > should identify financial opportunities
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/agents/__tests__/tools.test.ts:294:30
+    292|       );
+    293| 
+    294|       expect(result.success).to…
+       |                              ^
+    295|       expect(result.result).toH…
+    296|     });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/13]⎯
+
+ FAIL  src/agents/__tests__/tools.test.ts > Financial Tools > Agent Handoff Tool > should execute agent handoff successfully
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/agents/__tests__/tools.test.ts:313:30
+    311|       );
+    312| 
+    313|       expect(result.success).to…
+       |                              ^
+    314|       expect(result.result).toH…
+    315|       expect(result.result).toH…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[12/13]⎯
+
+ FAIL  src/agents/__tests__/tools.test.ts > Financial Tools > Tool Error Handling > should handle tool execution timeout
+AssertionError: expected 'tool.execute is not a function' to contain 'timeout'
+
+- Expected
++ Received
+
+- timeout
++ tool.execute is not a function
+
+ ❯ src/agents/__tests__/tools.test.ts:348:28
+    346| 
+    347|       expect(result.success).to…
+    348|       expect(result.error).toCo…
+       |                            ^
+    349|     });
+    350|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[13/13]⎯
+
+ Test Files  1 failed (1)
+      Tests  13 failed | 1 passed (14)
+   Start at  00:31:25
+   Duration  1.57s (transform 424ms, setup 0ms, collect 709ms, tests 38ms, environment 0ms, prepare 231ms)
+
+~/workspace$ 
