@@ -292,6 +292,10 @@ Focus on actionable recommendations that align with their financial goals and en
     return capabilities[agentName] || [];
   }
 
+  getAgentCount(): number {
+    return this.agents.size;
+  }
+
   getAgentMetrics(): Record<string, any> {
     const metrics: Record<string, any> = {};
 

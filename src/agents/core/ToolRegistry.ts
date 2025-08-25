@@ -1,12 +1,11 @@
-
 import { logger } from '../../lib/logger.js';
 
 export interface ToolMetrics {
   executionCount: number;
   averageExecutionTime: number;
   successRate: number;
-  lastExecution?: Date;
   totalErrors: number;
+  lastExecution?: Date;
 }
 
 export interface Tool {
@@ -88,6 +87,10 @@ export class ToolRegistry {
     error?: string;
   }> = [];
 
+  constructor() {
+    logger.info('Initializing ToolRegistry');
+  }
+
   registerTool(toolDefinition: any): void {
     // Handle OpenAI SDK tool format - the tool() function returns an object with metadata
     const toolName = toolDefinition.name || toolDefinition.toolName;
@@ -102,6 +105,15 @@ export class ToolRegistry {
       execute: toolDefinition.execute || toolDefinition.tool || toolDefinition,
     };
 
+    if (!tool.name) {
+      logger.error({ tool }, 'Tool name is required for registration');
+      throw new Error('Tool name is required for registration');
+    }
+
+    if (this.tools.has(tool.name)) {
+      logger.warn({ toolName: tool.name }, 'Tool already registered - overwriting');
+    }
+
     this.tools.set(toolDefinition.name, tool);
 
     // Initialize metrics for the tool
@@ -114,7 +126,12 @@ export class ToolRegistry {
       });
     }
 
-    logger.info({ toolName: toolDefinition.name }, 'Tool registered');
+    logger.debug({ 
+      toolName: tool.name, 
+      category: tool.category, 
+      requiresAuth: tool.requiresAuth,
+      riskLevel: tool.riskLevel 
+    }, 'Tool registered successfully');
   }
 
   unregisterTool(name: string): boolean {
@@ -163,21 +180,14 @@ export class ToolRegistry {
     context: ToolExecutionContext
   ): Promise<ToolExecutionResult> {
     const startTime = Date.now();
-    const tool = this.tools.get(name);
-
-    if (!tool) {
-      const error = `Tool not found: ${name}`;
-      this.recordExecution(name, 0, false, error);
-      return {
-        success: false,
-        error,
-        timestamp: new Date(),
-        duration: 0,
-      };
-    }
 
     try {
-      logger.info({ toolName: name, parameters }, 'Executing tool');
+      if (!this.tools.has(name)) {
+        logger.warn({ toolName: name, availableTools: Array.from(this.tools.keys()) }, 'Tool not found');
+        throw new Error(`Tool not found: ${name}`);
+      }
+
+      const tool = this.tools.get(name)!;
 
       // Validate parameters if schema is provided
       if (tool.schema) {
@@ -193,6 +203,11 @@ export class ToolRegistry {
             duration: Date.now() - startTime,
           };
         }
+      }
+
+      // Check authentication
+      if (tool.requiresAuth && !context.userId) {
+        throw new Error('Authentication required for this tool');
       }
 
       // Execute the tool with optional timeout
@@ -358,7 +373,4 @@ export class ToolRegistry {
 }
 
 // Create and export the singleton instance
-export const toolRegistry = new ToolRegistry();
-
-// Create and export singleton instance
 export const toolRegistry = new ToolRegistry();

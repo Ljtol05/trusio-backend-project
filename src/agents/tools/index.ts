@@ -12,18 +12,36 @@ import { registerIdentifyOpportunitiesTool } from './identify_opportunities.js';
 
 export function registerAllTools(): void {
   try {
+    logger.info('Starting tool registration process...');
+
     // Register all tool categories
     registerTransactionTools(toolRegistry);
+    logger.debug('Transaction tools registered');
+    
     registerBudgetTools(toolRegistry);
+    logger.debug('Budget tools registered');
+    
     registerEnvelopeTools(toolRegistry);
+    logger.debug('Envelope tools registered');
+    
     registerAnalysisTools(toolRegistry);
+    logger.debug('Analysis tools registered');
+    
     registerInsightTools(toolRegistry);
+    logger.debug('Insight tools registered');
+    
     registerHandoffTools(toolRegistry);
+    logger.debug('Handoff tools registered');
     
     // Register individual tools from Task 2
     registerTransferFundsTool(toolRegistry);
+    logger.debug('Transfer funds tool registered');
+    
     registerTrackAchievementsTool(toolRegistry);
+    logger.debug('Track achievements tool registered');
+    
     registerIdentifyOpportunitiesTool(toolRegistry);
+    logger.debug('Identify opportunities tool registered');
 
     const toolCount = toolRegistry.getToolCount();
     const allTools = toolRegistry.getAllTools();
@@ -43,7 +61,16 @@ export function registerAllTools(): void {
     
     const missingTools = expectedTools.filter(toolName => !toolRegistry.hasTool(toolName));
     if (missingTools.length > 0) {
-      logger.warn({ missingTools }, 'Some expected tools are missing from registry');
+      logger.warn({ missingTools, registeredTools: Object.keys(allTools) }, 'Some expected tools are missing from registry');
+      
+      // Try to identify what tools are actually registered
+      logger.info({ 
+        actuallyRegistered: Object.keys(allTools),
+        expectedCount: expectedTools.length,
+        actualCount: toolCount 
+      }, 'Tool registration status');
+    } else {
+      logger.info('All expected tools successfully registered');
     }
 
   } catch (error) {
@@ -65,4 +92,4 @@ export * from './identify_opportunities.js';
 export * from './types.js';
 
 // Export the tool registry
-export { toolRegistry } from './registry.js';
+export { toolRegistry } from '../core/ToolRegistry.js';

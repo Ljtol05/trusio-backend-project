@@ -1,4 +1,2 @@
-// src/agents/tools/registry.ts
-export * from '../core/ToolRegistry.js';
-export { toolRegistry } from './index.js';
-export { registerAllTools } from './index.js';
+// This file is deprecated - use the ToolRegistry from ../core/ToolRegistry.js
+export { toolRegistry, ToolRegistry } from '../core/ToolRegistry.js';
