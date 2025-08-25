@@ -335,5 +335,3 @@ export const analyzeGoalProgressTool = tool({
     });
   }
 });
-
-export { analyzeSpendingPatternsTool, analyzeBudgetVarianceTool, analyzeTrendsTool, analyzeGoalProgressTool };
