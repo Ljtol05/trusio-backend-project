@@ -1,10 +1,5 @@
+
 import { logger } from '../../lib/logger.js';
-import { analyzeSpendingPatternsTool, analyzeBudgetVarianceTool, analyzeTrendsTool, analyzeGoalProgressTool } from './analysis.js';
-import { createBudgetTool, updateBudgetTool, budgetAnalysisTool } from './budget.js';
-import { createEnvelopeTool, transferFundsTool, getEnvelopeBalanceTool } from './envelope.js';
-import { categorizeTransactionTool, analyzeSpendingTool } from './transaction.js';
-import { generateRecommendationsTool, identifyOpportunitiesTool } from './insight.js';
-import { agentHandoffTool } from './handoff.js';
 
 export interface ToolMetrics {
   executionCount: number;
@@ -328,20 +323,3 @@ export class ToolRegistry {
 
 // Create and export a singleton instance
 export const toolRegistry = new ToolRegistry();
-
-// Register all tools immediately
-toolRegistry.registerTool(analyzeSpendingPatternsTool);
-toolRegistry.registerTool(analyzeBudgetVarianceTool);
-toolRegistry.registerTool(analyzeTrendsTool);
-toolRegistry.registerTool(analyzeGoalProgressTool);
-toolRegistry.registerTool(createBudgetTool);
-toolRegistry.registerTool(updateBudgetTool);
-toolRegistry.registerTool(budgetAnalysisTool);
-toolRegistry.registerTool(createEnvelopeTool);
-toolRegistry.registerTool(transferFundsTool);
-toolRegistry.registerTool(getEnvelopeBalanceTool);
-toolRegistry.registerTool(categorizeTransactionTool);
-toolRegistry.registerTool(analyzeSpendingTool);
-toolRegistry.registerTool(generateRecommendationsTool);
-toolRegistry.registerTool(identifyOpportunitiesTool);
-toolRegistry.registerTool(agentHandoffTool);
