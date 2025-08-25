@@ -1,4 +1,3 @@
-
 import { toolRegistry } from '../core/ToolRegistry.js';
 import { logger } from '../../lib/logger.js';
 import { registerTransactionTools } from './transaction-tools.js';
@@ -25,11 +24,17 @@ export function registerAllTools(): void {
   }
 }
 
-// Export the registry and types for external use
-export { toolRegistry, ToolRegistry } from '../core/ToolRegistry.js';
-export * from './transaction-tools.js';
+// Export all financial tools
 export * from './budget.js';
 export * from './envelope.js';
+export * from './transaction-tools.js';
 export * from './analysis.js';
 export * from './insight.js';
 export * from './handoff.js';
+export * from './transfer_funds.js';
+export * from './track_achievements.js';
+export * from './identify_opportunities.js';
+export * from './types.js';
+
+// Export the tool registry
+export { toolRegistry } from './registry.js';
