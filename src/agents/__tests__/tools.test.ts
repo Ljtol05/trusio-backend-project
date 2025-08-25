@@ -1,31 +1,26 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { ToolRegistry } from '../core/ToolRegistry.js';
-import { registerTransactionTools } from '../tools/transaction-tools.js';
-import type { FinancialContext, ToolExecutionContext } from '../tools/types.js';
 
-// Setup mocks before any imports
-const mockDb = {
-  envelope: {
-    findMany: vi.fn(),
-    findUnique: vi.fn(),
-    create: vi.fn(),
-    update: vi.fn(),
-    delete: vi.fn(),
-  },
-  transaction: {
-    findMany: vi.fn(),
-    create: vi.fn(),
-    update: vi.fn(),
-  },
-  goal: {
-    findMany: vi.fn(),
-    create: vi.fn(),
-    update: vi.fn(),
-  },
-};
-
+// Setup mocks before any other imports
 vi.mock('../../lib/db.js', () => ({
-  db: mockDb,
+  db: {
+    envelope: {
+      findMany: vi.fn(),
+      findUnique: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+      delete: vi.fn(),
+    },
+    transaction: {
+      findMany: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+    },
+    goal: {
+      findMany: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+    },
+  },
 }));
 
 vi.mock('../../lib/logger.js', () => ({
@@ -56,6 +51,12 @@ vi.mock('@openai/agents', () => ({
   setDefaultOpenAIClient: vi.fn(),
   setOpenAIAPI: vi.fn(),
 }));
+
+// Import after mocks are set up
+import { ToolRegistry } from '../core/ToolRegistry.js';
+import { registerTransactionTools } from '../tools/transaction-tools.js';
+import type { FinancialContext, ToolExecutionContext } from '../tools/types.js';
+import { db } from '../../lib/db.js';
 
 describe('Financial Tools', () => {
   let testRegistry: ToolRegistry;
@@ -152,7 +153,7 @@ describe('Financial Tools', () => {
     });
 
     it('should analyze spending patterns', async () => {
-      mockDb.transaction.findMany.mockResolvedValue([
+      vi.mocked(db.transaction.findMany).mockResolvedValue([
         { amount: -50, category: 'food', createdAt: new Date() },
         { amount: -30, category: 'food', createdAt: new Date() },
         { amount: -100, category: 'transport', createdAt: new Date() },
