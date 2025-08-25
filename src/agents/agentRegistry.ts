@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { logger } from '../lib/logger.js';
 import { MODELS } from '../lib/openai.js';
 import { AGENT_CONFIG, AGENT_PROMPTS } from './config.js';
-import { toolRegistry } from './core/ToolRegistry.js';
+import { toolRegistry } from './tools/index.js';
 import type { FinancialContext } from './tools/types.js';
 
 export class AgentRegistry {
