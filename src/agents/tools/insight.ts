@@ -406,4 +406,261 @@ toolRegistry.registerTool({
   estimatedDuration: 4000
 });
 
-export { insightGeneratorExecute };
+// New tools from the edited snippet
+const recommendationSchema = z.object({
+  userId: z.string(),
+  analysisType: z.enum(['spending', 'saving', 'investment', 'general']).default('general'),
+  timeframe: z.string().optional(),
+});
+
+const opportunityAnalysisSchema = z.object({
+  userId: z.string(),
+  focusAreas: z.array(z.string()).optional(),
+});
+
+export const generateRecommendationsTool = tool({
+  name: 'generate_personalized_recommendations',
+  description: 'Generate personalized financial recommendations based on user data',
+  parameters: recommendationSchema,
+  async execute(params, context: ToolExecutionContext) {
+    try {
+      logger.info({ params, userId: context.userId }, 'Generating personalized recommendations');
+
+      // Gather user financial data
+      const [transactions, envelopes, user] = await Promise.all([
+        db.transaction.findMany({
+          where: {
+            userId: params.userId,
+            createdAt: { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) }
+          }
+        }),
+        db.envelope.findMany({ where: { userId: params.userId } }),
+        db.user.findUnique({ where: { id: params.userId } })
+      ]);
+
+      if (!user) {
+        return JSON.stringify({
+          success: false,
+          error: 'User not found'
+        });
+      }
+
+      const recommendations = [];
+      const insights = [];
+
+      // Spending analysis
+      if (params.analysisType === 'spending' || params.analysisType === 'general') {
+        const expenses = transactions.filter(tx => tx.amount < 0);
+        const totalSpent = Math.abs(expenses.reduce((sum, tx) => sum + tx.amount, 0));
+
+        if (expenses.length > 0) {
+          const categorySpending = expenses.reduce((acc, tx) => {
+            const category = tx.category || 'Other';
+            acc[category] = (acc[category] || 0) + Math.abs(tx.amount);
+            return acc;
+          }, {} as Record<string, number>);
+
+          const topCategory = Object.entries(categorySpending)
+            .sort(([,a], [,b]) => b - a)[0];
+
+          if (topCategory && topCategory[1] > totalSpent * 0.3) {
+            recommendations.push({
+              type: 'spending_optimization',
+              priority: 'high',
+              description: `Consider reducing spending in ${topCategory[0]} - it represents ${Math.round((topCategory[1] / totalSpent) * 100)}% of your expenses`,
+              estimatedImpact: `Could save $${(topCategory[1] * 0.1).toFixed(2)} per month`,
+              actionRequired: `Review ${topCategory[0]} expenses and identify unnecessary purchases`
+            });
+          }
+        }
+      }
+
+      // Budget envelope analysis
+      if (envelopes.length > 0) {
+        const overBudgetEnvelopes = envelopes.filter(env => env.currentAmount < 0);
+        if (overBudgetEnvelopes.length > 0) {
+          recommendations.push({
+            type: 'budget_adjustment',
+            priority: 'high',
+            description: `${overBudgetEnvelopes.length} budget categories are overspent`,
+            estimatedImpact: 'Better budget adherence',
+            actionRequired: 'Reallocate funds or adjust spending habits'
+          });
+        }
+
+        const underUtilizedEnvelopes = envelopes.filter(env =>
+          env.currentAmount > env.budgetAmount * 0.8
+        );
+        if (underUtilizedEnvelopes.length > 0) {
+          recommendations.push({
+            type: 'reallocation',
+            priority: 'medium',
+            description: `${underUtilizedEnvelopes.length} budget categories have excess funds`,
+            estimatedImpact: 'Better fund utilization',
+            actionRequired: 'Consider reallocating excess funds to other categories'
+          });
+        }
+      }
+
+      // Saving opportunities
+      if (params.analysisType === 'saving' || params.analysisType === 'general') {
+        const income = transactions.filter(tx => tx.amount > 0);
+        const totalIncome = income.reduce((sum, tx) => sum + tx.amount, 0);
+        const expenses = Math.abs(transactions.filter(tx => tx.amount < 0).reduce((sum, tx) => sum + tx.amount, 0));
+
+        const savingsRate = totalIncome > 0 ? ((totalIncome - expenses) / totalIncome) * 100 : 0;
+
+        if (savingsRate < 20) {
+          recommendations.push({
+            type: 'savings_improvement',
+            priority: 'high',
+            description: `Your savings rate is ${savingsRate.toFixed(1)}%. Aim for at least 20%`,
+            estimatedImpact: `Increase monthly savings by $${((totalIncome * 0.2) - (totalIncome - expenses)).toFixed(2)}`,
+            actionRequired: 'Create a dedicated savings plan and reduce discretionary spending'
+          });
+        }
+      }
+
+      insights.push(`Analyzed ${transactions.length} transactions over the last 30 days`);
+      insights.push(`You have ${envelopes.length} active budget categories`);
+
+      if (recommendations.length === 0) {
+        recommendations.push({
+          type: 'general',
+          priority: 'low',
+          description: 'Your finances appear to be well managed',
+          estimatedImpact: 'Continued financial stability',
+          actionRequired: 'Keep monitoring your spending patterns'
+        });
+      }
+
+      return JSON.stringify({
+        success: true,
+        analysisType: params.analysisType,
+        recommendations,
+        insights,
+        summary: {
+          totalRecommendations: recommendations.length,
+          highPriorityItems: recommendations.filter(r => r.priority === 'high').length
+        }
+      });
+
+    } catch (error: any) {
+      logger.error({ error, params }, 'Failed to generate recommendations');
+      return JSON.stringify({
+        success: false,
+        error: 'Failed to generate personalized recommendations',
+        details: error.message
+      });
+    }
+  }
+});
+
+export const identifyOpportunitiesTool = tool({
+  name: 'identify_financial_opportunities',
+  description: 'Identify financial optimization opportunities',
+  parameters: opportunityAnalysisSchema,
+  async execute(params, context: ToolExecutionContext) {
+    try {
+      logger.info({ params, userId: context.userId }, 'Identifying financial opportunities');
+
+      const [transactions, envelopes] = await Promise.all([
+        db.transaction.findMany({
+          where: {
+            userId: params.userId,
+            createdAt: { gte: new Date(Date.now() - 60 * 24 * 60 * 60 * 1000) }
+          }
+        }),
+        db.envelope.findMany({ where: { userId: params.userId } })
+      ]);
+
+      const opportunities = [];
+
+      // Recurring expense optimization
+      const merchantFrequency = transactions.reduce((acc, tx) => {
+        if (tx.amount < 0 && tx.description) {
+          const merchant = tx.description.toLowerCase();
+          acc[merchant] = (acc[merchant] || 0) + 1;
+        }
+        return acc;
+      }, {} as Record<string, number>);
+
+      const frequentMerchants = Object.entries(merchantFrequency)
+        .filter(([, count]) => count >= 4)
+        .sort(([, a], [, b]) => b - a);
+
+      if (frequentMerchants.length > 0) {
+        opportunities.push({
+          type: 'subscription_optimization',
+          title: 'Review Recurring Expenses',
+          description: `You have ${frequentMerchants.length} frequently charged merchants`,
+          potentialSaving: 'Up to 15-25% on subscriptions',
+          action: 'Review and cancel unused subscriptions',
+          merchants: frequentMerchants.slice(0, 3).map(([name]) => name)
+        });
+      }
+
+      // Cash flow timing optimization
+      const monthlyExpenses = transactions
+        .filter(tx => tx.amount < 0)
+        .reduce((sum, tx) => sum + Math.abs(tx.amount), 0) / 2; // 2 months of data
+
+      const monthlyIncome = transactions
+        .filter(tx => tx.amount > 0)
+        .reduce((sum, tx) => sum + tx.amount, 0) / 2;
+
+      if (monthlyIncome > monthlyExpenses * 1.5) {
+        opportunities.push({
+          type: 'investment_opportunity',
+          title: 'Excess Cash Flow',
+          description: `You have $${(monthlyIncome - monthlyExpenses).toFixed(2)} monthly surplus`,
+          potentialSaving: 'Compound growth potential',
+          action: 'Consider investing surplus funds'
+        });
+      }
+
+      // Budget rebalancing
+      if (envelopes.length > 0) {
+        const imbalancedEnvelopes = envelopes.filter(env =>
+          Math.abs(env.currentAmount - env.budgetAmount) > env.budgetAmount * 0.2
+        );
+
+        if (imbalancedEnvelopes.length > 0) {
+          opportunities.push({
+            type: 'budget_rebalancing',
+            title: 'Budget Optimization',
+            description: `${imbalancedEnvelopes.length} budget categories need rebalancing`,
+            potentialSaving: 'Improved budget efficiency',
+            action: 'Redistribute funds between over/under-allocated categories'
+          });
+        }
+      }
+
+      return JSON.stringify({
+        success: true,
+        opportunities,
+        summary: {
+          totalOpportunities: opportunities.length,
+          categories: [...new Set(opportunities.map(o => o.type))]
+        },
+        nextSteps: opportunities.length > 0 ?
+          'Review the identified opportunities and prioritize based on potential impact' :
+          'Continue monitoring for new optimization opportunities'
+      });
+
+    } catch (error: any) {
+      logger.error({ error, params }, 'Failed to identify opportunities');
+      return JSON.stringify({
+        success: false,
+        error: 'Failed to identify financial opportunities',
+        details: error.message
+      });
+    }
+  }
+});
+
+export function registerInsightTools(registry: any): void {
+  registry.registerTool(generateRecommendationsTool);
+  registry.registerTool(identifyOpportunitiesTool);
+  logger.info('Financial insight tools registered');
+}

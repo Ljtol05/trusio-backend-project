@@ -226,7 +226,16 @@ export interface AgentExecutionResult {
   timestamp: Date;
   duration: number;
   error?: string;
-  metadata?: Record<string, unknown>;
+}
+
+export interface AgentInteraction {
+  id: string;
+  sessionId: string;
+  agentName: string;
+  userMessage: string;
+  agentResponse: string;
+  timestamp: Date;
+  metadata?: Record<string, any>;
 }
 
 // Agent capabilities

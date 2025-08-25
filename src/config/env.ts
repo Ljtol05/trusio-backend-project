@@ -1,4 +1,6 @@
 import { z } from 'zod';
+import OpenAI from 'openai';
+import { setDefaultOpenAIKey, setDefaultOpenAIClient, setOpenAIAPI, setTracingDisabled } from '@openai/agents';
 
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
@@ -48,14 +50,51 @@ const rawEnv = {
 
 export const env = envSchema.parse(rawEnv);
 
-// Validate OpenAI configuration for agent functionality
-if (!env.OPENAI_API_KEY) {
-  console.warn("[env] OpenAI configuration incomplete:");
-  console.warn("  - OPENAI_API_KEY missing from Replit Secrets");
-  console.warn("AI features will be disabled. Set OPENAI_API_KEY in Replit Secrets to enable AI functionality.");
-} else {
-  console.log("[env] ✅ OpenAI configured successfully");
-  if (env.OPENAI_PROJECT_ID) console.log("[env] Project ID:", env.OPENAI_PROJECT_ID);
-  if (env.OPENAI_ORG_ID) console.log("[env] Org ID:", env.OPENAI_ORG_ID);
-  console.log("[env] API Key:", env.OPENAI_API_KEY ? `${env.OPENAI_API_KEY.substring(0, 7)}...` : 'missing');
+// Initialize OpenAI client and configure Agents SDK
+let openaiClient: OpenAI | null = null;
+
+try {
+  if (env.OPENAI_API_KEY) {
+    const clientConfig: any = {
+      apiKey: env.OPENAI_API_KEY,
+      timeout: env.OPENAI_TIMEOUT_MS,
+      maxRetries: env.OPENAI_MAX_RETRIES,
+    };
+
+    // Add project or organization ID if available
+    if (env.OPENAI_PROJECT_ID) {
+      clientConfig.project = env.OPENAI_PROJECT_ID;
+    } else if (env.OPENAI_ORG_ID) {
+      clientConfig.organization = env.OPENAI_ORG_ID;
+    }
+
+    openaiClient = new OpenAI(clientConfig);
+    
+    // Configure OpenAI Agents SDK
+    setDefaultOpenAIKey(env.OPENAI_API_KEY);
+    setDefaultOpenAIClient(openaiClient);
+    setOpenAIAPI(env.OPENAI_AGENTS_API_TYPE);
+    
+    // Configure tracing
+    if (!env.OPENAI_AGENTS_TRACING_ENABLED) {
+      setTracingDisabled(true);
+    }
+    
+    console.log("[env] ✅ OpenAI Client initialized successfully");
+    console.log("[env] ✅ Agents SDK configured");
+    if (env.OPENAI_PROJECT_ID) console.log("[env] Using Project ID:", env.OPENAI_PROJECT_ID);
+    if (env.OPENAI_ORG_ID) console.log("[env] Using Org ID:", env.OPENAI_ORG_ID);
+    console.log("[env] Agents API Type:", env.OPENAI_AGENTS_API_TYPE);
+    console.log("[env] Tracing Enabled:", env.OPENAI_AGENTS_TRACING_ENABLED);
+  } else {
+    console.warn("[env] OpenAI configuration incomplete:");
+    console.warn("  - OPENAI_API_KEY missing from Replit Secrets");
+    console.warn("AI features will be disabled. Set OPENAI_API_KEY in Replit Secrets to enable AI functionality.");
+  }
+} catch (error) {
+  console.error("[env] ❌ Failed to initialize OpenAI client:", error);
+  openaiClient = null;
 }
+
+export const openai = openaiClient;
+export const isAIEnabled = () => !!openaiClient && !!env.OPENAI_API_KEY;

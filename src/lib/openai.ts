@@ -1,7 +1,5 @@
 // src/lib/openai.ts
-import OpenAI from "openai";
-import { setDefaultOpenAIKey, setDefaultOpenAIClient, setOpenAIAPI, setTracingDisabled } from "@openai/agents";
-import { env } from "../config/env.js";
+import { env, openai as envOpenAI, isAIEnabled as envIsAIEnabled } from "../config/env.js";
 import { logger } from "./logger.js";
 
 export const MODELS = {
@@ -11,50 +9,9 @@ export const MODELS = {
   embedding: env.OPENAI_MODEL_EMBEDDING,
 } as const;
 
-let openaiClient: OpenAI | null = null;
-
-try {
-  if (env.OPENAI_API_KEY) {
-    const clientConfig: any = {
-      apiKey: env.OPENAI_API_KEY,
-      timeout: env.OPENAI_TIMEOUT_MS,
-      maxRetries: env.OPENAI_MAX_RETRIES,
-    };
-
-    // Add project or organization ID if available
-    if (env.OPENAI_PROJECT_ID) {
-      clientConfig.project = env.OPENAI_PROJECT_ID;
-    } else if (env.OPENAI_ORG_ID) {
-      clientConfig.organization = env.OPENAI_ORG_ID;
-    }
-
-    openaiClient = new OpenAI(clientConfig);
-    
-    // Configure OpenAI Agents SDK
-    setDefaultOpenAIKey(env.OPENAI_API_KEY);
-    setDefaultOpenAIClient(openaiClient);
-    setOpenAIAPI(env.OPENAI_AGENTS_API_TYPE);
-    
-    // Configure tracing
-    if (!env.OPENAI_AGENTS_TRACING_ENABLED) {
-      setTracingDisabled(true);
-    }
-    
-    console.log("[openai] ✅ Client initialized successfully");
-    console.log("[openai] ✅ Agents SDK configured");
-    if (env.OPENAI_PROJECT_ID) console.log("[openai] Using Project ID:", env.OPENAI_PROJECT_ID);
-    if (env.OPENAI_ORG_ID) console.log("[openai] Using Org ID:", env.OPENAI_ORG_ID);
-    console.log("[openai] Agents API Type:", env.OPENAI_AGENTS_API_TYPE);
-    console.log("[openai] Tracing Enabled:", env.OPENAI_AGENTS_TRACING_ENABLED);
-  } else {
-    console.log("[openai] ⚠️  Client not initialized - missing OPENAI_API_KEY");
-  }
-} catch (error) {
-  console.error("[openai] ❌ Failed to initialize client:", error);
-  openaiClient = null;
-}
-
-export const openai = openaiClient;
+// Use the OpenAI client from env.ts
+export const openai = envOpenAI;
+export const isAIEnabled = envIsAIEnabled;
 
 export const isAIEnabled = () => !!openai && !!env.OPENAI_API_KEY;
 

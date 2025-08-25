@@ -1,4 +1,3 @@
-
 import { Router } from 'express';
 import { z } from 'zod';
 import { logger } from '../lib/logger.js';
@@ -218,7 +217,7 @@ router.post('/chat', auth, async (req, res) => {
 
   } catch (error: any) {
     logger.error({ error, userId: req.user?.id }, 'Agent chat failed');
-    
+
     if (error.name === 'ZodError') {
       return res.status(400).json({
         ok: false,
@@ -281,7 +280,7 @@ router.post('/tools/execute', auth, async (req, res) => {
 
   } catch (error: any) {
     logger.error({ error, userId: req.user?.id }, 'Tool execution failed');
-    
+
     if (error.name === 'ZodError') {
       return res.status(400).json({
         ok: false,
@@ -385,7 +384,7 @@ router.post('/handoff', auth, async (req, res) => {
 
   } catch (error: any) {
     logger.error({ error, userId: req.user?.id }, 'Agent handoff failed');
-    
+
     if (error.name === 'ZodError') {
       return res.status(400).json({
         ok: false,
@@ -407,7 +406,7 @@ router.post('/handoff', auth, async (req, res) => {
 router.get('/agents', auth, async (req, res) => {
   try {
     const userId = req.user!.id;
-    
+
     logger.info({ userId }, 'Fetching available agents');
 
     const agentMetrics = agentRegistry.getAgentMetrics();
@@ -430,7 +429,7 @@ router.get('/agents', auth, async (req, res) => {
 
   } catch (error: any) {
     logger.error({ error, userId: req.user?.id }, 'Failed to fetch agents');
-    
+
     res.status(500).json({
       ok: false,
       error: 'Failed to fetch available agents',
@@ -444,7 +443,7 @@ router.get('/tools', auth, async (req, res) => {
   try {
     const userId = req.user!.id;
     const { category } = req.query;
-    
+
     logger.info({ userId, category }, 'Fetching available tools');
 
     const allTools = toolRegistry.getAllTools();
@@ -477,7 +476,7 @@ router.get('/tools', auth, async (req, res) => {
 
   } catch (error: any) {
     logger.error({ error, userId: req.user?.id }, 'Failed to fetch tools');
-    
+
     res.status(500).json({
       ok: false,
       error: 'Failed to fetch available tools',
@@ -527,7 +526,7 @@ router.get('/sessions/:sessionId/history', auth, async (req, res) => {
 
   } catch (error: any) {
     logger.error({ error, userId: req.user?.id }, 'Failed to fetch conversation history');
-    
+
     res.status(500).json({
       ok: false,
       error: 'Failed to fetch conversation history',
@@ -540,7 +539,7 @@ router.get('/sessions/:sessionId/history', auth, async (req, res) => {
 router.get('/status', auth, async (req, res) => {
   try {
     const userId = req.user!.id;
-    
+
     logger.info({ userId }, 'Checking AI system status');
 
     // Check agent registry status
@@ -574,7 +573,7 @@ router.get('/status', auth, async (req, res) => {
 
   } catch (error: any) {
     logger.error({ error, userId: req.user?.id }, 'Failed to get AI system status');
-    
+
     res.status(500).json({
       ok: false,
       error: 'Failed to check system status',
