@@ -1,4 +1,3 @@
-
 import { z } from 'zod';
 import { tool } from '@openai/agents';
 import { db } from '../../lib/db.js';
@@ -31,7 +30,7 @@ async function categorizeTransactionExecute(
     logger.info({ parameters, userId: context.userId }, 'Categorizing transaction');
 
     const { description, amount } = parameters;
-    
+
     // Simple categorization logic - in production, use ML model
     const categorization = categorizeTransaction(description || '', amount || 0);
 
@@ -67,7 +66,7 @@ async function autoAllocateExecute(
 
     // Categorize the transaction
     const categorization = categorizeTransaction(description || '', amount || 0);
-    
+
     // Find matching envelope
     const targetEnvelope = envelopes.find(env => 
       env.category?.toLowerCase() === categorization.category.toLowerCase()
@@ -100,7 +99,7 @@ async function patternDetectionExecute(
     const { userId, startDate, endDate, category } = parameters;
 
     const whereClause: any = { userId };
-    
+
     if (startDate && endDate) {
       whereClause.createdAt = {
         gte: new Date(startDate),
@@ -171,7 +170,7 @@ function categorizeTransaction(description: string, amount: number): {
   reasoning: string;
 } {
   const desc = description.toLowerCase();
-  
+
   // Simple rule-based categorization
   if (desc.includes('grocery') || desc.includes('food') || desc.includes('restaurant')) {
     return {
@@ -181,7 +180,7 @@ function categorizeTransaction(description: string, amount: number): {
       reasoning: 'Transaction description contains food-related keywords',
     };
   }
-  
+
   if (desc.includes('gas') || desc.includes('fuel') || desc.includes('exxon') || desc.includes('shell')) {
     return {
       category: 'transport',
@@ -190,7 +189,7 @@ function categorizeTransaction(description: string, amount: number): {
       reasoning: 'Transaction description contains fuel/gas-related keywords',
     };
   }
-  
+
   if (desc.includes('netflix') || desc.includes('spotify') || desc.includes('entertainment')) {
     return {
       category: 'entertainment',
@@ -199,7 +198,7 @@ function categorizeTransaction(description: string, amount: number): {
       reasoning: 'Transaction description contains entertainment-related keywords',
     };
   }
-  
+
   // Default category
   return {
     category: 'general',
@@ -211,7 +210,7 @@ function categorizeTransaction(description: string, amount: number): {
 
 function analyzeSpendingPatterns(transactions: any[]): any[] {
   const patterns = [];
-  
+
   // Group by day of week
   const dayOfWeekSpending = transactions.reduce((acc, txn) => {
     const day = new Date(txn.createdAt).getDay();
@@ -219,26 +218,26 @@ function analyzeSpendingPatterns(transactions: any[]): any[] {
     acc[dayName] = (acc[dayName] || 0) + Math.abs(txn.amount);
     return acc;
   }, {});
-  
+
   patterns.push({
     type: 'day_of_week',
     data: dayOfWeekSpending,
     insight: `Highest spending on ${Object.keys(dayOfWeekSpending).reduce((a, b) => dayOfWeekSpending[a] > dayOfWeekSpending[b] ? a : b)}`,
   });
-  
+
   // Group by category
   const categorySpending = transactions.reduce((acc, txn) => {
     const category = txn.category || 'uncategorized';
     acc[category] = (acc[category] || 0) + Math.abs(txn.amount);
     return acc;
   }, {});
-  
+
   patterns.push({
     type: 'category',
     data: categorySpending,
     insight: `Top spending category: ${Object.keys(categorySpending).reduce((a, b) => categorySpending[a] > categorySpending[b] ? a : b)}`,
   });
-  
+
   return patterns;
 }
 
@@ -248,25 +247,25 @@ function generatePatternInsights(patterns: any[]): string[] {
 
 function detectTransactionAnomalies(transactions: any[], sensitivity: string): any[] {
   const anomalies = [];
-  
+
   if (transactions.length < 10) {
     return anomalies; // Need sufficient data
   }
-  
+
   // Calculate average transaction amount
   const amounts = transactions.map(t => Math.abs(t.amount));
   const avgAmount = amounts.reduce((sum, amt) => sum + amt, 0) / amounts.length;
   const stdDev = Math.sqrt(amounts.reduce((sum, amt) => sum + Math.pow(amt - avgAmount, 2), 0) / amounts.length);
-  
+
   // Sensitivity multipliers
   const thresholds = {
     low: 3,
     medium: 2,
     high: 1.5,
   };
-  
+
   const threshold = avgAmount + (stdDev * thresholds[sensitivity as keyof typeof thresholds]);
-  
+
   // Find anomalous transactions
   transactions.forEach(txn => {
     if (Math.abs(txn.amount) > threshold) {
@@ -281,23 +280,23 @@ function detectTransactionAnomalies(transactions: any[], sensitivity: string): a
       });
     }
   });
-  
+
   return anomalies;
 }
 
 function generateAnomalyRecommendations(anomalies: any[]): string[] {
   const recommendations = [];
-  
+
   if (anomalies.length === 0) {
     recommendations.push('No anomalies detected. Your spending patterns look normal.');
   } else {
     recommendations.push(`Found ${anomalies.length} unusual transaction(s). Review these for accuracy.`);
-    
+
     if (anomalies.some(a => a.severity === 'high')) {
       recommendations.push('Some transactions are significantly higher than usual. Verify these are legitimate.');
     }
   }
-  
+
   return recommendations;
 }
 

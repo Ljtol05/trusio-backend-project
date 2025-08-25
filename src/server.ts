@@ -1,11 +1,10 @@
-
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import { logger } from './lib/logger.js';
 import { env } from './config/env.js';
-import { initializeAgentSystem } from './agents/bootstrap.js';
+import { registerAllTools } from './agents/tools/index.js';
 
 // Import routes
 import authRoutes from './routes/auth.js';
@@ -47,7 +46,7 @@ app.use('/api/transactions', transactionRoutes);
 // Error handling middleware
 app.use((error: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
   logger.error({ error: error.message, stack: error.stack }, 'Unhandled error');
-  
+
   res.status(error.status || 500).json({
     error: {
       message: env.NODE_ENV === 'production' ? 'Internal server error' : error.message,
@@ -65,11 +64,8 @@ const PORT = env.PORT || 5000;
 
 async function startServer() {
   try {
-    // Initialize agent system first
-    const agentSystemReady = await initializeAgentSystem();
-    if (!agentSystemReady) {
-      throw new Error('Failed to initialize agent system');
-    }
+    // Initialize agents and tools
+    registerAllTools();
 
     app.listen(PORT, '0.0.0.0', () => {
       logger.info({ port: PORT }, 'Server started successfully');
