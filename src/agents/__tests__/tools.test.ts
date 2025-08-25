@@ -39,7 +39,12 @@ vi.mock('../../lib/logger.js', () => ({
 vi.mock('@openai/agents', () => ({
   Agent: vi.fn(),
   run: vi.fn(),
-  tool: vi.fn(),
+  tool: vi.fn().mockImplementation((config) => ({
+    name: config.name,
+    description: config.description,
+    parameters: config.parameters,
+    execute: config.execute,
+  })),
   defineTool: vi.fn().mockImplementation((config) => ({
     name: config.name,
     description: config.description,
@@ -48,6 +53,7 @@ vi.mock('@openai/agents', () => ({
   })),
   setDefaultOpenAIKey: vi.fn(),
   setDefaultOpenAIClient: vi.fn(),
+  setOpenAIAPI: vi.fn(),
 }));
 
 // Now import the tool registry after mocks are set up
@@ -329,14 +335,15 @@ describe('Financial Tools', () => {
     });
 
     it('should handle tool execution timeout', async () => {
-      // Mock a slow tool
+      // Mock a slow tool with proper structure
       const slowTool = {
-        tool: vi.fn().mockImplementation(() => new Promise(resolve => setTimeout(resolve, 10000))),
+        name: 'slow_tool',
         description: 'Slow tool',
         category: 'test',
+        execute: vi.fn().mockImplementation(() => new Promise(resolve => setTimeout(resolve, 10000))),
       };
 
-      toolRegistry['tools'].set('slow_tool', slowTool);
+      toolRegistry.registerTool(slowTool);
 
       const result = await toolRegistry.executeTool(
         'slow_tool',

@@ -58,16 +58,17 @@ export class ToolRegistry {
   }> = [];
 
   registerTool(toolDefinition: any): void {
-    // Handle OpenAI SDK tool format
+    // Handle OpenAI SDK tool format - the tool() function returns an object with metadata
+    const toolName = toolDefinition.name || toolDefinition.toolName;
     const tool: Tool = {
-      name: toolDefinition.name,
-      description: toolDefinition.description || 'No description available',
+      name: toolName,
+      description: toolDefinition.description || toolDefinition.toolDescription || 'No description available',
       category: toolDefinition.category || 'general',
       riskLevel: toolDefinition.riskLevel || 'low',
       requiresAuth: toolDefinition.requiresAuth || false,
       estimatedDuration: toolDefinition.estimatedDuration || 1000,
-      schema: toolDefinition.parameters,
-      execute: toolDefinition.execute || toolDefinition.tool,
+      schema: toolDefinition.parameters || toolDefinition.schema,
+      execute: toolDefinition.execute || toolDefinition.tool || toolDefinition,
     };
 
     this.tools.set(toolDefinition.name, tool);
@@ -163,8 +164,19 @@ export class ToolRegistry {
         }
       }
 
-      // Execute the tool
-      const result = await tool.execute(parameters, context);
+      // Execute the tool with optional timeout
+      let result;
+      if (context.timeout) {
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Tool execution timeout')), context.timeout)
+        );
+        result = await Promise.race([
+          tool.execute(parameters, context),
+          timeoutPromise
+        ]);
+      } else {
+        result = await tool.execute(parameters, context);
+      }
       const duration = Date.now() - startTime;
 
       // Record successful execution
@@ -316,3 +328,20 @@ export class ToolRegistry {
 
 // Create and export a singleton instance
 export const toolRegistry = new ToolRegistry();
+
+// Register all tools immediately
+toolRegistry.registerTool(analyzeSpendingPatternsTool);
+toolRegistry.registerTool(analyzeBudgetVarianceTool);
+toolRegistry.registerTool(analyzeTrendsTool);
+toolRegistry.registerTool(analyzeGoalProgressTool);
+toolRegistry.registerTool(createBudgetTool);
+toolRegistry.registerTool(updateBudgetTool);
+toolRegistry.registerTool(budgetAnalysisTool);
+toolRegistry.registerTool(createEnvelopeTool);
+toolRegistry.registerTool(transferFundsTool);
+toolRegistry.registerTool(getEnvelopeBalanceTool);
+toolRegistry.registerTool(categorizeTransactionTool);
+toolRegistry.registerTool(analyzeSpendingTool);
+toolRegistry.registerTool(generateRecommendationsTool);
+toolRegistry.registerTool(identifyOpportunitiesTool);
+toolRegistry.registerTool(agentHandoffTool);
