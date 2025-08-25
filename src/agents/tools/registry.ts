@@ -1,4 +1,3 @@
-
 import { logger } from '../../lib/logger.js';
 
 export interface ToolMetrics {
@@ -66,18 +65,18 @@ export class ToolRegistry {
     };
 
     this.tools.set(toolDefinition.name, tool);
-    
+
     // Initialize metrics for the tool
-    if (!this.metrics.has(name)) {
-      this.metrics.set(name, {
+    if (!this.metrics.has(toolDefinition.name)) {
+      this.metrics.set(toolDefinition.name, {
         executionCount: 0,
         averageExecutionTime: 0,
         successRate: 100,
         totalErrors: 0,
       });
     }
-    
-    logger.info({ toolName: name }, 'Tool registered');
+
+    logger.info({ toolName: toolDefinition.name }, 'Tool registered');
   }
 
   unregisterTool(name: string): boolean {
@@ -177,9 +176,9 @@ export class ToolRegistry {
     } catch (error: any) {
       const duration = Date.now() - startTime;
       const errorMessage = error.message || 'Unknown error occurred';
-      
+
       this.recordExecution(name, duration, false, errorMessage);
-      
+
       logger.error({ toolName: name, error, duration }, 'Tool execution failed');
 
       return {
@@ -216,17 +215,17 @@ export class ToolRegistry {
     if (metrics) {
       metrics.executionCount++;
       metrics.lastExecution = new Date();
-      
+
       // Update average execution time
       const totalTime = metrics.averageExecutionTime * (metrics.executionCount - 1) + duration;
       metrics.averageExecutionTime = totalTime / metrics.executionCount;
-      
+
       // Update success rate
       if (!success) {
         metrics.totalErrors++;
       }
       metrics.successRate = ((metrics.executionCount - metrics.totalErrors) / metrics.executionCount) * 100;
-      
+
       this.metrics.set(toolName, metrics);
     }
   }
@@ -285,17 +284,17 @@ export class ToolRegistry {
   } {
     const totalExecutions = Array.from(this.metrics.values())
       .reduce((sum, m) => sum + m.executionCount, 0);
-    
+
     const totalErrors = Array.from(this.metrics.values())
       .reduce((sum, m) => sum + m.totalErrors, 0);
-    
+
     const overallSuccessRate = totalExecutions > 0 
       ? ((totalExecutions - totalErrors) / totalExecutions) * 100 
       : 100;
-    
+
     const averageExecutionTime = Array.from(this.metrics.values())
       .reduce((sum, m) => sum + m.averageExecutionTime, 0) / this.metrics.size || 0;
-    
+
     const healthyTools = Array.from(this.metrics.values())
       .filter(m => m.executionCount === 0 || m.successRate >= 80).length;
 
