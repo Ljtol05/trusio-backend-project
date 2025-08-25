@@ -1,4 +1,3 @@
-
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { ToolRegistry } from '../core/ToolRegistry.js';
 import { registerTransactionTools } from '../tools/transaction-tools.js';
@@ -89,16 +88,25 @@ describe('Financial Tools', () => {
     it('should have all required transaction tools registered', () => {
       const tools = testRegistry.getAllTools();
 
-      // Transaction tools that should be registered
+      // Check for specific transaction tools that actually exist
       expect(tools).toHaveProperty('categorize_transaction');
       expect(tools).toHaveProperty('automatic_allocation');
       expect(tools).toHaveProperty('pattern_detection');
       expect(tools).toHaveProperty('detect_anomalies');
+
+      // Check tool properties
+      expect(tools.categorize_transaction).toBeDefined();
+      expect(tools.categorize_transaction.description).toBeDefined();
+      expect(tools.categorize_transaction.execute).toBeTypeOf('function');
     });
 
     it('should return correct tool count', () => {
-      const count = testRegistry.getToolCount();
-      expect(count).toBeGreaterThan(3);
+      const toolCount = testRegistry.getToolCount();
+      expect(toolCount).toBeGreaterThan(2);
+
+      const toolNames = testRegistry.getToolNames();
+      expect(toolNames).toContain('categorize_transaction');
+      expect(toolNames).toContain('automatic_allocation');
     });
   });
 

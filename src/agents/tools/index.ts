@@ -1,5 +1,5 @@
 
-import { logger } from '../../lib/logger.js';
+<old_str>import { logger } from '../../lib/logger.js';
 import { toolRegistry } from '../core/ToolRegistry.js';
 import { registerTransactionTools } from './transaction-tools.js';
 
@@ -38,4 +38,18 @@ export * from './transaction-tools.js';
 // export * from './budget-tools.js';
 // export * from './envelope-tools.js';
 // export * from './insight-tools.js';
-// export * from './handoff-tools.js';
+// export * from './handoff-tools.js';</old_str>
+<new_str>import { toolRegistry } from '../core/ToolRegistry.js';
+import { registerTransactionTools } from './transaction-tools.js';
+// import { registerBudgetTools } from './budget-tools.js';
+// import { registerEnvelopeTools } from './envelope-tools.js';
+// etc.
+
+export function registerAllTools() {
+  registerTransactionTools(toolRegistry);
+  // registerBudgetTools(toolRegistry);
+  // registerEnvelopeTools(toolRegistry);
+  // etc.
+}
+
+export { toolRegistry };</new_str>

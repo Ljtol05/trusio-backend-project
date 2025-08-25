@@ -1,11 +1,10 @@
-
 import { Agent, tool, run } from '@openai/agents';
 import { z } from 'zod';
 import { logger } from '../lib/logger.js';
 import { MODELS } from '../lib/openai.js';
 import { AGENT_CONFIG, AGENT_PROMPTS } from './config.js';
-import { toolRegistry } from './tools/registry.js';
-import { FinancialContext } from './tools/types.js';
+import { toolRegistry } from './core/ToolRegistry.js';
+import type { FinancialContext } from './tools/types.js';
 
 export class AgentRegistry {
   private agents: Map<string, Agent> = new Map();
@@ -21,7 +20,7 @@ export class AgentRegistry {
       const financialAdvisor = new Agent({
         name: 'Financial Advisor',
         instructions: `${AGENT_PROMPTS.systemBase}
-        
+
 ${AGENT_PROMPTS.financialAdvisor}
 
 You are the primary financial coaching agent. Your role is to:
@@ -44,7 +43,7 @@ Always be supportive, educational, and actionable in your advice.`,
       const budgetCoach = new Agent({
         name: 'Budget Coach',
         instructions: `${AGENT_PROMPTS.systemBase}
-        
+
 ${AGENT_PROMPTS.budgetCoach}
 
 You are a specialized budget coaching agent. Your expertise includes:
@@ -63,7 +62,7 @@ Focus on practical, actionable budgeting advice that users can implement immedia
       const transactionAnalyst = new Agent({
         name: 'Transaction Analyst',
         instructions: `${AGENT_PROMPTS.systemBase}
-        
+
 ${AGENT_PROMPTS.transactionAnalyst}
 
 You are a specialized transaction analysis agent. Your expertise includes:
@@ -82,7 +81,7 @@ Present findings in clear, actionable ways that help users make better financial
       const insightGenerator = new Agent({
         name: 'Insight Generator',
         instructions: `${AGENT_PROMPTS.systemBase}
-        
+
 ${AGENT_PROMPTS.insightGenerator}
 
 You are a specialized insight generation agent. Your expertise includes:
@@ -218,7 +217,7 @@ Focus on actionable recommendations that align with their financial goals and en
 
     try {
       logger.info({ agentName, userId: context.userId }, 'Running financial agent');
-      
+
       const result = await run(agent, userMessage, { context });
 
       // Handle different result types from the OpenAI Agents SDK
