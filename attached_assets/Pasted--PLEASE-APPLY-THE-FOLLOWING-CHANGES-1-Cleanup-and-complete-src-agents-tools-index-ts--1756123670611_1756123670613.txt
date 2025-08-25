@@ -1,0 +1,51 @@
+---PLEASE APPLY THE FOLLOWING CHANGES---
+
+1. **Cleanup and complete `src/agents/tools/index.ts`**
+
+   The file currently contains `<old_str>`/`<new_str>` markers, which cause an esbuild parse error. Replace its entire contents with a clean module that registers *all* tools and re‑exports them:
+
+   ```ts
+   import { logger } from '../../lib/logger.js';
+   import { toolRegistry } from '../core/ToolRegistry.js';
+
+   import { registerTransactionTools } from './transaction-tools.js';
+   import { registerBudgetTools } from './budget.js';
+   import { registerEnvelopeTools } from './envelope.js';
+   import { registerAnalysisTools } from './analysis.js';
+   import { registerInsightTools } from './insight.js';
+   import { registerHandoffTools } from './handoff.js';
+   import { registerTransferTools } from './transfer_funds.js';
+   import { registerAchievementTools } from './track_achievements.js';
+   import { registerIdentifyTools } from './identify_opportunities.js';
+
+   // Register every tool group into the shared registry.
+   export function registerAllTools() {
+     try {
+       registerTransactionTools(toolRegistry);
+       registerBudgetTools(toolRegistry);
+       registerEnvelopeTools(toolRegistry);
+       registerAnalysisTools(toolRegistry);
+       registerInsightTools(toolRegistry);
+       registerHandoffTools(toolRegistry);
+       registerTransferTools(toolRegistry);
+       registerAchievementTools(toolRegistry);
+       registerIdentifyTools(toolRegistry);
+       const toolCount = toolRegistry.getToolCount();
+       logger.info({ toolCount }, 'All financial tools registered successfully');
+     } catch (error) {
+       logger.error({ error }, 'Failed to register tools');
+       throw error;
+     }
+   }
+
+   // Re‑export registry and individual tools
+   export { toolRegistry, ToolRegistry } from '../core/ToolRegistry.js';
+   export * from './transaction-tools.js';
+   export * from './budget.js';
+   export * from './envelope.js';
+   export * from './analysis.js';
+   export * from './insight.js';
+   export * from './handoff.js';
+   export * from './transfer_funds.js';
+   export * from './track_achievements.js';
+   export * from './identify_opportunities.js';
