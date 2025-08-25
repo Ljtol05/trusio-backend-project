@@ -1,4 +1,10 @@
 import { logger } from '../../lib/logger.js';
+import { analyzeSpendingPatternsTool, analyzeBudgetVarianceTool, analyzeTrendsTool, analyzeGoalProgressTool } from './analysis.js';
+import { createBudgetTool, updateBudgetTool, budgetAnalysisTool } from './budget.js';
+import { createEnvelopeTool, transferFundsTool, getEnvelopeBalanceTool } from './envelope.js';
+import { categorizeTransactionTool, analyzeSpendingTool } from './transaction.js';
+import { generateRecommendationsTool, identifyOpportunitiesTool } from './insight.js';
+import { agentHandoffTool } from './handoff.js';
 
 export interface ToolMetrics {
   executionCount: number;
