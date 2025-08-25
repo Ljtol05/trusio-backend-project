@@ -1,4 +1,6 @@
+
 import { toolRegistry } from '../core/ToolRegistry.js';
+import { logger } from '../../lib/logger.js';
 import { registerTransactionTools } from './transaction-tools.js';
 import { registerBudgetTools } from './budget.js';
 import { registerEnvelopeTools } from './envelope.js';

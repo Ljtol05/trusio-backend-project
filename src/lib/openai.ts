@@ -19,15 +19,24 @@ export function configureOpenAIFromEnv(): boolean {
     if (key && typeof (Agents as any).setDefaultOpenAIKey === 'function') {
       (Agents as any).setDefaultOpenAIKey(key);
       aiEnabled = true;
+      logger.info('OpenAI SDK configured with API key');
     }
 
     const apiMode = process.env.OPENAI_API || 'responses';
     if (typeof (Agents as any).setOpenAIAPI === 'function') {
       (Agents as any).setOpenAIAPI(apiMode);
+      logger.info({ apiMode }, 'OpenAI API mode configured');
+    }
+
+    // Additional SDK configuration
+    if (typeof (Agents as any).setDefaultOpenAIClient === 'function' && envOpenAI) {
+      (Agents as any).setDefaultOpenAIClient(envOpenAI);
+      logger.info('OpenAI client configured');
     }
 
     return true;
-  } catch {
+  } catch (error) {
+    logger.error({ error }, 'Failed to configure OpenAI SDK');
     return false;
   }
 }
@@ -41,7 +50,6 @@ export const MODELS = {
 
 // Use the OpenAI client from env.ts
 export const openai = envOpenAI;
-// export const isAIEnabled = envIsAIEnabled; // This line is removed as isAIEnabled is now a function
 
 // Models that should not receive a custom temperature on chat.completions
 const NO_TEMP_MODELS = [/^gpt-4-1/, /^gpt-5/, /^gpt-4o/, /^gpt-4-turbo/];
