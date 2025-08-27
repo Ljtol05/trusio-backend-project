@@ -535,6 +535,195 @@ router.get('/sessions/:sessionId/history', auth, async (req, res) => {
   }
 });
 
+// POST /api/ai/memory/store - Store user preference or learning
+router.post('/memory/store', auth, async (req, res) => {
+  try {
+    const { type, key, value, category, confidence } = req.body;
+    const userId = req.user!.id;
+
+    if (!type || !key || value === undefined) {
+      return res.status(400).json({
+        ok: false,
+        error: 'Missing required fields: type, key, value',
+        code: 'MISSING_FIELDS'
+      });
+    }
+
+    const financialContext = await buildFinancialContext(userId);
+
+    if (type === 'preference') {
+      const result = await toolRegistry.executeTool(
+        'store_user_preference',
+        {
+          userId,
+          preferenceKey: key,
+          preferenceValue: value,
+          category: category || 'general',
+          confidence: confidence || 0.8,
+        },
+        financialContext
+      );
+
+      res.json({
+        ok: true,
+        stored: result.success,
+        type: 'preference',
+        key,
+        value,
+        timestamp: new Date().toISOString(),
+      });
+    } else if (type === 'insight') {
+      const result = await toolRegistry.executeTool(
+        'store_insight',
+        {
+          userId,
+          insight: value,
+          category: category || 'general',
+          confidence: confidence || 0.8,
+        },
+        financialContext
+      );
+
+      res.json({
+        ok: true,
+        stored: result.success,
+        type: 'insight',
+        category: category || 'general',
+        timestamp: new Date().toISOString(),
+      });
+    } else {
+      return res.status(400).json({
+        ok: false,
+        error: 'Invalid type. Must be "preference" or "insight"',
+        code: 'INVALID_TYPE'
+      });
+    }
+
+  } catch (error: any) {
+    logger.error({ error, userId: req.user?.id }, 'Failed to store memory');
+
+    res.status(500).json({
+      ok: false,
+      error: 'Failed to store memory',
+      code: 'MEMORY_STORE_ERROR'
+    });
+  }
+});
+
+// GET /api/ai/memory/profile - Get user memory profile
+router.get('/memory/profile', auth, async (req, res) => {
+  try {
+    const userId = req.user!.id;
+    const { includeHistory = 'false' } = req.query;
+
+    const financialContext = await buildFinancialContext(userId);
+
+    const result = await toolRegistry.executeTool(
+      'get_user_memory_profile',
+      {
+        userId,
+        includeHistory: includeHistory === 'true',
+      },
+      financialContext
+    );
+
+    res.json({
+      ok: true,
+      profile: result.result.profile,
+      interactionHistory: result.result.interactionHistory,
+      isNewUser: result.result.isNewUser || false,
+      lastInteraction: result.result.lastInteraction,
+      currentFocus: result.result.currentFocus,
+      timestamp: new Date().toISOString(),
+    });
+
+  } catch (error: any) {
+    logger.error({ error, userId: req.user?.id }, 'Failed to get memory profile');
+
+    res.status(500).json({
+      ok: false,
+      error: 'Failed to retrieve memory profile',
+      code: 'MEMORY_PROFILE_ERROR'
+    });
+  }
+});
+
+// GET /api/ai/goals/tracking - Get goal tracking data
+router.get('/goals/tracking', auth, async (req, res) => {
+  try {
+    const userId = req.user!.id;
+    const { goalId, recommendations = 'true' } = req.query;
+
+    const financialContext = await buildFinancialContext(userId);
+
+    const result = await toolRegistry.executeTool(
+      'track_goal_progress',
+      {
+        userId,
+        goalId: goalId as string,
+        generateRecommendations: recommendations === 'true',
+      },
+      financialContext
+    );
+
+    res.json({
+      ok: true,
+      goalCount: result.result.goalCount || 0,
+      tracking: result.result.tracking || [],
+      summary: result.result.summary || {},
+      recommendations: result.result.recommendations || [],
+      timestamp: new Date().toISOString(),
+    });
+
+  } catch (error: any) {
+    logger.error({ error, userId: req.user?.id }, 'Failed to get goal tracking');
+
+    res.status(500).json({
+      ok: false,
+      error: 'Failed to retrieve goal tracking data',
+      code: 'GOAL_TRACKING_ERROR'
+    });
+  }
+});
+
+// GET /api/ai/recommendations - Get contextual recommendations
+router.get('/recommendations', auth, async (req, res) => {
+  try {
+    const userId = req.user!.id;
+    const { focus = 'general', limit = '5' } = req.query;
+
+    const financialContext = await buildFinancialContext(userId);
+
+    const result = await toolRegistry.executeTool(
+      'get_contextual_recommendations',
+      {
+        userId,
+        focus: focus as string,
+        limit: parseInt(limit as string),
+      },
+      financialContext
+    );
+
+    res.json({
+      ok: true,
+      recommendations: result.result.recommendations || [],
+      userFocus: result.result.userFocus,
+      preferences: result.result.preferences || {},
+      isNewUser: result.result.isNewUser || false,
+      timestamp: new Date().toISOString(),
+    });
+
+  } catch (error: any) {
+    logger.error({ error, userId: req.user?.id }, 'Failed to get recommendations');
+
+    res.status(500).json({
+      ok: false,
+      error: 'Failed to generate recommendations',
+      code: 'RECOMMENDATIONS_ERROR'
+    });
+  }
+});
+
 // GET /api/ai/status - System status and health check
 router.get('/status', auth, async (req, res) => {
   try {

@@ -3,6 +3,8 @@ import { logger } from '../../lib/logger.js';
 import { agentLifecycleManager } from '../config.js';
 import { agentValidator } from './AgentValidator.js';
 import { agentContextManager } from './AgentContextManager.js';
+import { memoryManager } from './MemoryManager.js';
+import { goalTracker } from './GoalTracker.js';
 import {
   FinancialAdvisorAgent,
   BudgetCoachAgent,
@@ -84,13 +86,51 @@ export class AgentManager {
         userId: context.userId,
         sessionId: context.sessionId,
         messageLength: message.length
-      }, 'Running agent');
+      }, 'Running agent with memory integration');
 
-      const result: AgentExecutionResult = await agent.run(message, context);
+      // Build enhanced memory context
+      const memoryContext = await memoryManager.buildAgentMemoryContext(
+        context.userId,
+        agentName,
+        context.sessionId,
+        true // Include history
+      );
+
+      // Track goals if available
+      let goalTrackingData: any[] = [];
+      if (context.goals && context.goals.length > 0) {
+        goalTrackingData = await goalTracker.trackGoalProgress(context.userId, context);
+      }
+
+      // Enhanced context with memory and goal tracking
+      const enhancedContext = {
+        ...context,
+        memoryContext,
+        goalTrackingData,
+        personalization: memoryContext.personalizations,
+        contextSummary: memoryContext.contextSummary,
+      };
+
+      const result: AgentExecutionResult = await agent.run(message, enhancedContext);
 
       if (!result.success) {
         throw new Error(result.error || 'Agent execution failed');
       }
+
+      // Store the interaction in memory
+      await memoryManager.storeInteraction(
+        context.userId,
+        agentName,
+        context.sessionId,
+        message,
+        result.response,
+        context,
+        {
+          duration: result.duration,
+          success: result.success,
+          goalTrackingEnabled: goalTrackingData.length > 0,
+        }
+      );
 
       return result.response;
 

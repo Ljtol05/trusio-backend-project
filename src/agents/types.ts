@@ -249,32 +249,56 @@ export interface AgentExecutionResult {
   timestamp: Date;
   duration: number;
   error?: string;
-}
-
-export interface AgentInteraction {
-  id: string;
-  sessionId: string;
-  agentName: string;
-  userMessage: string;
-  agentResponse: string;
-  timestamp: Date;
   metadata?: Record<string, any>;
 }
 
-// Agent capabilities
-export interface AgentCapability {
-  name: string;
-  description: string;
-  tools: string[];
-  specialties: string[];
-  riskLevel: 'low' | 'medium' | 'high';
+export interface AgentMemoryContext {
+  userId: string;
+  agentName: string;
+  sessionId: string;
+  userProfile: UserMemoryProfile | null;
+  conversationHistory: any[];
+  relevantInsights: any[];
+  contextSummary: string;
+  personalizations: Record<string, any>;
+  timestamp: Date;
 }
 
-// Agent metrics
-export interface AgentMetrics {
-  totalInteractions: number;
-  successfulInteractions: number;
-  averageResponseTime: number;
-  lastInteraction?: Date;
-  errorRate: number;
+export interface UserMemoryProfile {
+  userId: string;
+  preferences: {
+    budgetingStyle: 'strict' | 'flexible' | 'aggressive' | 'conservative';
+    communicationStyle: 'detailed' | 'concise' | 'encouraging' | 'analytical';
+    riskTolerance: 'low' | 'medium' | 'high';
+    goalPriorities: string[];
+    reminderFrequency: 'daily' | 'weekly' | 'monthly';
+  };
+  learnings: {
+    spendingPatterns: Record<string, any>;
+    successfulStrategies: string[];
+    challenges: string[];
+    improvements: string[];
+  };
+  context: {
+    financialSituation: string;
+    majorGoals: string[];
+    currentFocus: string;
+    lastInteraction: Date;
+  };
+}
+
+export interface GoalTrackingContext {
+  goalId: string;
+  description: string;
+  targetAmount: number;
+  currentAmount: number;
+  deadline?: string;
+  progress: {
+    percentage: number;
+    trend: 'improving' | 'stable' | 'declining';
+    milestones: string[];
+    nextMilestone?: string;
+  };
+  insights: string[];
+  recommendations: string[];
 }
