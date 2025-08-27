@@ -5,6 +5,7 @@ import { agentValidator } from './AgentValidator.js';
 import { agentContextManager } from './AgentContextManager.js';
 import { memoryManager } from './MemoryManager.js';
 import { goalTracker } from './GoalTracker.js';
+import { handoffManager } from './HandoffManager.js';
 import {
   FinancialAdvisorAgent,
   BudgetCoachAgent,
@@ -46,12 +47,33 @@ export class AgentManager {
    */
   async routeToAgent(message: string, context: FinancialContext): Promise<string> {
     try {
-      const agentName = this.determineAgentFromMessage(message);
-      return await this.runAgent(agentName, message, {
+      const sessionId = `route_${Date.now()}`;
+      
+      // Use handoff manager for intelligent routing
+      const routingDecision = await handoffManager.routeToOptimalAgent(
+        'financial_advisor', // Default starting agent
+        message,
+        context,
+        sessionId
+      );
+
+      logger.info({
+        targetAgent: routingDecision.targetAgent,
+        reason: routingDecision.reason,
+        confidence: routingDecision.confidence,
+        userId: context.userId
+      }, 'Intelligent agent routing completed');
+
+      return await this.runAgent(routingDecision.targetAgent, message, {
         ...context,
-        sessionId: `route_${Date.now()}`,
+        sessionId,
         timestamp: new Date(),
         previousInteractions: [],
+        routingMetadata: {
+          reason: routingDecision.reason,
+          confidence: routingDecision.confidence,
+          originalAgent: 'financial_advisor',
+        }
       });
     } catch (error: any) {
       logger.error({ error: error.message, message }, 'Agent routing failed');
@@ -145,7 +167,7 @@ export class AgentManager {
   }
 
   /**
-   * Execute agent handoff from one agent to another
+   * Execute agent handoff from one agent to another using HandoffManager
    */
   async executeHandoff(
     fromAgent: string,
@@ -156,41 +178,51 @@ export class AgentManager {
       sessionId: string;
       timestamp: Date;
       previousInteractions: any[];
-    }
+    },
+    priority: 'low' | 'medium' | 'high' | 'urgent' = 'medium'
   ): Promise<string> {
     try {
       logger.info({
         fromAgent,
         toAgent,
         reason,
+        priority,
         userId: context.userId,
         sessionId: context.sessionId
-      }, 'Executing agent handoff');
+      }, 'Executing agent handoff via HandoffManager');
 
-      // Validate both agents exist
-      if (!this.agents.has(fromAgent) || !this.agents.has(toAgent)) {
-        throw new Error(`Invalid agent handoff: ${fromAgent} -> ${toAgent}`);
+      // Use HandoffManager for comprehensive handoff handling
+      const handoffResult = await handoffManager.executeHandoff({
+        fromAgent,
+        toAgent,
+        userId: context.userId,
+        sessionId: context.sessionId,
+        reason,
+        priority,
+        context,
+        userMessage: message,
+        preserveHistory: true,
+        escalationLevel: 0,
+        metadata: {
+          originalTimestamp: context.timestamp,
+          previousInteractionCount: context.previousInteractions.length,
+        }
+      });
+
+      if (!handoffResult.success) {
+        throw new Error(handoffResult.error || 'Handoff execution failed');
       }
 
-      // Add handoff context to the message
-      const handoffMessage = `[Handoff from ${fromAgent}: ${reason}]\n\n${message}`;
+      logger.info({
+        handoffId: handoffResult.handoffId,
+        fromAgent,
+        toAgent,
+        userId: context.userId,
+        duration: handoffResult.duration,
+        contextPreserved: handoffResult.contextPreserved
+      }, 'Agent handoff completed successfully');
 
-      // Update context with handoff information
-      const handoffContext = {
-        ...context,
-        previousInteractions: [
-          ...context.previousInteractions,
-          {
-            role: 'system' as const,
-            content: `Handoff from ${fromAgent} to ${toAgent}: ${reason}`,
-            timestamp: new Date().toISOString(),
-            agentName: fromAgent,
-          }
-        ],
-      };
-
-      // Run the target agent
-      return await this.runAgent(toAgent, handoffMessage, handoffContext);
+      return handoffResult.response;
 
     } catch (error: any) {
       logger.error({
@@ -274,7 +306,7 @@ export class AgentManager {
   }
 
   /**
-   * Get agent metrics
+   * Get agent metrics including handoff statistics
    */
   getAgentMetrics(): Record<string, any> {
     const metrics: Record<string, any> = {};
@@ -286,6 +318,17 @@ export class AgentManager {
         ...agentLifecycleManager.getAgentMetrics(name),
       };
     });
+
+    // Add handoff statistics
+    const handoffStats = handoffManager.getHandoffStatistics();
+    metrics.handoffSystem = {
+      totalHandoffs: handoffStats.totalHandoffs,
+      successRate: handoffStats.successRate,
+      averageDuration: handoffStats.averageDuration,
+      escalationRate: handoffStats.escalationRate,
+      activeHandoffs: handoffManager.getActiveHandoffs().length,
+      healthStatus: handoffManager.getHealthStatus(),
+    };
 
     return metrics;
   }

@@ -310,76 +310,63 @@ router.post('/handoff', auth, async (req, res) => {
       toAgent, 
       reason,
       priority 
-    }, 'Processing agent handoff');
-
-    // Verify both agents exist
-    const sourceAgent = agentRegistry.getAgent(fromAgent);
-    const targetAgent = agentRegistry.getAgent(toAgent);
-
-    if (!sourceAgent || !targetAgent) {
-      return res.status(400).json({
-        ok: false,
-        error: 'Invalid agent names for handoff',
-        code: 'INVALID_AGENTS'
-      });
-    }
+    }, 'Processing agent handoff via comprehensive HandoffManager');
 
     // Build financial context
     const financialContext = await buildFinancialContext(userId);
 
-    // Execute handoff using the handoff tool
-    const handoffResult = await toolRegistry.executeTool(
-      'agent_handoff',
-      {
-        fromAgent,
-        toAgent,
-        reason,
-        context: context || {},
-        priority,
-        userMessage: message,
-      },
-      {
+    // Execute comprehensive handoff using HandoffManager
+    const { handoffManager } = await import('../agents/core/HandoffManager.js');
+    
+    const handoffResult = await handoffManager.executeHandoff({
+      fromAgent,
+      toAgent,
+      userId,
+      sessionId: `api_handoff_${Date.now()}`,
+      reason,
+      priority: priority as 'low' | 'medium' | 'high' | 'urgent',
+      context: {
         ...financialContext,
-        userId,
-        sessionId: `handoff_${Date.now()}`,
-        agentName: fromAgent,
-        timestamp: new Date(),
+        ...context,
+      },
+      userMessage: message,
+      preserveHistory: true,
+      escalationLevel: 0,
+      metadata: {
+        source: 'api_endpoint',
+        requestTimestamp: new Date().toISOString(),
+        userAgent: req.get('User-Agent'),
       }
-    );
+    });
 
     if (!handoffResult.success) {
       return res.status(500).json({
         ok: false,
         error: 'Handoff failed',
         details: handoffResult.error,
-        code: 'HANDOFF_ERROR'
+        code: 'HANDOFF_ERROR',
+        handoffId: handoffResult.handoffId,
+        duration: handoffResult.duration,
       });
     }
-
-    // Run the target agent with the handoff message
-    const agentResponse = await agentRegistry.runAgent(
-      toAgent,
-      message,
-      {
-        ...financialContext,
-        sessionId: `handoff_${Date.now()}`,
-        timestamp: new Date(),
-        previousInteractions: [{
-          role: 'system',
-          content: `Handoff from ${fromAgent}: ${reason}`,
-          timestamp: new Date().toISOString(),
-        }],
-      }
-    );
 
     res.json({
       ok: true,
       handoffCompleted: true,
-      fromAgent,
-      toAgent,
-      response: agentResponse,
+      handoffId: handoffResult.handoffId,
+      fromAgent: handoffResult.fromAgent,
+      toAgent: handoffResult.toAgent,
+      response: handoffResult.response,
       handoffReason: reason,
+      contextPreserved: handoffResult.contextPreserved,
+      escalationTriggered: handoffResult.escalationTriggered,
+      duration: handoffResult.duration,
       timestamp: new Date().toISOString(),
+      metadata: {
+        priority,
+        sessionId: `api_handoff_${Date.now()}`,
+        preservedContext: handoffResult.contextPreserved,
+      }
     });
 
   } catch (error: any) {
@@ -606,6 +593,223 @@ router.post('/memory/store', auth, async (req, res) => {
       ok: false,
       error: 'Failed to store memory',
       code: 'MEMORY_STORE_ERROR'
+    });
+  }
+});
+
+
+
+// GET /api/ai/handoff/history/:userId - Get user handoff history
+router.get('/handoff/history/:userId?', auth, async (req, res) => {
+  try {
+    const targetUserId = req.params.userId || req.user!.id;
+    const { limit = '20' } = req.query;
+
+    // Security check - users can only access their own history unless admin
+    if (targetUserId !== req.user!.id) {
+      // Add admin check here if needed
+      return res.status(403).json({
+        ok: false,
+        error: 'Access denied to handoff history',
+        code: 'ACCESS_DENIED'
+      });
+    }
+
+    const { handoffManager } = await import('../agents/core/HandoffManager.js');
+    const history = handoffManager.getHandoffHistory(targetUserId, parseInt(limit as string));
+
+    logger.info({
+      userId: targetUserId,
+      historyLength: history.length,
+      requestedBy: req.user!.id
+    }, 'Handoff history retrieved');
+
+    res.json({
+      ok: true,
+      userId: targetUserId,
+      history,
+      totalCount: history.length,
+      limit: parseInt(limit as string),
+    });
+
+  } catch (error: any) {
+    logger.error({ error, userId: req.user?.id }, 'Failed to get handoff history');
+
+    res.status(500).json({
+      ok: false,
+      error: 'Failed to retrieve handoff history',
+      code: 'HISTORY_ERROR'
+    });
+  }
+});
+
+// GET /api/ai/handoff/statistics - Get handoff system statistics
+router.get('/handoff/statistics', auth, async (req, res) => {
+  try {
+    const userId = req.user!.id;
+    const { global = 'false' } = req.query;
+
+    const { handoffManager } = await import('../agents/core/HandoffManager.js');
+    
+    // Get user-specific or global statistics
+    const statistics = handoffManager.getHandoffStatistics(
+      global === 'true' ? undefined : userId
+    );
+
+    logger.info({
+      userId,
+      global: global === 'true',
+      totalHandoffs: statistics.totalHandoffs
+    }, 'Handoff statistics retrieved');
+
+    res.json({
+      ok: true,
+      scope: global === 'true' ? 'global' : 'user',
+      userId: global === 'true' ? undefined : userId,
+      statistics,
+      timestamp: new Date().toISOString(),
+    });
+
+  } catch (error: any) {
+    logger.error({ error, userId: req.user?.id }, 'Failed to get handoff statistics');
+
+    res.status(500).json({
+      ok: false,
+      error: 'Failed to retrieve handoff statistics',
+      code: 'STATISTICS_ERROR'
+    });
+  }
+});
+
+// GET /api/ai/handoff/active - Get currently active handoffs
+router.get('/handoff/active', auth, async (req, res) => {
+  try {
+    const userId = req.user!.id;
+
+    const { handoffManager } = await import('../agents/core/HandoffManager.js');
+    const activeHandoffs = handoffManager.getActiveHandoffs().filter(
+      handoff => handoff.userId === userId
+    );
+
+    logger.info({
+      userId,
+      activeCount: activeHandoffs.length
+    }, 'Active handoffs retrieved');
+
+    res.json({
+      ok: true,
+      userId,
+      activeHandoffs,
+      count: activeHandoffs.length,
+      timestamp: new Date().toISOString(),
+    });
+
+  } catch (error: any) {
+    logger.error({ error, userId: req.user?.id }, 'Failed to get active handoffs');
+
+    res.status(500).json({
+      ok: false,
+      error: 'Failed to retrieve active handoffs',
+      code: 'ACTIVE_HANDOFFS_ERROR'
+    });
+  }
+});
+
+// POST /api/ai/handoff/auto-route - Intelligent auto-routing endpoint
+router.post('/handoff/auto-route', auth, async (req, res) => {
+  try {
+    const { message, currentAgent = 'financial_advisor', sessionId } = req.body;
+    const userId = req.user!.id;
+
+    if (!message) {
+      return res.status(400).json({
+        ok: false,
+        error: 'Message is required for auto-routing',
+        code: 'MISSING_MESSAGE'
+      });
+    }
+
+    logger.info({
+      userId,
+      currentAgent,
+      messageLength: message.length
+    }, 'Processing auto-route request');
+
+    // Build financial context
+    const financialContext = await buildFinancialContext(userId);
+
+    // Use HandoffManager for intelligent routing
+    const { handoffManager } = await import('../agents/core/HandoffManager.js');
+    const routingDecision = await handoffManager.routeToOptimalAgent(
+      currentAgent,
+      message,
+      financialContext,
+      sessionId || `auto_route_${Date.now()}`
+    );
+
+    // If routing suggests a different agent, provide handoff recommendation
+    if (routingDecision.targetAgent !== currentAgent) {
+      res.json({
+        ok: true,
+        routingRecommended: true,
+        currentAgent,
+        recommendedAgent: routingDecision.targetAgent,
+        reason: routingDecision.reason,
+        confidence: routingDecision.confidence,
+        autoExecute: routingDecision.confidence > 0.8,
+        message: `Recommended handoff: ${currentAgent} → ${routingDecision.targetAgent}`,
+        timestamp: new Date().toISOString(),
+      });
+    } else {
+      res.json({
+        ok: true,
+        routingRecommended: false,
+        currentAgent,
+        recommendedAgent: currentAgent,
+        reason: routingDecision.reason,
+        confidence: routingDecision.confidence,
+        message: 'Continue with current agent',
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+  } catch (error: any) {
+    logger.error({ error, userId: req.user?.id }, 'Auto-routing failed');
+
+    res.status(500).json({
+      ok: false,
+      error: 'Failed to process auto-routing',
+      code: 'AUTO_ROUTE_ERROR'
+    });
+  }
+});
+
+// GET /api/ai/handoff/health - Handoff system health check
+router.get('/handoff/health', auth, async (req, res) => {
+  try {
+    const { handoffManager } = await import('../agents/core/HandoffManager.js');
+    const healthStatus = handoffManager.getHealthStatus();
+
+    logger.info({
+      userId: req.user!.id,
+      isHealthy: healthStatus.isHealthy,
+      activeHandoffs: healthStatus.activeHandoffs,
+      issues: healthStatus.issues.length
+    }, 'Handoff system health checked');
+
+    res.json({
+      ok: true,
+      health: healthStatus,
+      timestamp: new Date().toISOString(),
+    });
+
+  } catch (error: any) {
+    logger.error({ error, userId: req.user?.id }, 'Failed to check handoff health');
+
+    res.status(500).json({
+      ok: false,
+      error: 'Failed to check handoff system health',
+      code: 'HEALTH_CHECK_ERROR'
     });
   }
 });

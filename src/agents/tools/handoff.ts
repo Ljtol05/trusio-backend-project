@@ -21,49 +21,95 @@ const agentHandoffTool = tool({
   name: 'agent_handoff',
   description: 'Hand off the conversation to another specialized financial agent with full context preservation and capability matching',
   parameters: agentHandoffSchema,
-  async execute({ targetAgent, context, priority, userIntent, transferData, preserveHistory }) {
+  execute: async (params, context) => {
     try {
-      logger.info({ targetAgent, context, priority, userIntent }, 'Executing agent handoff');
+      const { fromAgent, toAgent, reason, context: handoffContext, priority, userMessage } = params;
 
-      // Validate target agent capabilities
-      const agentCapabilities = {
-        'financial_advisor': ['comprehensive_financial_guidance', 'goal_setting', 'financial_education', 'agent_coordination'],
-        'budget_coach': ['envelope_budgeting', 'budget_creation', 'fund_allocation', 'category_optimization'],
-        'transaction_analyst': ['spending_analysis', 'transaction_categorization', 'pattern_recognition', 'anomaly_detection'],
-        'insight_generator': ['trend_analysis', 'goal_tracking', 'personalized_recommendations', 'predictive_insights']
-      };
-
-      const handoffRecord = {
-        id: `handoff_${Date.now()}`,
-        fromAgent: 'current_agent', // TODO: Get current agent name from context
-        toAgent: targetAgent,
-        context,
-        userIntent,
+      logger.info({
+        fromAgent,
+        toAgent,
+        reason,
         priority,
-        transferData: transferData || {},
-        preserveHistory,
-        capabilities: agentCapabilities[targetAgent] || [],
+        userId: context.userId,
+        agentName: context.agentName
+      }, 'Executing agent handoff tool via HandoffManager');
+
+      // Import handoffManager locally to avoid circular imports
+      const { handoffManager } = await import('../core/HandoffManager.js');
+
+      // Execute comprehensive handoff using HandoffManager
+      const handoffResult = await handoffManager.executeHandoff({
+        fromAgent,
+        toAgent,
+        userId: context.userId,
+        sessionId: context.sessionId || `tool_${Date.now()}`,
+        reason,
+        priority: priority as 'low' | 'medium' | 'high' | 'urgent',
+        context: {
+          ...context,
+          ...handoffContext,
+        },
+        userMessage: userMessage || 'Agent handoff requested',
+        preserveHistory: true,
+        escalationLevel: 0,
+        metadata: {
+          initiatedBy: context.agentName,
+          toolExecution: true,
+          originalContext: handoffContext,
+        }
+      });
+
+      if (!handoffResult.success) {
+        return {
+          success: false,
+          error: handoffResult.error,
+          fromAgent,
+          toAgent,
+          handoffId: handoffResult.handoffId,
+        };
+      }
+
+      logger.info({
+        handoffId: handoffResult.handoffId,
+        fromAgent,
+        toAgent,
+        userId: context.userId,
+        duration: handoffResult.duration,
+        contextPreserved: handoffResult.contextPreserved
+      }, 'Agent handoff tool completed successfully');
+
+      return {
+        success: true,
+        fromAgent: handoffResult.fromAgent,
+        toAgent: handoffResult.toAgent,
+        reason,
+        priority,
+        response: handoffResult.response,
+        handoffId: handoffResult.handoffId,
+        contextPreserved: handoffResult.contextPreserved,
+        escalationTriggered: handoffResult.escalationTriggered,
+        duration: handoffResult.duration,
+        message: `Handoff completed: ${fromAgent} → ${toAgent}. Reason: ${reason}`,
         timestamp: new Date().toISOString(),
-        status: 'initiated',
-        estimatedHandoffTime: 500
+        metadata: handoffResult.metadata,
       };
 
-      // TODO: Implement actual agent switching logic with agent registry
+    } catch (error: any) {
+      logger.error({
+        error: error.message,
+        fromAgent: params.fromAgent,
+        toAgent: params.toAgent,
+        userId: context.userId
+      }, 'Agent handoff tool failed');
+
       return {
-        status: 'success',
-        handoff: handoffRecord,
-        message: `Handing off to ${targetAgent} for specialized assistance with: ${context}`,
-        nextSteps: [
-          `${targetAgent} will analyze your request`,
-          'Context and history will be preserved',
-          'You can continue the conversation seamlessly'
-        ]
+        success: false,
+        error: error.message,
+        fromAgent: params.fromAgent,
+        toAgent: params.toAgent,
       };
-    } catch (error) {
-      logger.error({ error, targetAgent, context }, 'Agent handoff failed');
-      throw new Error(`Agent handoff failed: ${error.message}`);
     }
-  }
+  },
 });
 
 const agentCapabilityCheckTool = tool({
@@ -92,7 +138,7 @@ const agentCapabilityCheckTool = tool({
         availableCapabilities: hasCapabilities,
         requiredCapabilities,
         missingCapabilities,
-        recommendation: hasAllCapabilities 
+        recommendation: hasAllCapabilities
           ? `${agentName} can handle all required capabilities`
           : `Consider alternative agent or split request across multiple agents`
       };

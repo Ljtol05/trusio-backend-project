@@ -302,3 +302,51 @@ export interface GoalTrackingContext {
   insights: string[];
   recommendations: string[];
 }
+
+// Handoff-related types
+export interface HandoffContext {
+  fromAgent: string;
+  toAgent: string;
+  reason: string;
+  priority: 'low' | 'medium' | 'high' | 'urgent';
+  preserveHistory: boolean;
+  escalationLevel: number;
+  contextData: Record<string, any>;
+  timestamp: Date;
+}
+
+export interface HandoffRule {
+  name: string;
+  fromAgents: string[];
+  toAgents: string[];
+  conditions: (context: any) => boolean;
+  priority: number;
+  autoApprove: boolean;
+  preserveContext: boolean;
+  escalationThreshold?: number;
+}
+
+export interface HandoffMetrics {
+  totalHandoffs: number;
+  successRate: number;
+  averageDuration: number;
+  escalationRate: number;
+  mostCommonRoutes: Array<{
+    from: string;
+    to: string;
+    count: number;
+  }>;
+  recentFailures: number;
+}
+
+export interface AgentRoutingDecision {
+  targetAgent: string;
+  reason: string;
+  confidence: number;
+  metadata?: {
+    keywords: string[];
+    intent: string;
+    urgency: 'low' | 'medium' | 'high';
+    contextFactors: string[];
+  };
+}
