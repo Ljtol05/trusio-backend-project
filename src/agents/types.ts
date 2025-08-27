@@ -160,6 +160,29 @@ export interface AgentInstance {
   isInitialized: boolean;
   lastUsed: Date;
   metrics: AgentMetrics;
+  contextManager?: any;
+  validator?: any;
+}
+
+// Enhanced agent execution context
+export interface EnhancedAgentContext extends FinancialContext {
+  sessionId: string;
+  timestamp: Date;
+  previousInteractions: AgentInteraction[];
+  userProfile?: {
+    id: string;
+    name?: string;
+    email?: string;
+    isNewUser?: boolean;
+    preferences?: Record<string, any>;
+    financialGoals?: string[];
+  };
+  agentMetadata?: {
+    startTime: Date;
+    maxDuration: number;
+    riskLevel: 'low' | 'medium' | 'high';
+    capabilities: string[];
+  };
 }
 
 // Agent registry type
