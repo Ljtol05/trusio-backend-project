@@ -1,4 +1,3 @@
-
 # Envelope Budgeting Backend
 
 A TypeScript/Express backend for envelope-style budgeting with smart transaction routing, **AI-powered multi-agent coaching**, and real-time updates.
@@ -305,44 +304,437 @@ curl -X POST http://localhost:5000/api/transactions/import \
   }'
 ```
 
+## 🤖 AI Agent Usage Examples
+
+### Chat with Financial Advisor
+```bash
+curl -X POST http://localhost:5000/api/ai/chat \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <your-jwt-token>" \
+  -d '{
+    "message": "Help me create a budget for $4000 monthly income",
+    "agentName": "financial_advisor",
+    "sessionId": "session_123",
+    "context": {
+      "includeHistory": true,
+      "maxHistory": 10,
+      "includeFinancialData": true
+    }
+  }'
+```
+
+### Get AI Envelope Suggestions
+```bash
+curl -X POST http://localhost:5000/api/envelopes/suggestions \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <your-jwt-token>" \
+  -d '{
+    "budget": 4000,
+    "goals": ["Save for emergency", "Pay off debt"],
+    "preferences": "Conservative approach with 20% savings"
+  }'
+```
+
+### Execute Financial Analysis Tool
+```bash
+curl -X POST http://localhost:5000/api/ai/tools/execute \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <your-jwt-token>" \
+  -d '{
+    "toolName": "analyze_spending_patterns",
+    "parameters": {
+      "period": "last_3_months",
+      "categories": ["food", "transportation"]
+    },
+    "agentContext": {
+      "sessionId": "session_123"
+    }
+  }'
+```
+
+### Agent Handoff Example
+```bash
+curl -X POST http://localhost:5000/api/ai/handoff \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <your-jwt-token>" \
+  -d '{
+    "fromAgent": "financial_advisor",
+    "toAgent": "budget_coach",
+    "message": "I need help optimizing my monthly budget",
+    "reason": "User needs detailed budgeting guidance",
+    "priority": "high"
+  }'
+```
+
+### List Available Agents
+```bash
+curl -X GET http://localhost:5000/api/ai/agents \
+  -H "Authorization: Bearer <your-jwt-token>"
+```
+
+### Get Conversation History
+```bash
+curl -X GET "http://localhost:5000/api/ai/sessions/session_123/history?limit=20&offset=0" \
+  -H "Authorization: Bearer <your-jwt-token>"
+```
+
+### Categorize Transactions with AI
+```bash
+curl -X POST http://localhost:5000/api/transactions/categorize \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <your-jwt-token>" \
+  -d '{
+    "transactions": [
+      {
+        "merchant": "Whole Foods",
+        "amount": -85.43,
+        "description": "Grocery shopping"
+      },
+      {
+        "merchant": "Shell Gas Station", 
+        "amount": -45.20,
+        "description": "Fuel"
+      }
+    ]
+  }'
+```
+
+### Get AI System Status
+```bash
+curl -X GET http://localhost:5000/api/ai/status \
+  -H "Authorization: Bearer <your-jwt-token>"
+```
+
 ## 🤖 Multi-Agent System Architecture
 
-### Available Agents
+### Core Financial Agents
 
-1. **Financial Advisor** (`financial_advisor`)
-   - General financial guidance and planning
-   - Goal setting and achievement strategies
-   - Default agent for routing
+The system includes four specialized agents:
+- **Financial Advisor Agent** - General financial guidance and coordination
+- **Budget Coach Agent** - Envelope budgeting and fund allocation
+- **Transaction Analyst Agent** - Spending analysis and categorization
+- **Insight Generator Agent** - Trend analysis and personalized recommendations
 
-2. **Budget Coach** (`budget_coach`)
-   - Budgeting strategies and envelope optimization
-   - Spending habit analysis and recommendations
-   - Envelope creation and management advice
+### Agent Chat & Communication
 
-3. **Transaction Analyst** (`transaction_analyst`)
-   - Transaction categorization and analysis
-   - Spending pattern identification
-   - Fraud detection and unusual spending alerts
+#### Main Chat Interface
+- **`POST /api/ai/chat`** - Primary agent interaction endpoint
+  ```json
+  {
+    "message": "How should I allocate my budget this month?",
+    "agentName": "budget_coach", // optional: financial_advisor, budget_coach, transaction_analyst, insight_generator
+    "sessionId": "session_123", // optional: for conversation continuity
+    "context": {
+      "includeHistory": true,
+      "maxHistory": 10,
+      "includeFinancialData": true
+    }
+  }
+  ```
+  - Automatically routes to appropriate agent based on message content
+  - Maintains conversation history and context
+  - Returns personalized responses with financial insights
 
-4. **Insight Generator** (`insight_generator`)
-   - Financial insights and trend analysis
-   - Predictive analytics and forecasting
-   - Custom report generation
+#### Agent Information & Discovery
+- **`GET /api/ai/agents`** - List all available agents
+  - Returns agent capabilities, availability status, and tool counts
+  - Shows default agent and agent display names
 
-### Agent Capabilities
+- **`GET /api/ai/status`** - Comprehensive system status
+  - Agent initialization status and metrics
+  - Tool registry status and execution history
+  - Overall system health indicators
 
-Each agent has access to specialized tools:
-- **Budget Tools**: Envelope management, allocation optimization
-- **Transaction Tools**: Categorization, analysis, pattern detection
-- **Analysis Tools**: Spending trends, goal tracking, forecasting
-- **Insight Tools**: Custom reports, recommendations, alerts
+### Agent Handoffs & Routing
 
-### Conversation Flow
+#### Manual Agent Handoffs
+- **`POST /api/ai/handoff`** - Execute agent-to-agent handoff
+  ```json
+  {
+    "fromAgent": "budget_coach",
+    "toAgent": "insight_generator",
+    "message": "I need insights on my spending patterns",
+    "reason": "User needs detailed analysis",
+    "priority": "medium", // low, medium, high
+    "context": {}, // additional context data
+    "preserveHistory": true
+  }
+  ```
+  - Preserves conversation context across agent transitions
+  - Tracks escalation levels and handoff success rates
 
-1. **Smart Routing**: Messages are automatically routed to the most appropriate agent
-2. **Context Preservation**: Financial data and conversation history maintained
-3. **Seamless Handoffs**: Agents can transfer conversations when needed
-4. **Tool Integration**: Direct access to all financial analysis tools
+#### Intelligent Auto-Routing
+- **`POST /api/ai/handoff/auto-route`** - Get routing recommendations
+  ```json
+  {
+    "message": "I want to analyze my spending trends",
+    "currentAgent": "financial_advisor",
+    "sessionId": "session_123"
+  }
+  ```
+  - Uses AI to determine optimal agent for user query
+  - Provides confidence scores and reasoning
+
+#### Handoff Management & Analytics
+- **`GET /api/ai/handoff/history/:userId?`** - Get handoff history
+  - View user's handoff history with success rates and patterns
+  - Access restricted to user's own data unless admin
+
+- **`GET /api/ai/handoff/statistics`** - Handoff system statistics
+  - Global or user-specific handoff metrics
+  - Success rates, escalation rates, common routes
+
+- **`GET /api/ai/handoff/active`** - View active handoffs
+  - Shows currently in-progress handoffs for user
+
+- **`GET /api/ai/handoff/health`** - Handoff system health check
+  - Monitors for stuck or failed handoffs
+  - System performance indicators
+
+### Tool Execution System
+
+#### Direct Tool Execution
+- **`POST /api/ai/tools/execute`** - Execute specific financial tools
+  ```json
+  {
+    "toolName": "create_envelope",
+    "parameters": {
+      "name": "Groceries",
+      "targetAmount": 500,
+      "category": "necessities"
+    },
+    "agentContext": {
+      "agentName": "budget_coach",
+      "sessionId": "session_123"
+    }
+  }
+  ```
+  - Direct access to 25+ financial analysis and management tools
+  - Bypasses conversation for programmatic access
+
+#### Tool Discovery & Management
+- **`GET /api/ai/tools`** - List all available tools
+  - Filter by category: budget, transaction, analysis, envelope, memory, handoff
+  - Shows tool descriptions, risk levels, and execution metrics
+  - Query parameter: `?category=budget` to filter by category
+
+### Memory & Personalization System
+
+#### User Memory Management
+- **`POST /api/ai/memory/store`** - Store user preferences and insights
+  ```json
+  {
+    "type": "preference", // or "insight"
+    "key": "budgeting_style",
+    "value": "aggressive_saver",
+    "category": "general",
+    "confidence": 0.9
+  }
+  ```
+  - Stores user preferences for personalized experiences
+  - Learns from user behavior patterns
+
+- **`GET /api/ai/memory/profile`** - Get user memory profile
+  - Returns comprehensive user profile with preferences
+  - Includes interaction history and current focus areas
+  - Query parameter: `?includeHistory=true` for detailed history
+
+#### Goal Tracking & Progress
+- **`GET /api/ai/goals/tracking`** - Track financial goal progress
+  - Automated goal progress monitoring
+  - Generates personalized recommendations
+  - Query parameters: `?goalId=123&recommendations=true`
+
+### Contextual Recommendations
+
+#### Smart Recommendations
+- **`GET /api/ai/recommendations`** - Get personalized recommendations
+  - Context-aware financial advice based on user behavior
+  - Query parameters: `?focus=budgeting&limit=5`
+  - Adapts to user's current financial situation and goals
+
+### Conversation History
+
+#### Session Management
+- **`GET /api/ai/sessions/:sessionId/history`** - Get conversation history
+  - Retrieve full conversation history for a session
+  - Pagination support: `?limit=20&offset=0`
+  - Includes agent names and interaction metadata
+
+### Enhanced Existing Endpoints
+
+The AI system enhances existing endpoints with intelligent features:
+
+#### Smart Envelope Management
+- **`POST /api/envelopes/suggestions`** - AI-powered envelope creation suggestions
+- **`POST /api/envelopes/:id/optimize`** - Intelligent envelope optimization advice
+
+#### Intelligent Transaction Processing
+- **`POST /api/transactions/categorize`** - AI-powered transaction categorization
+- **`GET /api/transactions/analysis`** - Advanced spending pattern analysis
+
+#### Optimized Transfers
+- **`POST /api/transfers/optimize`** - AI-driven transfer optimization recommendations
+
+### Required Environment Variables
+
+Add these environment variables to your `.env` file for full AI functionality:
+
+```env
+# OpenAI Configuration (Required)
+OPENAI_API_KEY="sk-..."
+OPENAI_PROJECT_ID="proj_..."
+OPENAI_ORG_ID="org-..."
+
+# OpenAI Agents SDK Configuration
+OPENAI_AGENTS_TRACING_ENABLED="true"
+OPENAI_AGENTS_API_TYPE="chat_completions"
+
+# AI Model Configuration (Optional - defaults provided)
+OPENAI_MODEL_AGENTIC="gpt-4o"
+OPENAI_MODEL_PRIMARY="gpt-4o-mini"
+OPENAI_MODEL_ANALYSIS="gpt-4o-mini"
+OPENAI_MODEL_BUDGET="gpt-4o-mini"
+
+# Agent System Configuration
+AGENT_MAX_TOKENS="4096"
+AGENT_TEMPERATURE="0.1"
+AGENT_EXECUTION_TIMEOUT="30000"
+```
+
+### Frontend Integration Examples
+
+#### Basic Agent Chat
+```typescript
+const response = await fetch('/api/ai/chat', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    message: "Help me create a budget for groceries",
+    sessionId: "user_session_" + Date.now()
+  })
+});
+const { response: aiResponse, agentName } = await response.json();
+```
+
+#### Tool Execution
+```typescript
+const toolResult = await fetch('/api/ai/tools/execute', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    toolName: "analyze_spending_patterns",
+    parameters: { category: "entertainment", timeframe: "3_months" }
+  })
+});
+```
+
+#### Get Recommendations
+```typescript
+const recommendations = await fetch('/api/ai/recommendations?focus=budgeting&limit=3');
+const { recommendations: tips } = await recommendations.json();
+```
+
+## 🤖 AI Agent Usage Examples
+
+### Chat with Financial Advisor
+```bash
+curl -X POST http://localhost:5000/api/ai/chat \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <your-jwt-token>" \
+  -d '{
+    "message": "Help me create a budget for $4000 monthly income",
+    "agentName": "financial_advisor",
+    "sessionId": "session_123",
+    "context": {
+      "includeHistory": true,
+      "maxHistory": 10,
+      "includeFinancialData": true
+    }
+  }'
+```
+
+### Get AI Envelope Suggestions
+```bash
+curl -X POST http://localhost:5000/api/envelopes/suggestions \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <your-jwt-token>" \
+  -d '{
+    "budget": 4000,
+    "goals": ["Save for emergency", "Pay off debt"],
+    "preferences": "Conservative approach with 20% savings"
+  }'
+```
+
+### Execute Financial Analysis Tool
+```bash
+curl -X POST http://localhost:5000/api/ai/tools/execute \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <your-jwt-token>" \
+  -d '{
+    "toolName": "analyze_spending_patterns",
+    "parameters": {
+      "period": "last_3_months",
+      "categories": ["food", "transportation"]
+    },
+    "agentContext": {
+      "sessionId": "session_123"
+    }
+  }'
+```
+
+### Agent Handoff Example
+```bash
+curl -X POST http://localhost:5000/api/ai/handoff \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <your-jwt-token>" \
+  -d '{
+    "fromAgent": "financial_advisor",
+    "toAgent": "budget_coach",
+    "message": "I need help optimizing my monthly budget",
+    "reason": "User needs detailed budgeting guidance",
+    "priority": "high"
+  }'
+```
+
+### List Available Agents
+```bash
+curl -X GET http://localhost:5000/api/ai/agents \
+  -H "Authorization: Bearer <your-jwt-token>"
+```
+
+### Get Conversation History
+```bash
+curl -X GET "http://localhost:5000/api/ai/sessions/session_123/history?limit=20&offset=0" \
+  -H "Authorization: Bearer <your-jwt-token>"
+```
+
+### Categorize Transactions with AI
+```bash
+curl -X POST http://localhost:5000/api/transactions/categorize \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <your-jwt-token>" \
+  -d '{
+    "transactions": [
+      {
+        "merchant": "Whole Foods",
+        "amount": -85.43,
+        "description": "Grocery shopping"
+      },
+      {
+        "merchant": "Shell Gas Station", 
+        "amount": -45.20,
+        "description": "Fuel"
+      }
+    ]
+  }'
+```
+
+### Get AI System Status
+```bash
+curl -X GET http://localhost:5000/api/ai/status \
+  -H "Authorization: Bearer <your-jwt-token>"
+```
 
 ## Database Schema
 
