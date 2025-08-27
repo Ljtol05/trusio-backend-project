@@ -1,316 +1,225 @@
-import { Agent, tool, run } from '@openai/agents';
-import { z } from 'zod';
+
 import { logger } from '../lib/logger.js';
-import { MODELS } from '../lib/openai.js';
-import { AGENT_CONFIG, AGENT_PROMPTS } from './config.js';
-import { toolRegistry } from './tools/index.js';
-import type { FinancialContext } from './tools/types.js';
+import { agentManager } from './core/AgentManager.js';
+import { agentContextManager } from './core/AgentContextManager.js';
+import { agentValidator } from './core/AgentValidator.js';
+import { AGENT_CAPABILITIES } from './config.js';
+import type { FinancialContext, AgentExecutionResult } from './types.js';
 
 export class AgentRegistry {
-  private agents: Map<string, Agent> = new Map();
-  private initialized = false;
+  private isRegistryInitialized = false;
 
   constructor() {
-    this.initializeAgents();
+    this.initialize();
   }
 
-  private initializeAgents(): void {
+  private async initialize(): Promise<void> {
     try {
-      // Financial Advisor Agent (Main coordinator)
-      const financialAdvisor = new Agent({
-        name: 'Financial Advisor',
-        instructions: `${AGENT_PROMPTS.systemBase}
-
-${AGENT_PROMPTS.financialAdvisor}
-
-You are the primary financial coaching agent. Your role is to:
-- Provide comprehensive financial guidance using envelope budgeting principles
-- Coordinate with specialist agents when needed using handoffs
-- Help users understand their financial situation holistically
-- Encourage healthy financial habits and goal achievement
-
-When you need specialized help:
-- Use budget_coach for detailed budgeting assistance
-- Use transaction_analyst for spending pattern analysis
-- Use insight_generator for data-driven recommendations
-
-Always be supportive, educational, and actionable in your advice.`,
-        model: MODELS.agentic,
-        tools: this.getToolsForAgent('financial_advisor'),
-      });
-
-      // Budget Coach Agent (Budgeting specialist)
-      const budgetCoach = new Agent({
-        name: 'Budget Coach',
-        instructions: `${AGENT_PROMPTS.systemBase}
-
-${AGENT_PROMPTS.budgetCoach}
-
-You are a specialized budget coaching agent. Your expertise includes:
-- Creating and optimizing envelope budgets
-- Helping users allocate funds effectively across categories
-- Teaching envelope budgeting best practices
-- Troubleshooting budget issues and imbalances
-
-You have access to budget analysis tools and can create, modify, and optimize envelopes.
-Focus on practical, actionable budgeting advice that users can implement immediately.`,
-        model: MODELS.agentic,
-        tools: this.getToolsForAgent('budget_coach'),
-      });
-
-      // Transaction Analyst Agent (Spending analysis specialist)
-      const transactionAnalyst = new Agent({
-        name: 'Transaction Analyst',
-        instructions: `${AGENT_PROMPTS.systemBase}
-
-${AGENT_PROMPTS.transactionAnalyst}
-
-You are a specialized transaction analysis agent. Your expertise includes:
-- Analyzing spending patterns and trends
-- Categorizing transactions automatically
-- Detecting unusual spending or potential issues
-- Providing insights into financial behavior
-
-Use your analysis tools to help users understand their spending habits and identify opportunities for improvement.
-Present findings in clear, actionable ways that help users make better financial decisions.`,
-        model: MODELS.agentic,
-        tools: this.getToolsForAgent('transaction_analyst'),
-      });
-
-      // Insight Generator Agent (Analytics and recommendations)
-      const insightGenerator = new Agent({
-        name: 'Insight Generator',
-        instructions: `${AGENT_PROMPTS.systemBase}
-
-${AGENT_PROMPTS.insightGenerator}
-
-You are a specialized insight generation agent. Your expertise includes:
-- Analyzing financial data to identify trends and patterns
-- Generating personalized recommendations
-- Tracking progress toward financial goals
-- Providing predictive insights and warnings
-
-Use your analytical tools to provide data-driven insights that help users make informed financial decisions.
-Focus on actionable recommendations that align with their financial goals and envelope budgeting strategy.`,
-        model: MODELS.agentic,
-        tools: this.getToolsForAgent('insight_generator'),
-      });
-
-      // Register all agents
-      this.agents.set('financial_advisor', financialAdvisor);
-      this.agents.set('budget_coach', budgetCoach);
-      this.agents.set('transaction_analyst', transactionAnalyst);
-      this.agents.set('insight_generator', insightGenerator);
-
-      logger.info({
-        agentCount: this.agents.size,
-        agentNames: Array.from(this.agents.keys())
-      }, 'Financial coaching agents initialized successfully');
-
-      this.initialized = true;
-
+      // Agent manager initializes itself in constructor
+      if (agentManager.isReady()) {
+        this.isRegistryInitialized = true;
+        logger.info('Agent Registry initialized successfully');
+      } else {
+        throw new Error('Agent Manager is not ready');
+      }
     } catch (error) {
-      logger.error({ error: error.message }, 'Failed to initialize agent registry');
+      logger.error({ error }, 'Failed to initialize Agent Registry');
       throw error;
     }
   }
 
-  private getToolsForAgent(agentType: string): any[] {
-    const toolMappings: Record<string, string[]> = {
-      'financial_advisor': [
-        'generate_recommendations',
-        'identify_opportunities',
-        'track_achievements',
-        'agent_handoff'
-      ],
-      'budget_coach': [
-        'budget_analysis',
-        'spending_patterns',
-        'variance_calculation',
-        'create_envelope',
-        'transfer_funds',
-        'manage_balance',
-        'optimize_categories',
-        'agent_handoff'
-      ],
-      'transaction_analyst': [
-        'categorize_transaction',
-        'auto_allocate',
-        'recognize_patterns',
-        'detect_anomalies',
-        'analyze_spending_patterns',
-        'analyze_budget_variance',
-        'agent_handoff'
-      ],
-      'insight_generator': [
-        'analyze_trends',
-        'analyze_goal_progress',
-        'generate_recommendations',
-        'identify_opportunities',
-        'detect_warnings',
-        'track_achievements',
-        'agent_handoff'
-      ]
+  /**
+   * Route a message to the most appropriate agent
+   */
+  async routeToAgent(message: string, context?: Partial<FinancialContext>): Promise<any> {
+    if (!this.isRegistryInitialized) {
+      throw new Error('Agent Registry not initialized');
+    }
+
+    // Build minimal context if not provided
+    const defaultContext: FinancialContext = {
+      userId: context?.userId || 'unknown',
+      ...context,
     };
 
-    const toolNames = toolMappings[agentType] || [];
-    const agentTools: any[] = [];
-    const allTools = toolRegistry.getAllTools();
-
-    for (const toolName of toolNames) {
-      const toolInfo = allTools[toolName];
-      if (toolInfo && toolInfo.tool) {
-        agentTools.push(toolInfo.tool);
-      }
-    }
-
-    logger.debug({
-      agentType,
-      assignedTools: toolNames,
-      foundTools: agentTools.length
-    }, "Retrieved tools for agent");
-
-    return agentTools;
+    return agentManager.routeToAgent(message, defaultContext);
   }
 
-  getAgent(name: string): Agent | null {
-    return this.agents.get(name) || null;
-  }
-
-  getAllAgents(): Agent[] {
-    return Array.from(this.agents.values());
-  }
-
-  getAgentNames(): Set<string> {
-    return new Set(this.agents.keys());
-  }
-
-  routeToAgent(userMessage: string): Agent {
-    // Simple routing logic based on message content
-    const message = userMessage.toLowerCase();
-
-    if (message.includes('budget') || message.includes('envelope') || message.includes('allocate')) {
-      return this.getAgent('budget_coach') || this.getAgent('financial_advisor')!;
-    }
-
-    if (message.includes('spending') || message.includes('transaction') || message.includes('categorize')) {
-      return this.getAgent('transaction_analyst') || this.getAgent('financial_advisor')!;
-    }
-
-    if (message.includes('insight') || message.includes('trend') || message.includes('analysis')) {
-      return this.getAgent('insight_generator') || this.getAgent('financial_advisor')!;
-    }
-
-    // Default to financial advisor
-    return this.getAgent('financial_advisor')!;
-  }
-
+  /**
+   * Run a specific agent
+   */
   async runAgent(
     agentName: string,
-    userMessage: string,
-    context: FinancialContext
+    message: string,
+    context: FinancialContext & {
+      sessionId?: string;
+      timestamp?: Date;
+      previousInteractions?: any[];
+    }
   ): Promise<string> {
-    const agent = this.getAgent(agentName);
-    if (!agent) {
-      throw new Error(`Agent '${agentName}' not found`);
+    if (!this.isRegistryInitialized) {
+      throw new Error('Agent Registry not initialized');
     }
 
-    try {
-      logger.info({ agentName, userId: context.userId }, 'Running financial agent');
-
-      const result = await run(agent, userMessage, { context });
-
-      // Handle different result types from the OpenAI Agents SDK
-      let output: string;
-      if (typeof result === 'string') {
-        output = result;
-      } else if (result && typeof result === 'object' && 'output' in result) {
-        output = (result as any).output || 'I apologize, but I was unable to process your request.';
-      } else {
-        output = 'I apologize, but I was unable to process your request.';
-      }
-
-      logger.info({ 
-        agentName, 
-        userId: context.userId, 
-        outputLength: output.length 
-      }, 'Agent completed successfully');
-
-      return output;
-    } catch (error) {
-      logger.error({ error, agentName, userId: context.userId }, 'Agent execution error');
-      throw new Error('Failed to process request with financial agent');
-    }
-  }
-
-  async initialize(): Promise<void> {
-    if (this.initialized) {
-      logger.info('Agent registry already initialized');
-      return;
-    }
-
-    // Re-initialize if needed
-    this.initializeAgents();
-  }
-
-  isInitialized(): boolean {
-    return this.initialized;
-  }
-
-  getAgentCapabilities(agentName: string): string[] {
-    const capabilities: Record<string, string[]> = {
-      'financial_advisor': [
-        'comprehensive_financial_guidance',
-        'goal_setting',
-        'financial_education',
-        'agent_coordination',
-        'holistic_planning'
-      ],
-      'budget_coach': [
-        'envelope_budgeting',
-        'budget_creation',
-        'fund_allocation',
-        'category_optimization',
-        'budget_troubleshooting'
-      ],
-      'transaction_analyst': [
-        'spending_analysis',
-        'transaction_categorization',
-        'pattern_recognition',
-        'anomaly_detection',
-        'spending_insights'
-      ],
-      'insight_generator': [
-        'trend_analysis',
-        'goal_tracking',
-        'personalized_recommendations',
-        'predictive_insights',
-        'financial_forecasting'
-      ]
+    const enhancedContext = {
+      ...context,
+      sessionId: context.sessionId || `session_${Date.now()}`,
+      timestamp: context.timestamp || new Date(),
+      previousInteractions: context.previousInteractions || [],
     };
 
-    return capabilities[agentName] || [];
+    return agentManager.runAgent(agentName, message, enhancedContext);
   }
 
-  getAgentCount(): number {
-    return this.agents.size;
+  /**
+   * Execute agent handoff
+   */
+  async executeHandoff(
+    fromAgent: string,
+    toAgent: string,
+    message: string,
+    reason: string,
+    context: FinancialContext & {
+      sessionId: string;
+      timestamp: Date;
+      previousInteractions?: any[];
+    }
+  ): Promise<string> {
+    if (!this.isRegistryInitialized) {
+      throw new Error('Agent Registry not initialized');
+    }
+
+    const enhancedContext = {
+      ...context,
+      previousInteractions: context.previousInteractions || [],
+    };
+
+    return agentManager.executeHandoff(fromAgent, toAgent, message, reason, enhancedContext);
   }
 
+  /**
+   * Get agent by name
+   */
+  getAgent(agentName: string): any {
+    return agentManager.getAgent(agentName);
+  }
+
+  /**
+   * Get all available agent names
+   */
+  getAgentNames(): Set<string> {
+    return new Set(agentManager.getAgentNames());
+  }
+
+  /**
+   * Get agent capabilities
+   */
+  getAgentCapabilities(agentName: string): string[] {
+    return agentManager.getAgentCapabilities(agentName);
+  }
+
+  /**
+   * Get all agents
+   */
+  getAllAgents(): Record<string, any> {
+    return agentManager.getAllAgents();
+  }
+
+  /**
+   * Get agent metrics
+   */
   getAgentMetrics(): Record<string, any> {
-    const metrics: Record<string, any> = {};
+    return agentManager.getAgentMetrics();
+  }
 
-    this.agents.forEach((agent, name) => {
-      metrics[name] = {
-        name: agent.name,
-        isAvailable: true,
-        capabilities: this.getAgentCapabilities(name),
-        toolCount: this.getToolsForAgent(name).length
-      };
+  /**
+   * Check if registry is initialized
+   */
+  isInitialized(): boolean {
+    return this.isRegistryInitialized && agentManager.isReady();
+  }
+
+  /**
+   * Build full agent context for execution
+   */
+  async buildAgentContext(
+    userId: string,
+    sessionId: string,
+    agentName: string,
+    includeHistory = true,
+    maxHistory = 20
+  ): Promise<any> {
+    return agentContextManager.createAgentContext(
+      userId,
+      sessionId,
+      agentName,
+      includeHistory,
+      maxHistory
+    );
+  }
+
+  /**
+   * Save agent interaction to history
+   */
+  async saveInteraction(
+    userId: string,
+    sessionId: string,
+    agentName: string,
+    userMessage: string,
+    agentResponse: string,
+    metadata?: Record<string, any>
+  ): Promise<void> {
+    return agentContextManager.saveInteraction(
+      userId,
+      sessionId,
+      agentName,
+      userMessage,
+      agentResponse,
+      metadata
+    );
+  }
+
+  /**
+   * Validate agent input
+   */
+  validateInput(input: unknown): { isValid: boolean; data?: any; errors?: string[] } {
+    return agentValidator.validateInput(input);
+  }
+
+  /**
+   * Validate agent output
+   */
+  validateOutput(output: unknown): { isValid: boolean; data?: any; errors?: string[] } {
+    return agentValidator.validateOutput(output);
+  }
+
+  /**
+   * Health check for all agents
+   */
+  async healthCheck(): Promise<Record<string, boolean>> {
+    const health: Record<string, boolean> = {};
+    
+    agentManager.getAgentNames().forEach(agentName => {
+      const agent = agentManager.getAgent(agentName);
+      health[agentName] = agent?.isReady() || false;
     });
 
-    return metrics;
+    return health;
+  }
+
+  /**
+   * Get registry statistics
+   */
+  getStats(): Record<string, any> {
+    return {
+      isInitialized: this.isRegistryInitialized,
+      agentCount: agentManager.getAgentNames().length,
+      availableAgents: agentManager.getAgentNames(),
+      agentMetrics: agentManager.getAgentMetrics(),
+      contextCacheStats: agentContextManager.getCacheStats(),
+    };
   }
 }
 
-// Create singleton instance
+// Export singleton instance
 export const agentRegistry = new AgentRegistry();
