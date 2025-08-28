@@ -6,6 +6,7 @@ import { agentRegistry } from '../agents/agentRegistry.js';
 import { agentManager } from '../agents/registry.js';
 import { toolRegistry } from '../agents/tools/index.js';
 import { db } from '../lib/db.js';
+import { globalAIBrain, getUserContext } from '../lib/vectorstore.js';
 import type { FinancialContext } from '../agents/tools/types.js';
 
 const router = Router();
@@ -90,7 +91,23 @@ async function buildFinancialContext(userId: string): Promise<FinancialContext> 
       .filter(t => t.amount < 0)
       .reduce((sum, t) => sum + Math.abs(t.amount), 0);
 
-    return {
+    // Determine user type based on transaction patterns
+    const businessExpenseRatio = transactions
+      .filter(t => t.description?.toLowerCase().includes('equipment') || 
+                   t.description?.toLowerCase().includes('software') ||
+                   t.description?.toLowerCase().includes('camera'))
+      .reduce((sum, t) => sum + Math.abs(t.amount), 0) / Math.max(totalExpenses, 1) * 100;
+    
+    const userType = businessExpenseRatio > 5 ? 'creator' : 'consumer';
+
+    // Detect tithe envelope or charitable giving pattern
+    const hasTitheEnvelope = envelopes.some(e => 
+      e.name.toLowerCase().includes('tithe') || 
+      e.name.toLowerCase().includes('giving') ||
+      e.name.toLowerCase().includes('church')
+    );
+
+    const financialContext: FinancialContext = {
       userId,
       totalIncome,
       totalExpenses,
@@ -115,7 +132,12 @@ async function buildFinancialContext(userId: string): Promise<FinancialContext> 
         currentAmount: g.currentAmount || 0,
         deadline: g.targetDate?.toISOString(),
       })),
+      userType,
+      hasTitheEnvelope,
+      businessExpenseRatio,
     };
+
+    return financialContext;
   } catch (error) {
     logger.error({ error, userId }, 'Failed to build financial context');
     return { userId };
@@ -825,6 +847,73 @@ router.get('/memory/profile', auth, async (req, res) => {
     const result = await toolRegistry.executeTool(
       'get_user_memory_profile',
       {
+
+
+// GET /api/ai/knowledge - Get relevant financial knowledge
+router.get('/knowledge', auth, async (req, res) => {
+  try {
+    const userId = req.user!.id;
+    const { query, userType = 'consumer', category, limit = '5' } = req.query;
+
+    if (!query || typeof query !== 'string') {
+      return res.status(400).json({
+        ok: false,
+        error: 'Query parameter is required',
+        code: 'MISSING_QUERY'
+      });
+    }
+
+    logger.info({ userId, query, userType, category }, 'Fetching relevant knowledge from Global AI Brain');
+
+    const relevantKnowledge = await globalAIBrain.getRelevantKnowledge(
+      query,
+      userType as 'consumer' | 'creator' | 'business',
+      category as string | undefined,
+      parseInt(limit as string)
+    );
+
+    // Get user context including memories
+    const userContext = await getUserContext(
+      userId,
+      query,
+      userType as 'consumer' | 'creator',
+      3
+    );
+
+    res.json({
+      ok: true,
+      query,
+      userType,
+      knowledge: relevantKnowledge.map(k => ({
+        id: k.id,
+        title: k.title,
+        content: k.content,
+        category: k.category,
+        subcategory: k.subcategory,
+        complexity: k.metadata.complexity,
+        tags: k.metadata.tags,
+        relevanceScore: k.metadata.relevanceScore,
+      })),
+      userContext: {
+        memories: userContext.memories.length,
+        personalizedInsights: userContext.knowledge.map(k => k.title),
+      },
+      stats: globalAIBrain.getKnowledgeStats(),
+      timestamp: new Date().toISOString(),
+    });
+
+  } catch (error: any) {
+    logger.error({ error, userId: req.user?.id }, 'Failed to retrieve knowledge');
+
+    res.status(500).json({
+      ok: false,
+      error: 'Failed to retrieve knowledge',
+      code: 'KNOWLEDGE_RETRIEVAL_ERROR'
+    });
+  }
+});
+
+
         userId,
         includeHistory: includeHistory === 'true',
       },
@@ -955,12 +1044,19 @@ router.get('/status', auth, async (req, res) => {
       registryReady: agentManager.isRegistryReady(),
     };
 
+    // Check Global AI Brain status
+    const brainStatus = {
+      knowledgeStats: globalAIBrain.getKnowledgeStats(),
+      isInitialized: true, // Will be false if initialization failed
+    };
+
     res.json({
       ok: true,
       status: 'operational',
       agents: agentStatus,
       tools: toolStatus,
       manager: managerStatus,
+      globalAIBrain: brainStatus,
       timestamp: new Date().toISOString(),
     });
 

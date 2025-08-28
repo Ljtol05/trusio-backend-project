@@ -3,7 +3,9 @@ import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import { logger } from './lib/logger.js';
+import { db } from './lib/db.js';
 import { env } from './config/env.js';
+import { globalAIBrain } from './lib/vectorstore.js';
 import { registerAllTools } from './agents/tools/index.js';
 
 // Import routes
@@ -64,6 +66,24 @@ const PORT = env.PORT || 5000;
 
 async function startServer() {
   try {
+    // Connect to database
+    try {
+      await db.$connect();
+      logger.info('Database connected successfully');
+    } catch (error) {
+      logger.error({ error }, 'Failed to connect to database');
+      process.exit(1);
+    }
+
+    // Initialize Global AI Brain
+    try {
+      await globalAIBrain.initialize();
+      logger.info('Global AI Brain initialized with financial knowledge base');
+    } catch (error) {
+      logger.error({ error }, 'Failed to initialize Global AI Brain');
+      // Don't exit - continue without advanced AI features
+    }
+
     // Initialize agents and tools
     registerAllTools();
 

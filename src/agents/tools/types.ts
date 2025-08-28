@@ -1,4 +1,3 @@
-
 import { z } from 'zod';
 
 // Base tool execution context
@@ -24,14 +23,14 @@ export interface FinancialContext {
     id: string;
     name: string;
     balance: number;
-    target?: number;
-    category?: string;
+    target: number;
+    category: string;
   }>;
   transactions?: Array<{
     id: string;
     amount: number;
     description: string;
-    category?: string;
+    category: string;
     date: string;
   }>;
   goals?: Array<{
@@ -39,9 +38,11 @@ export interface FinancialContext {
     description: string;
     targetAmount: number;
     currentAmount: number;
-    deadline: string;
+    deadline?: string;
   }>;
-  riskTolerance?: 'low' | 'medium' | 'high';
+  userType?: 'consumer' | 'creator' | 'business';
+  hasTitheEnvelope?: boolean;
+  businessExpenseRatio?: number;
 }
 
 // Tool execution result
