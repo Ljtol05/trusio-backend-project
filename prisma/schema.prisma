@@ -21,6 +21,8 @@ model User {
   kycData                  String?       // Changed from Json to String for SQLite
   createdAt                DateTime      @default(now())
   updatedAt                DateTime      @updatedAt
+  onboardingCompleted      Boolean       @default(false)
+  userType                 String?       // 'consumer', 'creator', 'hybrid'
 
   envelopes                Envelope[]
   cards                    Card[]
@@ -46,6 +48,8 @@ model Envelope {
   userId         Int
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
+  autoAllocate          Boolean @default(false)
+  allocationPercentage  Float?  // For auto-routing (e.g., 10% for tithe)
 
   user              User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   transactionsFrom  Transaction[]     @relation("FromEnvelope")
