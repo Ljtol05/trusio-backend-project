@@ -1,4 +1,3 @@
-
 import express from 'express';
 import cors from 'cors';
 import { env } from './config/env.js';
@@ -22,6 +21,7 @@ import billRoutes from './routes/bills.js';
 import mccRoutes from './routes/mcc.js';
 import creditCardRoutes from './routes/credit-cards.js';
 import creatorRoutes from './routes/creator.js';
+import voiceOnboardingRoutes from './routes/voice-onboarding.js';
 
 const app = express();
 
@@ -63,6 +63,7 @@ app.use('/api/bills', billRoutes);
 app.use('/api/mcc', mccRoutes);
 app.use('/api/credit-cards', creditCardRoutes);
 app.use('/api/creator', creatorRoutes);
+app.use('/api/voice-onboarding', voiceOnboardingRoutes);
 
 // Error handling middleware
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {

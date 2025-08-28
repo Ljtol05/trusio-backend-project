@@ -1,4 +1,3 @@
-
 import { Configuration, PlaidApi, PlaidEnvironments, Products, CountryCode } from 'plaid';
 import { writeFileSync } from 'fs';
 import pino from 'pino';
@@ -31,8 +30,8 @@ const plaidClient = new PlaidApi(new Configuration({
   basePath: PLAID_ENV === 'production' ? PlaidEnvironments.production : PlaidEnvironments.sandbox,
   baseOptions: {
     headers: {
-      'PLAID-CLIENT-ID': PLAID_CLIENT_ID,
-      'PLAID-SECRET': PLAID_SECRET,
+      'PLAID_CLIENT_ID': PLAID_CLIENT_ID,
+      'PLAID_SECRET': PLAID_SECRET,
     },
   },
 }));
@@ -40,89 +39,79 @@ const plaidClient = new PlaidApi(new Configuration({
 async function createSandboxPublicToken() {
   try {
     console.log('🏦 Creating sandbox public token for custom_konglogic_user...');
-    
+
     const request = {
 
 // Enhanced transaction processing functions
 function inferMCCFromMerchant(merchantName: string): string | null {
   if (!merchantName) return null;
-  
+
   const merchantLower = merchantName.toLowerCase();
-  
-  // Common MCC mappings based on merchant names
-  const mccMappings: { [key: string]: string } = {
-    // Grocery stores
-    'walmart': '5411', 'target': '5411', 'safeway': '5411', 'kroger': '5411',
-    'whole foods': '5411', 'trader joe': '5411', 'costco': '5411',
-    
-    // Gas stations
-    'shell': '5541', 'chevron': '5541', 'exxon': '5541', 'bp': '5541',
-    'texaco': '5541', 'mobil': '5541', 'arco': '5541',
-    
-    // Fast food
-    'mcdonald': '5814', 'starbucks': '5814', 'subway': '5814', 'taco bell': '5814',
-    'burger king': '5814', 'kfc': '5814', 'dunkin': '5814',
-    
-    // Airlines
-    'southwest': '4511', 'american airlines': '4511', 'delta': '4511', 'united': '4511',
-    
-    // Telecom
-    'verizon': '4814', 'at&t': '4814', 'tmobile': '4814', 'sprint': '4814',
-    
-    // Utilities
-    'pg&e': '4900', 'edison': '4900', 'comcast': '4814',
-    
-    // Rideshare
-    'uber': '4121', 'lyft': '4121',
-    
-    // Online/Digital
-    'amazon': '5999', 'ebay': '5999', 'apple': '5732', 'google': '5732'
+  const mccMappings: Record<string, string> = {
+    'walmart': '5411', 
+    'target': '5411', 
+    'safeway': '5411',
+    'shell': '5541', 
+    'chevron': '5541', 
+    'exxon': '5541',
+    'mcdonald': '5814', 
+    'starbucks': '5814', 
+    'subway': '5814',
+    'southwest': '4511', 
+    'delta': '4511', 
+    'american airlines': '4511',
+    'verizon': '4814', 
+    'at&t': '4814', 
+    'comcast': '4814',
+    'uber': '4121', 
+    'lyft': '4121',
+    'amazon': '5999', 
+    'ebay': '5999'
   };
-  
+
   for (const [merchant, mcc] of Object.entries(mccMappings)) {
     if (merchantLower.includes(merchant)) {
       return mcc;
     }
   }
-  
   return null;
 }
 
 function inferCategoryFromTransaction(transaction: any): string[] {
   const merchantName = (transaction.merchant_name || transaction.name || '').toLowerCase();
   const amount = Math.abs(transaction.amount);
-  
+
   // Category inference based on merchant patterns and amount
   if (merchantName.includes('grocery') || merchantName.includes('market') || 
       ['walmart', 'target', 'safeway', 'kroger'].some(store => merchantName.includes(store))) {
     return ['Food and Drink', 'Groceries'];
   }
-  
+
   if (merchantName.includes('gas') || merchantName.includes('fuel') ||
       ['shell', 'chevron', 'exxon', 'bp'].some(gas => merchantName.includes(gas))) {
     return ['Transportation', 'Gas'];
   }
-  
+
   if (['mcdonald', 'starbucks', 'subway', 'taco bell'].some(food => merchantName.includes(food))) {
     return ['Food and Drink', 'Fast Food'];
   }
-  
+
   if (['southwest', 'american airlines', 'delta', 'united'].some(airline => merchantName.includes(airline))) {
     return ['Travel', 'Airlines'];
   }
-  
+
   if (['verizon', 'at&t', 'comcast'].some(telecom => merchantName.includes(telecom))) {
     return ['Bills', 'Telecommunications'];
   }
-  
+
   if (['uber', 'lyft'].some(ride => merchantName.includes(ride))) {
     return ['Transportation', 'Rideshare'];
   }
-  
+
   if (amount > 1000) {
     return ['Transfer', 'Large Purchase'];
   }
-  
+
   return ['Other', 'Miscellaneous'];
 }
 
@@ -140,7 +129,7 @@ function analyzeTransactionLocation(transaction: any): any {
 function generateTransactionInsights(transaction: any): any {
   const amount = Math.abs(transaction.amount);
   const isWeekend = new Date(transaction.date).getDay() % 6 === 0;
-  
+
   return {
     isLargeTransaction: amount > 500,
     isSmallTransaction: amount < 10,
@@ -162,7 +151,7 @@ function generateTransactionInsights(transaction: any): any {
 
     const response = await plaidClient.sandboxPublicTokenCreate(request);
     console.log('✅ Public token created successfully');
-    
+
     return response.data.public_token;
   } catch (error: any) {
     console.error('❌ Failed to create sandbox public token:', error.message);
@@ -176,14 +165,14 @@ function generateTransactionInsights(transaction: any): any {
 async function exchangePublicToken(publicToken: string) {
   try {
     console.log('🔄 Exchanging public token for access token...');
-    
+
     const response = await plaidClient.itemPublicTokenExchange({
       public_token: publicToken,
     });
-    
+
     console.log('✅ Access token received successfully');
     console.log('📋 Item ID:', response.data.item_id);
-    
+
     return {
       accessToken: response.data.access_token,
       itemId: response.data.item_id,
@@ -200,17 +189,17 @@ async function exchangePublicToken(publicToken: string) {
 async function getAccountsInfo(accessToken: string) {
   try {
     console.log('📊 Fetching account information...');
-    
+
     const response = await plaidClient.accountsGet({
       access_token: accessToken,
     });
-    
+
     console.log(`✅ Found ${response.data.accounts.length} accounts:`);
     response.data.accounts.forEach((account, index) => {
       console.log(`   ${index + 1}. ${account.name} (${account.type}/${account.subtype}) - ${account.mask || 'N/A'}`);
       console.log(`      Balance: $${account.balances.current || 0}`);
     });
-    
+
     return response.data.accounts;
   } catch (error: any) {
     console.error('❌ Failed to fetch accounts:', error.message);
@@ -224,25 +213,25 @@ async function getAccountsInfo(accessToken: string) {
 async function getTransactions(accessToken: string) {
   try {
     console.log('💳 Fetching last 120 days of transaction data...');
-    
+
     // Calculate date range (120 days)
     const endDate = new Date();
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - 120);
-    
+
     console.log(`📅 Date range: ${startDate.toISOString().split('T')[0]} to ${endDate.toISOString().split('T')[0]}`);
-    
+
     // Wait for transactions to be ready (Plaid sandbox needs time to initialize)
     console.log('⏳ Waiting for transactions data to be ready...');
     await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds
-    
+
     let allTransactions: any[] = [];
     let offset = 0;
     const count = 500; // Max per request
     let hasMore = true;
     let retryCount = 0;
     const maxRetries = 3;
-    
+
     while (hasMore) {
       const requestParams: any = {
         access_token: accessToken,
@@ -262,10 +251,10 @@ async function getTransactions(accessToken: string) {
 
       try {
         const response = await plaidClient.transactionsGet(requestParams);
-        
+
         const transactions = response.data.transactions;
         const totalTransactions = response.data.total_transactions;
-        
+
         // Enhance transactions with additional data
         const enhancedTransactions = transactions.map(transaction => ({
           ...transaction,
@@ -278,16 +267,16 @@ async function getTransactions(accessToken: string) {
           // Add transaction insights
           insights: generateTransactionInsights(transaction)
         }));
-        
+
         allTransactions = allTransactions.concat(enhancedTransactions);
-        
+
         console.log(`📥 Fetched ${transactions.length} transactions (offset: ${offset}, total available: ${totalTransactions})`);
-        
+
         // Check if we have more transactions
         hasMore = allTransactions.length < totalTransactions && transactions.length > 0;
         offset += transactions.length;
         retryCount = 0; // Reset retry count on success
-        
+
         // Prevent infinite loop
         if (offset > 10000) {
           console.warn('⚠️ Reached maximum offset limit, stopping fetch');
@@ -303,9 +292,9 @@ async function getTransactions(accessToken: string) {
         throw error; // Re-throw if not a retryable error or max retries exceeded
       }
     }
-    
+
     console.log(`✅ Total transactions fetched: ${allTransactions.length}`);
-    
+
     // Log transaction summary
     const summary = generateTransactionSummary(allTransactions);
     console.log('\n📈 Transaction Summary:');
@@ -321,7 +310,7 @@ async function getTransactions(accessToken: string) {
       .forEach(([category, amount]) => {
         console.log(`   ${category}: $${Math.abs(amount as number).toFixed(2)}`);
       });
-    
+
     return allTransactions;
   } catch (error: any) {
     console.error('❌ Failed to fetch transactions:', error.message);
@@ -346,39 +335,39 @@ function generateTransactionSummary(transactions: any[]) {
     avgTransactionSize: 0,
     uniqueMerchants: 0
   };
-  
+
   transactions.forEach(transaction => {
     const amount = transaction.amount;
     const absAmount = Math.abs(amount);
-    
+
     if (amount > 0) {
       totalSpent += amount; // Positive amounts are debits (expenses)
     } else {
       totalIncome += absAmount; // Negative amounts are credits (income)
     }
-    
+
     // Track by inferred category (enhanced)
     const category = transaction.inferredCategory?.[0] || transaction.category?.[0] || 'Other';
     categories[category] = (categories[category] || 0) + absAmount;
-    
+
     // Track by merchant
     const merchant = transaction.merchant_name || transaction.name || 'Unknown';
     merchants[merchant] = (merchants[merchant] || 0) + absAmount;
-    
+
     // Track by MCC
     const mcc = transaction.inferredMCC || 'Unknown';
     mccCodes[mcc] = (mccCodes[mcc] || 0) + absAmount;
-    
+
     // Collect insights
     if (transaction.insights?.isLargeTransaction) insights.largeTransactions++;
     if (transaction.insights?.isWeekendSpending) insights.weekendSpending++;
     if (transaction.locationAnalysis?.isOnline) insights.onlineTransactions++;
     if (transaction.locationAnalysis?.hasLocation) insights.hasLocationData++;
   });
-  
+
   insights.avgTransactionSize = totalSpent / transactions.length;
   insights.uniqueMerchants = Object.keys(merchants).length;
-  
+
   return {
     total: transactions.length,
     totalSpent,
@@ -401,7 +390,7 @@ async function saveTransactionsToFile(transactions: any[], accessToken: string) 
   try {
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     const filename = `plaid-transactions-${timestamp}.json`;
-    
+
     const data = {
       metadata: {
         fetchedAt: new Date().toISOString(),
@@ -429,10 +418,10 @@ async function saveTransactionsToFile(transactions: any[], accessToken: string) 
         iso_currency_code: transaction.iso_currency_code,
       })),
     };
-    
+
     writeFileSync(filename, JSON.stringify(data, null, 2));
     console.log(`💾 Transaction data saved to: ${filename}`);
-    
+
     return filename;
   } catch (error: any) {
     console.error('❌ Failed to save transactions to file:', error.message);
@@ -448,31 +437,31 @@ async function main() {
     console.log(`   Environment: ${PLAID_ENV}`);
     console.log(`   Target User: custom_konglogic_user`);
     console.log('');
-    
+
     // Step 1: Create public token
     const publicToken = await createSandboxPublicToken();
     console.log('');
-    
+
     // Step 2: Exchange for access token
     const { accessToken, itemId } = await exchangePublicToken(publicToken);
     console.log('');
-    
+
     // Step 3: Get account information
     const accounts = await getAccountsInfo(accessToken);
     console.log('');
-    
+
     // Step 4: Fetch transactions
     const transactions = await getTransactions(accessToken);
     console.log('');
-    
+
     // Step 5: Save to file
     const filename = await saveTransactionsToFile(transactions, accessToken);
-    
+
     console.log('\n🎉 Plaid Sandbox Test Completed Successfully!');
     console.log(`📁 Data saved to: ${filename}`);
     console.log(`🔑 Access Token: ${accessToken.substring(0, 20)}...`);
     console.log(`📊 Item ID: ${itemId}`);
-    
+
     // Log the data for analysis use
     logger.info({
       plaidTest: {
@@ -485,7 +474,7 @@ async function main() {
         timestamp: new Date().toISOString(),
       }
     }, 'Plaid sandbox test completed successfully');
-    
+
   } catch (error: any) {
     console.error('\n💥 Script failed:', error.message);
     logger.error({ error: error.message, stack: error.stack }, 'Plaid sandbox test failed');
