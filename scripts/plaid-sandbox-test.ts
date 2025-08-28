@@ -128,22 +128,34 @@ async function getTransactions(accessToken: string) {
     let hasMore = true;
     
     while (hasMore) {
-      const response = await plaidClient.transactionsGet({
+      const requestParams: any = {
         access_token: accessToken,
         start_date: startDate.toISOString().split('T')[0],
         end_date: endDate.toISOString().split('T')[0],
-        offset,
-        count,
-      });
+      };
+
+      // Only add offset if it's greater than 0
+      if (offset > 0) {
+        requestParams.offset = offset;
+      }
+
+      // Only add count if we want to limit results
+      if (count < 500) {
+        requestParams.count = count;
+      }
+
+      const response = await plaidClient.transactionsGet(requestParams);
       
       const transactions = response.data.transactions;
+      const totalTransactions = response.data.total_transactions;
+      
       allTransactions = allTransactions.concat(transactions);
       
-      console.log(`📥 Fetched ${transactions.length} transactions (offset: ${offset})`);
+      console.log(`📥 Fetched ${transactions.length} transactions (offset: ${offset}, total available: ${totalTransactions})`);
       
       // Check if we have more transactions
-      hasMore = transactions.length === count;
-      offset += count;
+      hasMore = allTransactions.length < totalTransactions && transactions.length > 0;
+      offset += transactions.length;
       
       // Prevent infinite loop
       if (offset > 10000) {
