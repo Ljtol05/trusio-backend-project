@@ -9,11 +9,12 @@ export interface AutoRouteRule {
 }
 
 class EnvelopeAutoRouter {
-  // Route funds to auto-allocation envelopes when income is added
+  // Route funds to auto-allocation envelopes when income is added (NOT for spending transactions)
   async routeIncomeFunds(
     userId: string, 
     totalIncome: number,
-    transactionId?: string
+    transactionId?: string,
+    transactionType: 'INCOME' | 'DEPOSIT' = 'INCOME'
   ): Promise<{
     routedAmount: number;
     distributions: Array<{
@@ -21,6 +22,7 @@ class EnvelopeAutoRouter {
       envelopeName: string;
       amount: number;
       percentage: number;
+      isFromIncome: boolean;
     }>;
   }> {
     try {
@@ -80,6 +82,7 @@ class EnvelopeAutoRouter {
           envelopeName: envelope.name,
           amount,
           percentage,
+          isFromIncome: true, // This is specifically for income-based auto-routing
         });
 
         totalRouted += amount;

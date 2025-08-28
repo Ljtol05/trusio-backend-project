@@ -1,4 +1,3 @@
-
 import { logger } from './logger.js';
 import { db } from './db.js';
 import { mccDatabase, TransactionSuggestion, SplitSuggestion } from './mccDatabase.js';
@@ -59,7 +58,7 @@ class TransactionIntelligence {
 
       // Get user context
       const userContext = await this.getUserContext(userId);
-      
+
       // Generate suggestions using MCC database
       const intelligenceResult = await mccDatabase.generateTransactionSuggestions(
         transactionData,
@@ -97,7 +96,7 @@ class TransactionIntelligence {
 
       // Check if we can auto-process (high confidence single suggestion)
       const autoProcessable = this.canAutoProcess(intelligenceResult.suggestions);
-      
+
       if (autoProcessable && intelligenceResult.suggestions.length > 0) {
         await this.processUserChoice(
           userId,
@@ -192,10 +191,10 @@ class TransactionIntelligence {
         });
 
         const transfers = [];
-        
+
         for (const split of choice.splits) {
           const splitAmount = Math.round((transaction.amountCents * split.percentage) / 100);
-          
+
           // Create transfer record
           const transfer = await db.transfer.create({
             data: {
@@ -211,7 +210,7 @@ class TransactionIntelligence {
             where: { id: split.envelopeId },
             data: {
               balanceCents: { decrement: splitAmount },
-              spentThisMonth: { increment: splitAmount },
+              spentThisMonth: { increment: split.amountCents },
             }
           });
 
@@ -246,7 +245,7 @@ class TransactionIntelligence {
       // In a real implementation, suggestions would be stored in a separate table
       // For now, we'll regenerate them
       const result = [];
-      
+
       for (const transaction of pendingTransactions) {
         const userContext = await this.getUserContext(userId);
         const intelligenceResult = await mccDatabase.generateTransactionSuggestions(
@@ -300,7 +299,7 @@ class TransactionIntelligence {
     try {
       // In a production system, this would update ML models or user preference weights
       // For now, we'll store this as user memory for the AI agents
-      
+
       const envelope = await db.envelope.findUnique({
         where: { id: chosenEnvelopeId },
         select: { name: true, category: true }
@@ -377,7 +376,7 @@ class TransactionIntelligence {
   async cleanupExpiredPendingTransactions(): Promise<number> {
     try {
       const expiredDate = new Date(Date.now() - (this.PENDING_EXPIRY_HOURS * 60 * 60 * 1000));
-      
+
       const expiredTransactions = await db.transaction.findMany({
         where: {
           status: 'PENDING',
@@ -387,7 +386,7 @@ class TransactionIntelligence {
 
       // Auto-assign to first available envelope or general pool
       let cleanedCount = 0;
-      
+
       for (const transaction of expiredTransactions) {
         const userEnvelopes = await db.envelope.findMany({
           where: { userId: transaction.userId, isActive: true },

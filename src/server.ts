@@ -13,6 +13,7 @@ import authRoutes from './routes/auth.js';
 import aiRoutes from './routes/ai.js';
 import onboardingRoutes from './routes/onboarding.js';
 import mccRoutes from './routes/mcc.js';
+import billsRoutes from './routes/bills.js';
 import envelopeRoutes from './routes/envelopes.js';
 import transactionRoutes from './routes/transactions.js';
 
@@ -46,6 +47,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/onboarding', onboardingRoutes);
 app.use('/api/mcc', mccRoutes);
+app.use('/api/bills', billsRoutes);
 app.use('/api/envelopes', envelopeRoutes);
 app.use('/api/transactions', transactionRoutes);
 
