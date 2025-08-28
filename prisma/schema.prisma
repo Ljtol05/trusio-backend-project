@@ -50,6 +50,12 @@ model Envelope {
   updatedAt      DateTime @updatedAt
   autoAllocate          Boolean @default(false)
   allocationPercentage  Float?  // For auto-routing (e.g., 10% for tithe)
+  
+  // Enhanced envelope system fields
+  targetAmount   Float    @default(0)
+  category       String?  // 'giving', 'necessities', 'savings', etc.
+  description    String?
+  priority       String?  // 'essential', 'important', 'optional'
 
   user              User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   transactionsFrom  Transaction[]     @relation("FromEnvelope")

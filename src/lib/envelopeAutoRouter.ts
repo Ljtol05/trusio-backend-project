@@ -54,11 +54,11 @@ class EnvelopeAutoRouter {
         const percentage = envelope.allocationPercentage!;
         const amount = (totalIncome * percentage) / 100;
         
-        // Update envelope balance
+        // Update envelope balance (convert to cents)
         await db.envelope.update({
           where: { id: envelope.id },
           data: {
-            balance: { increment: amount }
+            balanceCents: { increment: Math.round(amount * 100) }
           }
         });
 
