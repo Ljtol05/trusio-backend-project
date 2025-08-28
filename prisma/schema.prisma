@@ -19,9 +19,13 @@ model User {
   phoneVerificationCode    String?
   kycApproved              Boolean       @default(false)
   kycData                  String?       // Changed from Json to String for SQLite
+  plaidConnected           Boolean       @default(false)
+  plaidAccessToken         String?       // Encrypted Plaid access token
+  plaidItemId              String?       // Plaid item ID
+  onboardingCompleted      Boolean       @default(false)
+  transactionDataReady     Boolean       @default(false) // Indicates if 90-day transaction analysis is complete
   createdAt                DateTime      @default(now())
   updatedAt                DateTime      @updatedAt
-  onboardingCompleted      Boolean       @default(false)
   userType                 String?       // 'consumer', 'creator', 'hybrid'
 
   envelopes                Envelope[]
@@ -50,7 +54,7 @@ model Envelope {
   updatedAt      DateTime @updatedAt
   autoAllocate          Boolean @default(false)
   allocationPercentage  Float?  // For auto-routing (e.g., 10% for tithe)
-  
+
   // Enhanced envelope system fields
   targetAmount   Float    @default(0)
   category       String?  // 'giving', 'necessities', 'savings', etc.

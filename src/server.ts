@@ -16,6 +16,8 @@ import mccRoutes from './routes/mcc.js';
 import billsRoutes from './routes/bills.js';
 import envelopeRoutes from './routes/envelopes.js';
 import transactionRoutes from './routes/transactions.js';
+import plaidRoutes from './routes/plaid.js';
+import creditCardRoutes from './routes/credit-cards.js';
 
 const app = express();
 
@@ -50,6 +52,8 @@ app.use('/api/mcc', mccRoutes);
 app.use('/api/bills', billsRoutes);
 app.use('/api/envelopes', envelopeRoutes);
 app.use('/api/transactions', transactionRoutes);
+app.use('/api/plaid', plaidRoutes);
+app.use('/api/credit-cards', creditCardRoutes);
 
 // Error handling middleware
 app.use((error: any, req: express.Request, res: express.Response, next: express.NextFunction) => {

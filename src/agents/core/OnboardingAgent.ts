@@ -87,37 +87,56 @@ Respond with detailed analysis and warm, personalized recommendations.
         5
       );
 
-      // ENHANCED: Analyze bills from transaction history if Plaid is connected
+      // ENHANCED: Comprehensive transaction analysis if Plaid is connected
+      let transactionAnalysis = null;
       let billAnalysis = null;
       let enhancedProfile = profile;
       
       try {
         // Check if user has transaction data (Plaid connected)
+        const user = await db.user.findUnique({
+          where: { id: userId },
+          select: { plaidConnected: true, transactionDataReady: true }
+        });
+
         const transactionCount = await db.transaction.count({
           where: { userId }
         });
 
-        if (transactionCount > 0) {
-          logger.info({ userId, transactionCount }, 'Analyzing bills from transaction history');
+        if (user?.plaidConnected && user?.transactionDataReady && transactionCount > 0) {
+          logger.info({ userId, transactionCount }, 'Performing comprehensive 90-day transaction analysis');
           
-          // Import bill analyzer
+          // Import analyzers
           const { billAnalyzer } = await import('../../lib/billAnalyzer.js');
+          const { transactionIntelligence } = await import('../../lib/transactionIntelligence.js');
           
-          // Analyze bills from transaction patterns
+          // Comprehensive transaction analysis
+          transactionAnalysis = await this.performComprehensiveTransactionAnalysis(userId, responses);
+          
+          // Bill analysis from transaction patterns
           billAnalysis = await billAnalyzer.analyzeBillsFromTransactions(userId, 90);
           
-          // Enhance profile with bill insights
-          enhancedProfile = await this.enhanceProfileWithBillAnalysis(profile, billAnalysis);
+          // Enhance profile with transaction insights
+          enhancedProfile = await this.enhanceProfileWithTransactionAnalysis(
+            profile, 
+            transactionAnalysis, 
+            billAnalysis
+          );
           
           logger.info({
             userId,
+            transactionCount,
             detectedBills: billAnalysis.detectedBills.length,
             totalMonthlyBills: billAnalysis.totalMonthlyBills,
+            averageMonthlySpending: transactionAnalysis.averageMonthlySpending,
+            topCategories: transactionAnalysis.topSpendingCategories.slice(0, 3).map(c => c.category),
             recommendedBillsAmount: billAnalysis.recommendedBillsEnvelopeAmount
-          }, 'Bill analysis completed during onboarding');
+          }, 'Comprehensive transaction analysis completed during onboarding');
+        } else if (transactionCount === 0 && user?.plaidConnected) {
+          logger.warn({ userId }, 'Plaid connected but no transaction data available yet');
         }
-      } catch (billError) {
-        logger.warn({ billError, userId }, 'Bill analysis failed during onboarding, continuing without it');
+      } catch (analysisError) {
+        logger.warn({ analysisError, userId }, 'Transaction analysis failed during onboarding, continuing without it');
       }
 
       // Generate personalized envelope recommendations (now with bill insights)
@@ -269,21 +288,106 @@ Respond with detailed analysis and warm, personalized recommendations.
     return 'conservative'; // Default to conservative
   }
 
-  private async enhanceProfileWithBillAnalysis(
+  private async performComprehensiveTransactionAnalysis(
+    userId: string,
+    responses: Record<string, any>
+  ): Promise<any> {
+    const { transactionIntelligence } = await import('../../lib/transactionIntelligence.js');
+    
+    // Analyze 90 days of transactions
+    const endDate = new Date();
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - 90);
+    
+    const transactions = await db.transaction.findMany({
+      where: {
+        userId,
+        createdAt: { 
+          gte: startDate,
+          lte: endDate 
+        }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    // Comprehensive analysis
+    const spendingByCategory = await transactionIntelligence.analyzeSpendingByCategory(userId, 90);
+    const monthlyPatterns = await transactionIntelligence.analyzeMonthlyPatterns(userId, 90);
+    const merchantAnalysis = await transactionIntelligence.analyzeMerchantPatterns(userId, 90);
+    
+    // Calculate key metrics
+    const totalSpending = transactions
+      .filter(t => t.amountCents > 0)
+      .reduce((sum, t) => sum + t.amountCents, 0) / 100;
+    
+    const averageMonthlySpending = totalSpending / 3; // 90 days = ~3 months
+    
+    const topSpendingCategories = spendingByCategory
+      .sort((a, b) => b.totalAmount - a.totalAmount)
+      .slice(0, 10);
+
+    // Income analysis (negative amounts in Plaid are deposits)
+    const incomeTransactions = transactions.filter(t => t.amountCents < 0);
+    const totalIncome = Math.abs(incomeTransactions.reduce((sum, t) => sum + t.amountCents, 0)) / 100;
+    const averageMonthlyIncome = totalIncome / 3;
+
+    return {
+      totalTransactions: transactions.length,
+      analysisDateRange: { start: startDate, end: endDate },
+      totalSpending,
+      averageMonthlySpending,
+      totalIncome,
+      averageMonthlyIncome,
+      topSpendingCategories,
+      monthlyPatterns,
+      merchantAnalysis,
+      spendingByCategory,
+      incomeTransactions: incomeTransactions.length,
+      savingsRate: totalIncome > 0 ? ((totalIncome - totalSpending) / totalIncome) * 100 : 0,
+    };
+  }
+
+  private async enhanceProfileWithTransactionAnalysis(
     profile: OnboardingProfile,
+    transactionAnalysis: any,
     billAnalysis: any
   ): Promise<OnboardingProfile> {
-    // Enhance monthly income estimate if we have bill data
-    if (billAnalysis.totalMonthlyBills > 0 && !profile.monthlyIncome) {
-      // Estimate income based on bills (bills typically 50-70% of income)
-      const estimatedIncome = Math.round((billAnalysis.totalMonthlyBills / 0.6) / 100) * 100;
-      profile.monthlyIncome = estimatedIncome;
+    // Enhance income estimate with actual transaction data
+    if (!profile.monthlyIncome && transactionAnalysis.averageMonthlyIncome > 0) {
+      profile.monthlyIncome = Math.round(transactionAnalysis.averageMonthlyIncome / 100) * 100;
       
       logger.info({
         userId: profile.userId,
-        estimatedIncome,
-        basedOnBills: billAnalysis.totalMonthlyBills
-      }, 'Enhanced profile with income estimate from bills');
+        estimatedIncome: profile.monthlyIncome,
+        basedOnTransactions: transactionAnalysis.averageMonthlyIncome,
+        savingsRate: transactionAnalysis.savingsRate
+      }, 'Enhanced profile with income from transaction analysis');
+    }
+
+    // Enhance spending personality based on actual patterns
+    if (transactionAnalysis.merchantAnalysis) {
+      const impulsePurchases = transactionAnalysis.merchantAnalysis.filter(m => 
+        m.name.toLowerCase().includes('amazon') || 
+        m.name.toLowerCase().includes('target') ||
+        m.averageAmount < 50
+      ).length;
+
+      const subscriptions = transactionAnalysis.merchantAnalysis.filter(m => 
+        m.frequency > 0.8 && m.averageAmount > 10
+      ).length;
+
+      // Refine personality based on spending patterns
+      if (impulsePurchases > subscriptions * 2 && profile.spendingPersonality === 'conservative') {
+        profile.spendingPersonality = 'impulsive';
+      } else if (subscriptions > 5 && profile.spendingPersonality === 'impulsive') {
+        profile.spendingPersonality = 'analytical';
+      }
+    }
+
+    // Enhance with bill analysis
+    if (billAnalysis?.totalMonthlyBills > 0 && !profile.monthlyIncome) {
+      const estimatedIncomeFromBills = Math.round((billAnalysis.totalMonthlyBills / 0.6) / 100) * 100;
+      profile.monthlyIncome = profile.monthlyIncome || estimatedIncomeFromBills;
     }
 
     return profile;
@@ -292,7 +396,8 @@ Respond with detailed analysis and warm, personalized recommendations.
   private async generateEnvelopeRecommendations(
     profile: OnboardingProfile,
     relevantKnowledge: any[],
-    billAnalysis?: any
+    billAnalysis?: any,
+    transactionAnalysis?: any
   ): Promise<Array<{
     name: string;
     purpose: string;
@@ -300,6 +405,7 @@ Respond with detailed analysis and warm, personalized recommendations.
     category: string;
     priority: 'essential' | 'important' | 'optional';
     autoRoutePercentage?: number;
+    basedOnTransactionData?: boolean;
   }>> {
     const envelopes = [];
 
