@@ -140,21 +140,50 @@ model Rule {
 }
 
 model Card {
-  id         Int     @id @default(autoincrement())
-  last4      String
-  token      String? // tokenized PAN
-  label      String?
-  inWallet   Boolean @default(false)
-  envelopeId Int?    @unique // 1:1 relationship with envelope
-  userId     Int
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id                    Int           @id @default(autoincrement())
+  userId                String
+  envelopeId            Int?
+  label                 String        @default("Virtual Card")
+  last4                 String
+  cardNumber            String?       // Full card number for wallet provisioning (encrypted in production)
+  expiryMonth           Int?
+  expiryYear            Int?
+  cvv                   String?       // CVV for wallet provisioning (encrypted in production)
+  status                CardStatus    @default(ACTIVE)
+  isDefault             Boolean       @default(false)
+  inWallet              Boolean       @default(false)
 
-  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  envelope     Envelope?     @relation(fields: [envelopeId], references: [id])
-  transactions Transaction[]
+  // Wallet integration fields
+  walletEligible        Boolean       @default(true)
+  walletProvisioned     Boolean       @default(false)
+  lastWalletActivity    DateTime?
 
-  @@map("cards")
+  // Spending controls
+  spendingLimitCents    Int?          // Optional spending limit per card
+  dailyLimitCents       Int?          // Optional daily limit
+  monthlyLimitCents     Int?          // Optional monthly limit
+
+  // Usage tracking
+  lastUsed              DateTime?
+  totalTransactions     Int           @default(0)
+  totalSpentCents       Int           @default(0)
+
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+
+  // Relations
+  user                  User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  envelope              Envelope?     @relation(fields: [envelopeId], references: [id], onDelete: SetNull)
+  transactions          Transaction[]
+
+  @@unique([envelopeId])
+}
+
+enum CardStatus {
+  ACTIVE
+  SUSPENDED
+  EXPIRED
+  CANCELED
 }
 
 model RoutingConfig {
@@ -164,7 +193,7 @@ model RoutingConfig {
   useGeneralPool   Boolean @default(true)
   bufferCents      Int     @default(0)
   confidence       Int     @default(75) // 0-100 slider
-  userId           Int     @unique
+  userId           Int    @unique
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
