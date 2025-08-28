@@ -371,143 +371,6 @@ curl -X GET http://localhost:5000/api/ai/status \
   -H "Authorization: Bearer <your-jwt-token>"
 ```
 
-## Traditional Usage Examples
-
-### Create an envelope
-```bash
-curl -X POST http://localhost:5000/api/envelopes \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer <your-jwt-token>" \
-  -d '{"name": "Coffee", "startingBalanceCents": 5000}'
-```
-
-### Transfer money between envelopes
-```bash
-curl -X POST http://localhost:5000/api/transfers \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer <your-jwt-token>" \
-  -d '{"fromId": 1, "toId": 2, "amountCents": 2500, "note": "Moving coffee money"}'
-```
-
-### Import transactions
-```bash
-curl -X POST http://localhost:5000/api/transactions/import \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer <your-jwt-token>" \
-  -d '{
-    "transactions": [
-      {
-        "merchant": "Starbucks",
-        "mcc": "5814",
-        "amountCents": -450,
-        "postedAt": "2024-01-15T10:30:00Z",
-        "location": "Seattle, WA"
-      }
-    ]
-  }'
-```
-
-## 🤖 AI Agent Usage Examples
-
-### Chat with Financial Advisor
-```bash
-curl -X POST http://localhost:5000/api/ai/chat \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer <your-jwt-token>" \
-  -d '{
-    "message": "Help me create a budget for $4000 monthly income",
-    "agentName": "financial_advisor",
-    "sessionId": "session_123",
-    "context": {
-      "includeHistory": true,
-      "maxHistory": 10,
-      "includeFinancialData": true
-    }
-  }'
-```
-
-### Get AI Envelope Suggestions
-```bash
-curl -X POST http://localhost:5000/api/envelopes/suggestions \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer <your-jwt-token>" \
-  -d '{
-    "budget": 4000,
-    "goals": ["Save for emergency", "Pay off debt"],
-    "preferences": "Conservative approach with 20% savings"
-  }'
-```
-
-### Execute Financial Analysis Tool
-```bash
-curl -X POST http://localhost:5000/api/ai/tools/execute \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer <your-jwt-token>" \
-  -d '{
-    "toolName": "analyze_spending_patterns",
-    "parameters": {
-      "period": "last_3_months",
-      "categories": ["food", "transportation"]
-    },
-    "agentContext": {
-      "sessionId": "session_123"
-    }
-  }'
-```
-
-### Agent Handoff Example
-```bash
-curl -X POST http://localhost:5000/api/ai/handoff \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer <your-jwt-token>" \
-  -d '{
-    "fromAgent": "financial_advisor",
-    "toAgent": "budget_coach",
-    "message": "I need help optimizing my monthly budget",
-    "reason": "User needs detailed budgeting guidance",
-    "priority": "high"
-  }'
-```
-
-### List Available Agents
-```bash
-curl -X GET http://localhost:5000/api/ai/agents \
-  -H "Authorization: Bearer <your-jwt-token>"
-```
-
-### Get Conversation History
-```bash
-curl -X GET "http://localhost:5000/api/ai/sessions/session_123/history?limit=20&offset=0" \
-  -H "Authorization: Bearer <your-jwt-token>"
-```
-
-### Categorize Transactions with AI
-```bash
-curl -X POST http://localhost:5000/api/transactions/categorize \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer <your-jwt-token>" \
-  -d '{
-    "transactions": [
-      {
-        "merchant": "Whole Foods",
-        "amount": -85.43,
-        "description": "Grocery shopping"
-      },
-      {
-        "merchant": "Shell Gas Station", 
-        "amount": -45.20,
-        "description": "Fuel"
-      }
-    ]
-  }'
-```
-
-### Get AI System Status
-```bash
-curl -X GET http://localhost:5000/api/ai/status \
-  -H "Authorization: Bearer <your-jwt-token>"
-```
-
 ## 🤖 Multi-Agent System Architecture
 
 ### Core Financial Agents
@@ -837,6 +700,125 @@ curl -X POST http://localhost:5000/api/transactions/categorize \
 ```bash
 curl -X GET http://localhost:5000/api/ai/status \
   -H "Authorization: Bearer <your-jwt-token>"
+```
+
+## 🆕 New Enhanced API Usage Examples
+
+### Start Voice Onboarding Session
+```bash
+curl -X POST http://localhost:5000/api/voice-onboarding/start \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <your-jwt-token>"
+```
+
+### Process Voice Input
+```bash
+curl -X POST http://localhost:5000/api/voice-onboarding/input \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <your-jwt-token>" \
+  -d '{
+    "sessionId": "session_123",
+    "transcription": "I want to save $500 per month for an emergency fund",
+    "audioMetadata": {
+      "duration": 3.2,
+      "language": "en-US"
+    }
+  }'
+```
+
+### Start KYC Verification
+```bash
+curl -X POST http://localhost:5000/api/kyc/start \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <your-jwt-token>" \
+  -d '{
+    "legalFirstName": "John",
+    "legalLastName": "Doe", 
+    "dob": "1990-01-15",
+    "ssnLast4": "1234",
+    "addressLine1": "123 Main St",
+    "city": "San Francisco",
+    "state": "CA",
+    "postalCode": "94102"
+  }'
+```
+
+### Get Personalized Financial Insights
+```bash
+curl -X GET http://localhost:5000/api/ai/coach/insights \
+  -H "Authorization: Bearer <your-jwt-token>"
+```
+
+### Start Interactive Coaching Session
+```bash
+curl -X POST http://localhost:5000/api/ai/coach/session \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <your-jwt-token>" \
+  -d '{
+    "message": "I am feeling stressed about my spending this month",
+    "sessionId": "coaching_session_456"
+  }'
+```
+
+### Analyze Transaction with MCC Intelligence
+```bash
+curl -X GET "http://localhost:5000/api/mcc/analyze?merchant=Starbucks&amount=5.50&location=San Francisco, CA" \
+  -H "Authorization: Bearer <your-jwt-token>"
+```
+
+### Upload Credit Card Statement for AI Analysis
+```bash
+curl -X POST http://localhost:5000/api/credit-cards/upload-statements \
+  -H "Authorization: Bearer <your-jwt-token>" \
+  -F "files=@credit_card_statement.pdf" \
+  -F "source=chase_sapphire"
+```
+
+### Get Content Creator Financial Analysis
+```bash
+curl -X GET http://localhost:5000/api/creator/analysis \
+  -H "Authorization: Bearer <your-jwt-token>"
+```
+
+### Track Creator Equipment Purchase
+```bash
+curl -X POST http://localhost:5000/api/creator/track/equipment \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <your-jwt-token>" \
+  -d '{
+    "equipmentType": "camera",
+    "brand": "Sony",
+    "model": "A7 III",
+    "purchasePrice": 1999.99,
+    "purchaseDate": "2024-01-15",
+    "businessUse": 85
+  }'
+```
+
+### Process Pending Transaction
+```bash
+curl -X POST http://localhost:5000/api/transactions/pending \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <your-jwt-token>" \
+  -d '{
+    "merchant": "Whole Foods Market",
+    "amountCents": -8750,
+    "mcc": "5411",
+    "location": "Palo Alto, CA"
+  }'
+```
+
+### Schedule Regular Coaching Check-ins
+```bash
+curl -X POST http://localhost:5000/api/ai/coach/check-in/schedule \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <your-jwt-token>" \
+  -d '{
+    "frequency": "weekly",
+    "preferredTime": "18:00",
+    "timezone": "America/Los_Angeles",
+    "enabled": true
+  }'
 ```
 
 ## Database Schema
