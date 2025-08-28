@@ -127,6 +127,7 @@ router.post('/submit', auth, async (req, res) => {
         userType: result.profile.userType,
         spendingPersonality: result.profile.spendingPersonality,
         needsTitheEnvelope: result.profile.needsTitheEnvelope,
+        monthlyIncome: result.profile.monthlyIncome,
         coachingFocus: result.coachingFocus,
       },
       envelopes: {
@@ -134,6 +135,12 @@ router.post('/submit', auth, async (req, res) => {
         titheEnvelope: result.profile.needsTitheEnvelope,
         autoRouting: result.profile.needsTitheEnvelope ? '10% to Tithe & Giving' : 'None',
       },
+      billAnalysis: result.billAnalysis ? {
+        detectedBills: result.billAnalysis.detectedBills.length,
+        totalMonthlyBills: result.billAnalysis.totalMonthlyBills,
+        recommendedBillsAmount: result.billAnalysis.recommendedBillsEnvelopeAmount,
+        topBills: result.billAnalysis.detectedBills.slice(0, 5),
+      } : null,
       welcome: result.personalizedWelcome,
       nextSteps: result.nextSteps,
       timestamp: new Date().toISOString(),

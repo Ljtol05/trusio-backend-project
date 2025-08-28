@@ -34,6 +34,7 @@ export interface OnboardingResponse {
   personalizedWelcome: string;
   nextSteps: string[];
   coachingFocus: string[];
+  billAnalysis?: any; // Include bill analysis results
 }
 
 class OnboardingAgent {
@@ -86,32 +87,68 @@ Respond with detailed analysis and warm, personalized recommendations.
         5
       );
 
-      // Generate personalized envelope recommendations
+      // ENHANCED: Analyze bills from transaction history if Plaid is connected
+      let billAnalysis = null;
+      let enhancedProfile = profile;
+      
+      try {
+        // Check if user has transaction data (Plaid connected)
+        const transactionCount = await db.transaction.count({
+          where: { userId }
+        });
+
+        if (transactionCount > 0) {
+          logger.info({ userId, transactionCount }, 'Analyzing bills from transaction history');
+          
+          // Import bill analyzer
+          const { billAnalyzer } = await import('../../lib/billAnalyzer.js');
+          
+          // Analyze bills from transaction patterns
+          billAnalysis = await billAnalyzer.analyzeBillsFromTransactions(userId, 90);
+          
+          // Enhance profile with bill insights
+          enhancedProfile = await this.enhanceProfileWithBillAnalysis(profile, billAnalysis);
+          
+          logger.info({
+            userId,
+            detectedBills: billAnalysis.detectedBills.length,
+            totalMonthlyBills: billAnalysis.totalMonthlyBills,
+            recommendedBillsAmount: billAnalysis.recommendedBillsEnvelopeAmount
+          }, 'Bill analysis completed during onboarding');
+        }
+      } catch (billError) {
+        logger.warn({ billError, userId }, 'Bill analysis failed during onboarding, continuing without it');
+      }
+
+      // Generate personalized envelope recommendations (now with bill insights)
       const recommendedEnvelopes = await this.generateEnvelopeRecommendations(
-        profile,
-        userContext.knowledge
+        enhancedProfile,
+        userContext.knowledge,
+        billAnalysis
       );
 
       // Create personalized welcome message and coaching plan
       const { personalizedWelcome, nextSteps, coachingFocus } = 
-        await this.generatePersonalizedGuidance(profile, userContext);
+        await this.generatePersonalizedGuidance(enhancedProfile, userContext, billAnalysis);
 
       // Store onboarding profile
-      await this.storeOnboardingProfile(userId, profile);
+      await this.storeOnboardingProfile(userId, enhancedProfile);
 
       const response: OnboardingResponse = {
-        profile,
+        profile: enhancedProfile,
         recommendedEnvelopes,
         personalizedWelcome,
         nextSteps,
         coachingFocus,
+        billAnalysis, // Include bill analysis in response
       };
 
       logger.info({
         userId,
-        userType: profile.userType,
-        needsTithe: profile.needsTitheEnvelope,
-        envelopeCount: recommendedEnvelopes.length
+        userType: enhancedProfile.userType,
+        needsTithe: enhancedProfile.needsTitheEnvelope,
+        envelopeCount: recommendedEnvelopes.length,
+        billsDetected: billAnalysis?.detectedBills.length || 0
       }, 'Onboarding analysis completed');
 
       return response;
@@ -232,9 +269,30 @@ Respond with detailed analysis and warm, personalized recommendations.
     return 'conservative'; // Default to conservative
   }
 
+  private async enhanceProfileWithBillAnalysis(
+    profile: OnboardingProfile,
+    billAnalysis: any
+  ): Promise<OnboardingProfile> {
+    // Enhance monthly income estimate if we have bill data
+    if (billAnalysis.totalMonthlyBills > 0 && !profile.monthlyIncome) {
+      // Estimate income based on bills (bills typically 50-70% of income)
+      const estimatedIncome = Math.round((billAnalysis.totalMonthlyBills / 0.6) / 100) * 100;
+      profile.monthlyIncome = estimatedIncome;
+      
+      logger.info({
+        userId: profile.userId,
+        estimatedIncome,
+        basedOnBills: billAnalysis.totalMonthlyBills
+      }, 'Enhanced profile with income estimate from bills');
+    }
+
+    return profile;
+  }
+
   private async generateEnvelopeRecommendations(
     profile: OnboardingProfile,
-    relevantKnowledge: any[]
+    relevantKnowledge: any[],
+    billAnalysis?: any
   ): Promise<Array<{
     name: string;
     purpose: string;
@@ -245,7 +303,7 @@ Respond with detailed analysis and warm, personalized recommendations.
   }>> {
     const envelopes = [];
 
-    // Base envelopes for all users
+    // Base envelopes for all users - Enhanced with bill analysis
     const baseEnvelopes = [
       {
         name: 'Emergency Fund',
@@ -254,28 +312,45 @@ Respond with detailed analysis and warm, personalized recommendations.
         category: 'security',
         priority: 'essential' as const,
       },
-      {
-        name: 'Housing',
-        purpose: 'Rent/mortgage, utilities, home maintenance',
-        suggestedAllocation: profile.needsTitheEnvelope ? 25 : 30,
-        category: 'necessities',
-        priority: 'essential' as const,
-      },
-      {
-        name: 'Transportation',
-        purpose: 'Car payments, gas, maintenance, public transit',
-        suggestedAllocation: 12,
-        category: 'necessities',
-        priority: 'essential' as const,
-      },
-      {
-        name: 'Food & Groceries',
-        purpose: 'Groceries and essential food expenses',
-        suggestedAllocation: 12,
-        category: 'necessities',
-        priority: 'essential' as const,
-      },
     ];
+
+    // Add Bills & Overhead envelope if we have bill analysis
+    if (billAnalysis && billAnalysis.recommendedBillsEnvelopeAmount > 0) {
+      baseEnvelopes.push({
+        name: 'Bills & Overhead',
+        purpose: `Monthly bills with ${billAnalysis.suggestedBuffer}% buffer (${billAnalysis.detectedBills.length} bills detected)`,
+        suggestedAllocation: profile.monthlyIncome 
+          ? Math.round((billAnalysis.recommendedBillsEnvelopeAmount / profile.monthlyIncome) * 100)
+          : 35, // Default if no income data
+        category: 'necessities',
+        priority: 'essential' as const,
+      });
+    } else {
+      // Fallback to traditional categories if no bill analysis
+      baseEnvelopes.push(
+        {
+          name: 'Housing',
+          purpose: 'Rent/mortgage, utilities, home maintenance',
+          suggestedAllocation: profile.needsTitheEnvelope ? 25 : 30,
+          category: 'necessities',
+          priority: 'essential' as const,
+        },
+        {
+          name: 'Transportation',
+          purpose: 'Car payments, gas, maintenance, public transit',
+          suggestedAllocation: 12,
+          category: 'necessities',
+          priority: 'essential' as const,
+        },
+        {
+          name: 'Food & Groceries',
+          purpose: 'Groceries and essential food expenses',
+          suggestedAllocation: 12,
+          category: 'necessities',
+          priority: 'essential' as const,
+        }
+      );
+    }
 
     envelopes.push(...baseEnvelopes);
 
@@ -339,7 +414,8 @@ Respond with detailed analysis and warm, personalized recommendations.
 
   private async generatePersonalizedGuidance(
     profile: OnboardingProfile,
-    userContext: any
+    userContext: any,
+    billAnalysis?: any
   ): Promise<{
     personalizedWelcome: string;
     nextSteps: string[];
@@ -352,15 +428,24 @@ Respond with detailed analysis and warm, personalized recommendations.
     - Type: ${profile.userType}
     - Personality: ${profile.spendingPersonality}
     - Income: ${profile.incomeType}
+    - Monthly Income: ${profile.monthlyIncome ? `$${profile.monthlyIncome}` : 'Not provided'}
     - Church/Tithe: ${profile.churchAttendance ? 'Yes' : 'No'}/${profile.paysTithes ? 'Yes' : 'No'}
     - Goals: ${profile.financialGoals.join(', ')}
 
-    Create:
-    1. A warm, encouraging welcome message that acknowledges their specific situation
-    2. 3-5 concrete next steps for their financial journey
-    3. 3-4 coaching focus areas based on their personality and goals
+    ${billAnalysis ? `
+    Bill Analysis Results:
+    - Detected ${billAnalysis.detectedBills.length} recurring bills
+    - Total monthly bills: $${billAnalysis.totalMonthlyBills}
+    - Recommended bills envelope: $${billAnalysis.recommendedBillsEnvelopeAmount}
+    - Key bills: ${billAnalysis.detectedBills.slice(0, 3).map(b => `${b.name} ($${b.amount})`).join(', ')}
+    ` : 'No transaction history available for bill analysis yet.'}
 
-    Make it personal, actionable, and encouraging. Reference their specific user type and goals.
+    Create:
+    1. A warm, encouraging welcome message that acknowledges their specific situation and bill insights
+    2. 3-5 concrete next steps for their financial journey
+    3. 3-4 coaching focus areas based on their personality, goals, and spending patterns
+
+    Make it personal, actionable, and encouraging. Reference their specific user type, goals, and bill analysis insights.
     `;
 
     const guidance = await createAgentResponse(
@@ -370,22 +455,32 @@ Respond with detailed analysis and warm, personalized recommendations.
       { temperature: 0.3 }
     );
 
+    // Generate enhanced next steps based on bill analysis
+    const nextSteps = [
+      'Set up your personalized envelope system',
+      billAnalysis 
+        ? `Review your ${billAnalysis.detectedBills.length} detected bills and allocate $${billAnalysis.recommendedBillsEnvelopeAmount} to Bills & Overhead`
+        : 'Link your bank account for automatic transaction tracking',
+      'Define your first financial goal',
+      'Complete your initial envelope allocations',
+      profile.needsTitheEnvelope ? 'Configure automatic 10% tithe allocation' : 'Review spending categories',
+      billAnalysis ? 'Set up auto-pay for recurring bills to avoid late fees' : 'Connect with Plaid for transaction analysis'
+    ].filter(Boolean);
+
+    const coachingFocus = [
+      `${profile.userType}-specific budgeting strategies`,
+      `${profile.spendingPersonality} spending habit optimization`,
+      profile.userType === 'creator' ? 'Irregular income management' : 'Steady income optimization',
+      billAnalysis ? 'Optimizing bill management and overhead control' : 'Emergency fund building'
+    ];
+
     // Parse the guidance response (simplified for now)
     return {
-      personalizedWelcome: `Welcome to your personalized financial journey! As a ${profile.userType} with ${profile.spendingPersonality} tendencies, you're uniquely positioned to build a strong financial foundation with envelope budgeting.`,
-      nextSteps: [
-        'Set up your personalized envelope system',
-        'Link your bank account for automatic transaction tracking',
-        'Define your first financial goal',
-        'Complete your initial envelope allocations',
-        profile.needsTitheEnvelope ? 'Configure automatic 10% tithe allocation' : 'Review spending categories'
-      ].filter(Boolean),
-      coachingFocus: [
-        `${profile.userType}-specific budgeting strategies`,
-        `${profile.spendingPersonality} spending habit optimization`,
-        profile.userType === 'creator' ? 'Irregular income management' : 'Steady income optimization',
-        'Emergency fund building'
-      ]
+      personalizedWelcome: billAnalysis 
+        ? `Welcome to your personalized financial journey! As a ${profile.userType} with ${profile.spendingPersonality} tendencies, I've analyzed your spending and found ${billAnalysis.detectedBills.length} recurring bills totaling $${billAnalysis.totalMonthlyBills}/month. You're perfectly positioned to build a strong financial foundation with envelope budgeting tailored to your actual spending patterns.`
+        : `Welcome to your personalized financial journey! As a ${profile.userType} with ${profile.spendingPersonality} tendencies, you're uniquely positioned to build a strong financial foundation with envelope budgeting.`,
+      nextSteps,
+      coachingFocus
     };
   }
 
