@@ -5,6 +5,7 @@ import { auth } from '../services/auth.js';
 import { createAgentResponse } from '../lib/openai.js';
 import { db } from '../lib/db.js';
 import { financialCoachAgent } from '../agents/core/FinancialCoachAgent.js';
+import { contentCreatorAgent } from '../agents/core/ContentCreatorAgent.js';
 import type { FinancialContext } from '../agents/tools/types.js';
 
 const router = Router();
@@ -105,8 +106,13 @@ router.get('/coach/insights', auth, async (req, res) => {
       emergencyFund: envelopes.find(e => e.name.toLowerCase().includes('emergency'))?.balance,
     };
 
-    // Get personalized insights
-    const insights = await financialCoachAgent.getPersonalizedInsights(userId, context);
+    // Get personalized insights (route to creator agent if user is a creator)
+    let insights;
+    if (user?.userType === 'creator') {
+      insights = await contentCreatorAgent.getCreatorInsights(userId, context);
+    } else {
+      insights = await financialCoachAgent.getPersonalizedInsights(userId, context);
+    }
 
     // Calculate financial health score
     const healthScore = calculateFinancialHealthScore(context);
