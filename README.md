@@ -1,19 +1,122 @@
 # Envelope Budgeting Backend
 
-A TypeScript/Express backend for envelope-style budgeting with smart transaction routing, **AI-powered multi-agent coaching**, and real-time updates.
+A TypeScript/Express backend for envelope-style budgeting with smart transaction routing, **AI-powered multi-agent coaching**, and real-time updates. **Focused on individual consumers and content creators** with future business expansion capabilities.
+
+## Required API Keys & Services
+
+### Currently Implemented
+- **OpenAI API** (for AI agents and financial coaching)
+  - `OPENAI_API_KEY` - Main API key
+  - `OPENAI_PROJECT_ID` - Project identifier
+  - `OPENAI_ORG_ID` - Organization identifier
+- **Resend API** (for email verification)
+  - `RESEND_API_KEY` - Email delivery service
+- **Plaid API** (for bank integration and transaction analysis)
+  - `PLAID_CLIENT_ID` - Sandbox/Development
+  - `PLAID_SECRET` - Sandbox/Development  
+  - `PLAID_ENV` - sandbox/development/production
+  - `PLAID_PRODUCTS` - transactions,auth,identity,assets
+- **Twilio** (optional - for SMS verification)
+  - `TWILIO_ACCOUNT_SID`
+  - `TWILIO_AUTH_TOKEN`
+  - `TWILIO_PHONE_NUMBER`
+
+### Future Production Requirements
+- **Banking-as-a-Service Provider** (for virtual accounts with routing numbers)
+  - `BAAS_API_KEY` - Synapse, Unit, or Treasury Prime
+  - `BAAS_PROGRAM_ID` - Program identifier
+  - `BAAS_ENVIRONMENT` - sandbox/production
+- **Tax Data API** (for real-time tax calculations)
+  - `TAXJAR_API_KEY` or `AVALARA_API_KEY`
+- **MCC Database Access** (for enhanced merchant category codes)
+  - `VISA_MCC_API_KEY` or `MASTERCARD_MCC_API_KEY`
+- **Credit Score API** (for financial health insights)
+  - `EXPERIAN_API_KEY` or `TRANSUNION_API_KEY` or `EQUIFAX_API_KEY`
+- **Market Data API** (for investment tracking features)
+  - `YAHOO_FINANCE_API_KEY` or `ALPHA_VANTAGE_API_KEY`
+- **Booking APIs** (for travel and dining category enhancements)
+  - `AMADEUS_API_KEY` (travel)
+  - `OPENTABLE_API_KEY` (restaurants)
+
+### Global AI Brain Configuration
+- **Pinecone** (for RAG vector database - budgeting playbooks, IRS codes)
+  - `PINECONE_API_KEY`
+  - `PINECONE_ENVIRONMENT`
+  - `PINECONE_INDEX_NAME`
+- **Alternative Vector Stores**
+  - `WEAVIATE_URL` and `WEAVIATE_API_KEY` (alternative)
+  - `CHROMA_API_KEY` (alternative)
+
+### Payment Processing (Future)
+- **Stripe** (for subscription management)
+  - `STRIPE_SECRET_KEY`
+  - `STRIPE_WEBHOOK_SECRET`
+  - `STRIPE_PRICE_ID_PREMIUM`
 
 ## Features
 
-- 📊 Envelope-based budgeting with real-time balance tracking
-- 🧠 Smart transaction routing with configurable rules
-- 🤖 **AI-powered multi-agent financial coaching** (with OpenAI Agents SDK)
-- 🔄 **Intelligent agent handoffs** between financial specialists
-- 💳 Virtual card management for category spending
+### Core Individual Consumer & Content Creator Features
+- 📊 **10 Smart Envelopes** with real-time balance tracking and AI optimization
+- 🤖 **AI-Powered Multi-Agent Financial Coaching** specialized for consumers and creators
+- 💳 **4 Virtual Cards Max** - Apple Wallet & Google Pay integration ready
+- 🎯 **AI Transaction Routing** using MCC codes with multiple suggestion options
+- ⛪ **Automatic Tithe Envelope** - 10% auto-allocation from income deposits
+- 💰 **Content Creator Income Tracking** - Multiple revenue streams support
+- 🔄 **Smart Transaction Splitting** - Choose from AI suggestions or manual split
+- 📱 **Real-time Pending Transaction Management** - Choose envelope before settlement
+- 🎨 **Creator-Specific Categories** - Equipment, software, sponsorships, platform earnings
+- 📈 **Financial Growth Insights** - Tailored for irregular creator income
+
+### AI & Intelligence Features
+- 🧠 **Multi-Agent System** with specialized financial coaching agents
+- 🔄 **Intelligent Agent Handoffs** between budget coach, transaction analyst, insight generator
+- 🎯 **MCC-Based Smart Routing** with fallback options and user choice
+- 💬 **Conversational Financial Guidance** with session management
+- 📊 **Pattern Recognition** for spending habits and income optimization
+- 🛠️ **Direct Tool Execution** for financial analysis and envelope management
+
+### Technical Infrastructure
 - 📡 Server-sent events for real-time UI updates
-- 🔄 Transaction import and auto-categorization
+- 🔄 Plaid integration with "Static Money" simulation (pre-BaaS)
 - 📋 Flexible routing rules with priority ordering
-- 💬 **Conversation history and session management**
-- 🛠️ **Direct tool execution** for financial analysis
+- 🎯 Basic tax categorization and compliance tracking
+- 🏦 **BaaS-Ready Architecture** - Plug-and-play for future virtual account integration
+
+## Implementation Plan - Individual Consumers & Content Creators Focus
+
+### Phase 1: Core Consumer Features (Current Focus)
+**Tasks 1-8: Foundation & AI Integration**
+1. **Global AI Brain Setup** - RAG system with budgeting playbooks, IRS codes, and financial tips
+2. **Enhanced Onboarding Agent** - Specialized for consumers and content creators
+3. **Smart Envelope System** - 10 envelopes including automatic Tithe envelope
+4. **AI Transaction Routing** - MCC-based with multiple suggestion options
+5. **Content Creator Specialization** - Revenue stream tracking, equipment categorization
+6. **Plaid Integration Enhancement** - Static money simulation with transaction pending management
+7. **Virtual Card Management** - 4-card limit with wallet integration preparation
+8. **Basic Tax Categorization** - Foundation for compliance tracking
+
+### Phase 2: Advanced Consumer Intelligence (Tasks 9-12)
+9. **Spending Pattern AI** - Learn user habits and optimize suggestions
+10. **Income Optimization for Creators** - Track platforms, sponsorships, irregular income
+11. **Smart Split Transactions** - AI suggestions with manual override options
+12. **Financial Health Dashboard** - Consumer-focused insights and recommendations
+
+### Future Business Features (Separate Implementation)
+- **Business Expense Tracking & Tax Optimization**
+- **Quarterly Tax Estimator for Business Owners** 
+- **Revenue Diversification for Small Business**
+- **Equipment Depreciation Tracking**
+- **Client Payment Optimization**
+- **Business Emergency Fund Management**
+
+### Pre-Production Requirements Checklist
+- [ ] Plaid Production Keys (when ready for live bank data)
+- [ ] Banking-as-a-Service Provider Partnership (Synapse/Unit/Treasury Prime)
+- [ ] Tax API Integration (TaxJar/Avalara)
+- [ ] MCC Database Access (Visa/Mastercard)
+- [ ] Stripe Integration (freemium to premium)
+- [ ] Vector Database Setup (Pinecone for Global AI Brain)
+- [ ] Apple Wallet & Google Pay Certification
 
 ## Getting Started
 
