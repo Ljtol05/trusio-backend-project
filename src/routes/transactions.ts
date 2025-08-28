@@ -1,12 +1,14 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { db } from '../lib/db.js';
 import { logger } from '../lib/logger.js';
-import { authenticateToken } from './auth.js';
+import { auth } from '../services/auth.js';
+import { db } from '../lib/db.js';
+import { transactionIntelligence, TransactionChoice } from '../lib/transactionIntelligence.js';
+import { mccDatabase } from '../lib/mccDatabase.js';
 import { CreateTransactionSchema, PaginationSchema } from '../types/dto.js';
 
 const router = Router();
-router.use(authenticateToken);
+router.use(auth);
 
 // Get all transactions with filtering
 router.get('/', async (req: any, res) => {
@@ -324,6 +326,18 @@ router.post('/import', async (req: any, res) => {
         location,
       });
 
+      // Get MCC details and categorize
+      const mccDetails = mccDatabase.find(m => m.code === mcc);
+      const category = mccDetails ? mccDetails.category : 'Uncategorized';
+      const suggestions = await transactionIntelligence(req.user.id, {
+        amount: Math.abs(amountCents),
+        merchantName: merchant,
+        mcc,
+        location,
+        category,
+        currentEnvelope: routing.envelope,
+      });
+
       const transaction = await db.transaction.create({
         data: {
           userId: req.user.id,
@@ -331,10 +345,11 @@ router.post('/import', async (req: any, res) => {
           mcc,
           amountCents,
           location,
-          envelopeId: routing.envelope?.id,
-          reason: routing.reason,
+          envelopeId: routing.envelope?.id || suggestions.choices[0]?.envelopeId,
+          reason: routing.reason || suggestions.choices[0]?.reason,
           postedAt: postedAt ? new Date(postedAt) : new Date(),
           status: 'SETTLED',
+          category: suggestions.choices[0]?.category || category,
         },
         include: {
           envelope: { select: { id: true, name: true } },
@@ -347,6 +362,7 @@ router.post('/import', async (req: any, res) => {
           envelope: routing.envelope,
           reason: routing.reason,
         },
+        intelligence: suggestions,
       });
     }
 

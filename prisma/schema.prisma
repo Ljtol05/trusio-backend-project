@@ -95,14 +95,20 @@ model Transaction {
 }
 
 model Transfer {
-  id           Int      @id @default(autoincrement())
-  amountCents  Int
-  note         String?
-  fromId       Int?
-  toId         Int?
-  userId       Int
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id                   Int      @id @default(autoincrement())
+  amountCents          Int
+  note                 String?
+  fromId               Int?
+  toId                 Int?
+  userId               Int
+  fromEnvelopeId       Int?     // For new column name consistency
+  toEnvelopeId         Int?     // For new column name consistency
+  amount               Float?   // For backwards compatibility
+  description          String?
+  category             String?  // 'auto_route', 'manual', 'split'
+  sourceTransactionId  String?  // Link to originating transaction
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
 
   user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   fromEnvelope Envelope? @relation("TransferFrom", fields: [fromId], references: [id])
