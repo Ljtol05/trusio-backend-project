@@ -1,7 +1,20 @@
 
 import { Configuration, PlaidApi, PlaidEnvironments, Products, CountryCode } from 'plaid';
 import { writeFileSync } from 'fs';
-import { logger } from '../src/lib/logger.js';
+import pino from 'pino';
+
+// Simple logger for the script
+const logger = pino({
+  level: 'info',
+  transport: {
+    target: 'pino-pretty',
+    options: {
+      colorize: true,
+      translateTime: 'HH:MM:ss',
+      ignore: 'pid,hostname',
+    },
+  },
+});
 
 // Load environment variables
 const PLAID_CLIENT_ID = process.env.PLAID_CLIENT_ID;
@@ -292,11 +305,7 @@ async function main() {
 }
 
 // Run the script
-if (require.main === module) {
-  main().catch((error) => {
-    console.error('Unhandled error:', error);
-    process.exit(1);
-  });
-}
-
-export default main;
+main().catch((error) => {
+  console.error('Unhandled error:', error);
+  process.exit(1);
+});
