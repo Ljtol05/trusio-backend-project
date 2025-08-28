@@ -1,113 +1,133 @@
+
 import express from 'express';
 import cors from 'cors';
-import helmet from 'helmet';
-import rateLimit from 'express-rate-limit';
+import { env } from './config/env.js';
 import { logger } from './lib/logger.js';
 import { db } from './lib/db.js';
-import { env } from './config/env.js';
-import { globalAIBrain } from './lib/vectorstore.js';
-import { registerAllTools } from './agents/tools/index.js';
+import { configureOpenAIFromEnv } from './lib/openai.js';
 
 // Import routes
 import authRoutes from './routes/auth.js';
-import aiRoutes from './routes/ai.js';
 import onboardingRoutes from './routes/onboarding.js';
-import mccRoutes from './routes/mcc.js';
-import billsRoutes from './routes/bills.js';
+import aiRoutes from './routes/ai.js';
 import envelopeRoutes from './routes/envelopes.js';
 import transactionRoutes from './routes/transactions.js';
+import transferRoutes from './routes/transfers.js';
+import cardRoutes from './routes/cards.js';
+import ruleRoutes from './routes/rules.js';
+import eventRoutes from './routes/events.js';
+import kycRoutes from './routes/kyc.js';
 import plaidRoutes from './routes/plaid.js';
+import billRoutes from './routes/bills.js';
+import mccRoutes from './routes/mcc.js';
 import creditCardRoutes from './routes/credit-cards.js';
 
 const app = express();
 
-// Security middleware
-app.use(helmet());
+// Middleware
 app.use(cors({
-  origin: env.NODE_ENV === 'production' ? env.FRONTEND_URL : true,
-  credentials: true,
+  origin: env.NODE_ENV === 'production' 
+    ? ['https://your-production-domain.com'] 
+    : true,
+  credentials: true
 }));
 
-// Rate limiting
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
-});
-app.use(limiter);
-
-// Body parsing middleware
 app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Health check endpoint
-app.get('/api/healthz', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+// Health check
+app.get('/healthz', (req, res) => {
+  res.json({ 
+    ok: true, 
+    timestamp: new Date().toISOString(),
+    service: 'envelope-budgeting-api',
+    version: '1.0.0',
+    environment: env.NODE_ENV
+  });
 });
 
-// Routes
+// API Routes
 app.use('/api/auth', authRoutes);
-app.use('/api/ai', aiRoutes);
 app.use('/api/onboarding', onboardingRoutes);
-app.use('/api/mcc', mccRoutes);
-app.use('/api/bills', billsRoutes);
+app.use('/api/ai', aiRoutes); // Enhanced with financial coaching
 app.use('/api/envelopes', envelopeRoutes);
 app.use('/api/transactions', transactionRoutes);
+app.use('/api/transfers', transferRoutes);
+app.use('/api/cards', cardRoutes);
+app.use('/api/rules', ruleRoutes);
+app.use('/api/events', eventRoutes);
+app.use('/api/kyc', kycRoutes);
 app.use('/api/plaid', plaidRoutes);
+app.use('/api/bills', billRoutes);
+app.use('/api/mcc', mccRoutes);
 app.use('/api/credit-cards', creditCardRoutes);
 
 // Error handling middleware
-app.use((error: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
-  logger.error({ error: error.message, stack: error.stack }, 'Unhandled error');
+app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  logger.error({
+    error: err.message,
+    stack: err.stack,
+    url: req.url,
+    method: req.method,
+    ip: req.ip
+  }, 'Unhandled error');
 
-  res.status(error.status || 500).json({
-    error: {
-      message: env.NODE_ENV === 'production' ? 'Internal server error' : error.message,
-      ...(env.NODE_ENV !== 'production' && { stack: error.stack }),
-    },
+  res.status(err.status || 500).json({
+    ok: false,
+    error: env.NODE_ENV === 'production' ? 'Internal server error' : err.message,
+    code: err.code || 'INTERNAL_ERROR'
   });
 });
 
 // 404 handler
-app.use('*', (req, res) => {
-  res.status(404).json({ error: 'Not Found' });
+app.use((req, res) => {
+  res.status(404).json({
+    ok: false,
+    error: 'Route not found',
+    code: 'NOT_FOUND'
+  });
 });
-
-const PORT = env.PORT || 5000;
 
 async function startServer() {
   try {
-    // Connect to database
-    try {
-      await db.$connect();
-      logger.info('Database connected successfully');
-    } catch (error) {
-      logger.error({ error }, 'Failed to connect to database');
-      process.exit(1);
+    // Test database connection
+    await db.$connect();
+    logger.info('Database connected successfully');
+
+    // Configure OpenAI
+    const openaiConfigured = configureOpenAIFromEnv();
+    if (openaiConfigured) {
+      logger.info('OpenAI configured successfully');
+    } else {
+      logger.warn('OpenAI configuration failed - AI features may not work');
     }
 
-    // Initialize Global AI Brain
-    try {
-      await globalAIBrain.initialize();
-      logger.info('Global AI Brain initialized with financial knowledge base');
-    } catch (error) {
-      logger.error({ error }, 'Failed to initialize Global AI Brain');
-      // Don't exit - continue without advanced AI features
-    }
-
-    // Initialize agents and tools
-    registerAllTools();
-
-    app.listen(PORT, '0.0.0.0', () => {
-      logger.info({ port: PORT }, 'Server started successfully');
+    // Start server
+    const server = app.listen(env.PORT, '0.0.0.0', () => {
+      logger.info({
+        port: env.PORT,
+        environment: env.NODE_ENV,
+        features: {
+          ai: openaiConfigured,
+          coaching: openaiConfigured,
+          database: true,
+        }
+      }, 'Server started successfully');
     });
+
+    // Graceful shutdown
+    process.on('SIGINT', async () => {
+      logger.info('Shutting down server...');
+      server.close(() => {
+        db.$disconnect();
+        process.exit(0);
+      });
+    });
+
   } catch (error) {
     logger.error({ error }, 'Failed to start server');
     process.exit(1);
   }
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
-  startServer();
-}
-
-export default app;
+startServer();
