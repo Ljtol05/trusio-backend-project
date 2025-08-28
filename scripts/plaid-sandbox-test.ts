@@ -122,10 +122,16 @@ async function getTransactions(accessToken: string) {
     
     console.log(`📅 Date range: ${startDate.toISOString().split('T')[0]} to ${endDate.toISOString().split('T')[0]}`);
     
+    // Wait for transactions to be ready (Plaid sandbox needs time to initialize)
+    console.log('⏳ Waiting for transactions data to be ready...');
+    await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds
+    
     let allTransactions: any[] = [];
     let offset = 0;
     const count = 500; // Max per request
     let hasMore = true;
+    let retryCount = 0;
+    const maxRetries = 3;
     
     while (hasMore) {
       const requestParams: any = {
@@ -144,23 +150,34 @@ async function getTransactions(accessToken: string) {
         requestParams.count = count;
       }
 
-      const response = await plaidClient.transactionsGet(requestParams);
-      
-      const transactions = response.data.transactions;
-      const totalTransactions = response.data.total_transactions;
-      
-      allTransactions = allTransactions.concat(transactions);
-      
-      console.log(`📥 Fetched ${transactions.length} transactions (offset: ${offset}, total available: ${totalTransactions})`);
-      
-      // Check if we have more transactions
-      hasMore = allTransactions.length < totalTransactions && transactions.length > 0;
-      offset += transactions.length;
-      
-      // Prevent infinite loop
-      if (offset > 10000) {
-        console.warn('⚠️ Reached maximum offset limit, stopping fetch');
-        break;
+      try {
+        const response = await plaidClient.transactionsGet(requestParams);
+        
+        const transactions = response.data.transactions;
+        const totalTransactions = response.data.total_transactions;
+        
+        allTransactions = allTransactions.concat(transactions);
+        
+        console.log(`📥 Fetched ${transactions.length} transactions (offset: ${offset}, total available: ${totalTransactions})`);
+        
+        // Check if we have more transactions
+        hasMore = allTransactions.length < totalTransactions && transactions.length > 0;
+        offset += transactions.length;
+        retryCount = 0; // Reset retry count on success
+        
+        // Prevent infinite loop
+        if (offset > 10000) {
+          console.warn('⚠️ Reached maximum offset limit, stopping fetch');
+          break;
+        }
+      } catch (error: any) {
+        if (error.response?.data?.error_code === 'PRODUCT_NOT_READY' && retryCount < maxRetries) {
+          retryCount++;
+          console.log(`⏳ Product not ready, retrying in ${retryCount * 2} seconds... (attempt ${retryCount}/${maxRetries})`);
+          await new Promise(resolve => setTimeout(resolve, retryCount * 2000));
+          continue; // Retry the same request
+        }
+        throw error; // Re-throw if not a retryable error or max retries exceeded
       }
     }
     
