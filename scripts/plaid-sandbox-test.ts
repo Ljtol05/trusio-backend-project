@@ -42,6 +42,116 @@ async function createSandboxPublicToken() {
     console.log('🏦 Creating sandbox public token for custom_konglogic_user...');
     
     const request = {
+
+// Enhanced transaction processing functions
+function inferMCCFromMerchant(merchantName: string): string | null {
+  if (!merchantName) return null;
+  
+  const merchantLower = merchantName.toLowerCase();
+  
+  // Common MCC mappings based on merchant names
+  const mccMappings: { [key: string]: string } = {
+    // Grocery stores
+    'walmart': '5411', 'target': '5411', 'safeway': '5411', 'kroger': '5411',
+    'whole foods': '5411', 'trader joe': '5411', 'costco': '5411',
+    
+    // Gas stations
+    'shell': '5541', 'chevron': '5541', 'exxon': '5541', 'bp': '5541',
+    'texaco': '5541', 'mobil': '5541', 'arco': '5541',
+    
+    // Fast food
+    'mcdonald': '5814', 'starbucks': '5814', 'subway': '5814', 'taco bell': '5814',
+    'burger king': '5814', 'kfc': '5814', 'dunkin': '5814',
+    
+    // Airlines
+    'southwest': '4511', 'american airlines': '4511', 'delta': '4511', 'united': '4511',
+    
+    // Telecom
+    'verizon': '4814', 'at&t': '4814', 'tmobile': '4814', 'sprint': '4814',
+    
+    // Utilities
+    'pg&e': '4900', 'edison': '4900', 'comcast': '4814',
+    
+    // Rideshare
+    'uber': '4121', 'lyft': '4121',
+    
+    // Online/Digital
+    'amazon': '5999', 'ebay': '5999', 'apple': '5732', 'google': '5732'
+  };
+  
+  for (const [merchant, mcc] of Object.entries(mccMappings)) {
+    if (merchantLower.includes(merchant)) {
+      return mcc;
+    }
+  }
+  
+  return null;
+}
+
+function inferCategoryFromTransaction(transaction: any): string[] {
+  const merchantName = (transaction.merchant_name || transaction.name || '').toLowerCase();
+  const amount = Math.abs(transaction.amount);
+  
+  // Category inference based on merchant patterns and amount
+  if (merchantName.includes('grocery') || merchantName.includes('market') || 
+      ['walmart', 'target', 'safeway', 'kroger'].some(store => merchantName.includes(store))) {
+    return ['Food and Drink', 'Groceries'];
+  }
+  
+  if (merchantName.includes('gas') || merchantName.includes('fuel') ||
+      ['shell', 'chevron', 'exxon', 'bp'].some(gas => merchantName.includes(gas))) {
+    return ['Transportation', 'Gas'];
+  }
+  
+  if (['mcdonald', 'starbucks', 'subway', 'taco bell'].some(food => merchantName.includes(food))) {
+    return ['Food and Drink', 'Fast Food'];
+  }
+  
+  if (['southwest', 'american airlines', 'delta', 'united'].some(airline => merchantName.includes(airline))) {
+    return ['Travel', 'Airlines'];
+  }
+  
+  if (['verizon', 'at&t', 'comcast'].some(telecom => merchantName.includes(telecom))) {
+    return ['Bills', 'Telecommunications'];
+  }
+  
+  if (['uber', 'lyft'].some(ride => merchantName.includes(ride))) {
+    return ['Transportation', 'Rideshare'];
+  }
+  
+  if (amount > 1000) {
+    return ['Transfer', 'Large Purchase'];
+  }
+  
+  return ['Other', 'Miscellaneous'];
+}
+
+function analyzeTransactionLocation(transaction: any): any {
+  const location = transaction.location;
+  return {
+    hasLocation: !!(location && (location.city || location.region)),
+    city: location?.city || null,
+    region: location?.region || null,
+    isOnline: !location || (!location.city && !location.region),
+    storeNumber: location?.store_number || null
+  };
+}
+
+function generateTransactionInsights(transaction: any): any {
+  const amount = Math.abs(transaction.amount);
+  const isWeekend = new Date(transaction.date).getDay() % 6 === 0;
+  
+  return {
+    isLargeTransaction: amount > 500,
+    isSmallTransaction: amount < 10,
+    isWeekendSpending: isWeekend,
+    isPendingTransaction: transaction.pending,
+    hasRichMerchantData: !!(transaction.merchant_name && transaction.location?.city),
+    spendingPattern: amount > 100 ? 'high' : amount > 50 ? 'medium' : 'low'
+  };
+}
+
+
       institution_id: 'ins_109508', // First Platypus Bank
       initial_products: [Products.Transactions, Products.Auth, Products.Identity],
       options: {
@@ -156,7 +266,20 @@ async function getTransactions(accessToken: string) {
         const transactions = response.data.transactions;
         const totalTransactions = response.data.total_transactions;
         
-        allTransactions = allTransactions.concat(transactions);
+        // Enhance transactions with additional data
+        const enhancedTransactions = transactions.map(transaction => ({
+          ...transaction,
+          // Add MCC code inference if missing
+          inferredMCC: inferMCCFromMerchant(transaction.merchant_name || transaction.name),
+          // Add spending category if missing
+          inferredCategory: inferCategoryFromTransaction(transaction),
+          // Add location analysis
+          locationAnalysis: analyzeTransactionLocation(transaction),
+          // Add transaction insights
+          insights: generateTransactionInsights(transaction)
+        }));
+        
+        allTransactions = allTransactions.concat(enhancedTransactions);
         
         console.log(`📥 Fetched ${transactions.length} transactions (offset: ${offset}, total available: ${totalTransactions})`);
         
@@ -213,20 +336,48 @@ function generateTransactionSummary(transactions: any[]) {
   let totalSpent = 0;
   let totalIncome = 0;
   const categories: { [key: string]: number } = {};
+  const merchants: { [key: string]: number } = {};
+  const mccCodes: { [key: string]: number } = {};
+  const insights = {
+    largeTransactions: 0,
+    weekendSpending: 0,
+    onlineTransactions: 0,
+    hasLocationData: 0,
+    avgTransactionSize: 0,
+    uniqueMerchants: 0
+  };
   
   transactions.forEach(transaction => {
     const amount = transaction.amount;
+    const absAmount = Math.abs(amount);
     
     if (amount > 0) {
       totalSpent += amount; // Positive amounts are debits (expenses)
     } else {
-      totalIncome += Math.abs(amount); // Negative amounts are credits (income)
+      totalIncome += absAmount; // Negative amounts are credits (income)
     }
     
-    // Track by category
-    const category = transaction.category?.[0] || 'Other';
-    categories[category] = (categories[category] || 0) + Math.abs(amount);
+    // Track by inferred category (enhanced)
+    const category = transaction.inferredCategory?.[0] || transaction.category?.[0] || 'Other';
+    categories[category] = (categories[category] || 0) + absAmount;
+    
+    // Track by merchant
+    const merchant = transaction.merchant_name || transaction.name || 'Unknown';
+    merchants[merchant] = (merchants[merchant] || 0) + absAmount;
+    
+    // Track by MCC
+    const mcc = transaction.inferredMCC || 'Unknown';
+    mccCodes[mcc] = (mccCodes[mcc] || 0) + absAmount;
+    
+    // Collect insights
+    if (transaction.insights?.isLargeTransaction) insights.largeTransactions++;
+    if (transaction.insights?.isWeekendSpending) insights.weekendSpending++;
+    if (transaction.locationAnalysis?.isOnline) insights.onlineTransactions++;
+    if (transaction.locationAnalysis?.hasLocation) insights.hasLocationData++;
   });
+  
+  insights.avgTransactionSize = totalSpent / transactions.length;
+  insights.uniqueMerchants = Object.keys(merchants).length;
   
   return {
     total: transactions.length,
@@ -234,6 +385,15 @@ function generateTransactionSummary(transactions: any[]) {
     totalIncome,
     net: totalIncome - totalSpent,
     categories,
+    merchants,
+    mccCodes,
+    insights,
+    topMerchants: Object.entries(merchants)
+      .sort(([,a], [,b]) => (b as number) - (a as number))
+      .slice(0, 10),
+    topMCCs: Object.entries(mccCodes)
+      .sort(([,a], [,b]) => (b as number) - (a as number))
+      .slice(0, 10)
   };
 }
 
