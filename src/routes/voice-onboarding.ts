@@ -101,19 +101,32 @@ router.get('/status/:sessionId', auth, async (req, res) => {
     const userId = req.user!.id;
     const { sessionId } = req.params;
 
-    // Implementation would get session status
-    // For now, return basic structure
+    logger.info({ userId, sessionId }, 'Getting session status');
+
+    // Get session from personal AI
+    const session = await personalAI.getSessionStatus(sessionId, userId);
+    
+    if (!session) {
+      return res.status(404).json({
+        ok: false,
+        error: 'Session not found',
+        code: 'SESSION_NOT_FOUND'
+      });
+    }
+
     res.json({
       ok: true,
       sessionId,
-      isActive: true,
-      isVoiceActive: true,
-      onboardingComplete: false,
+      isActive: session.isActive,
+      isVoiceActive: session.isVoiceActive,
+      onboardingComplete: session.onboardingComplete,
       progress: {
-        questionsAnswered: 3,
-        totalQuestions: 12,
-        currentStage: 'financial_goals'
-      }
+        questionsAnswered: session.currentContext?.questionsAnswered || 0,
+        totalQuestions: session.currentContext?.totalQuestions || 12,
+        currentStage: session.currentContext?.stage || 'greeting'
+      },
+      hasTransactionData: !!session.transactionInsights,
+      conversationLength: session.conversationHistory?.length || 0
     });
 
   } catch (error: any) {
@@ -134,12 +147,15 @@ router.post('/switch-to-text', auth, async (req, res) => {
 
     logger.info({ userId, sessionId }, 'Switching to text mode for budget review');
 
-    // Implementation would switch session mode
+    // Get session data for budget recommendations
+    const session = await personalAI.getSessionStatus(sessionId, userId);
+    
     res.json({
       ok: true,
       message: 'Switched to text mode for budget review',
       chatEndpoint: '/api/ai/coach',
-      budgetReviewReady: true
+      budgetReviewReady: true,
+      budgetRecommendations: session?.budgetRecommendations || null
     });
 
   } catch (error: any) {
@@ -148,6 +164,31 @@ router.post('/switch-to-text', auth, async (req, res) => {
       ok: false,
       error: 'Failed to switch to text mode',
       code: 'MODE_SWITCH_ERROR'
+    });
+  }
+});
+
+// POST /api/voice-onboarding/end - End voice onboarding session
+router.post('/end', auth, async (req, res) => {
+  try {
+    const userId = req.user!.id;
+    const { sessionId } = req.body;
+
+    logger.info({ userId, sessionId }, 'Ending voice onboarding session');
+
+    await personalAI.endSession(sessionId);
+
+    res.json({
+      ok: true,
+      message: 'Voice onboarding session ended successfully'
+    });
+
+  } catch (error: any) {
+    logger.error({ error, userId: req.user?.id }, 'Failed to end session');
+    res.status(500).json({
+      ok: false,
+      error: 'Failed to end session',
+      code: 'SESSION_END_ERROR'
     });
   }
 });

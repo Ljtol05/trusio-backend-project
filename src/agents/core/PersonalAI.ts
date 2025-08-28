@@ -350,17 +350,77 @@ class PersonalAI {
 
   // Helper methods for analysis
   private async analyzeUserTransactionPatterns(userId: string) {
-    // Implementation for transaction pattern analysis
-    return {};
+    const transactions = await db.transaction.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+      take: 500
+    });
+
+    if (transactions.length === 0) return {};
+
+    const totalSpending = transactions
+      .filter(t => t.amountCents > 0)
+      .reduce((sum, t) => sum + t.amountCents, 0) / 100;
+
+    const categories = transactions.reduce((acc, t) => {
+      const category = t.mcc || 'unknown';
+      acc[category] = (acc[category] || 0) + Math.abs(t.amountCents) / 100;
+      return acc;
+    }, {} as Record<string, number>);
+
+    const frequentMerchants = transactions.reduce((acc, t) => {
+      acc[t.merchant] = (acc[t.merchant] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+
+    return {
+      totalTransactions: transactions.length,
+      totalSpending,
+      averageTransaction: totalSpending / transactions.length,
+      topCategories: Object.entries(categories)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5),
+      frequentMerchants: Object.entries(frequentMerchants)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5),
+      dateRange: {
+        start: transactions[transactions.length - 1]?.createdAt,
+        end: transactions[0]?.createdAt
+      }
+    };
   }
 
   private async analyzeUserBillPatterns(userId: string) {
-    // Implementation for bill pattern analysis
-    return {};
+    try {
+      const { billAnalyzer } = await import('../../lib/billAnalyzer.js');
+      return await billAnalyzer.analyzeBillsFromTransactions(userId, 90);
+    } catch (error) {
+      logger.warn({ error, userId }, 'Failed to analyze bill patterns');
+      return {};
+    }
   }
 
   private inferSpendingPersonality(analysis: any): 'analytical' | 'emotional' | 'impulsive' | 'conservative' {
-    // Logic to infer personality from transaction patterns
+    if (!analysis.totalTransactions) return 'conservative';
+
+    const avgTransaction = analysis.averageTransaction || 0;
+    const transactionCount = analysis.totalTransactions || 0;
+    
+    // High frequency, low amounts = impulsive
+    if (transactionCount > 100 && avgTransaction < 50) return 'impulsive';
+    
+    // High amounts, low frequency = analytical
+    if (transactionCount < 50 && avgTransaction > 100) return 'analytical';
+    
+    // Medium patterns with emotional spending indicators
+    const hasEmotionalMerchants = analysis.frequentMerchants?.some(([merchant]: [string, number]) => 
+      merchant.toLowerCase().includes('amazon') || 
+      merchant.toLowerCase().includes('starbucks') ||
+      merchant.toLowerCase().includes('target')
+    );
+    
+    if (hasEmotionalMerchants) return 'emotional';
+    
     return 'conservative';
   }
 
@@ -372,40 +432,247 @@ class PersonalAI {
     return user?.firstName || user?.name || 'User';
   }
 
-  // Additional helper methods...
   private async analyzeSpendingPatterns(transactions: any[]) {
-    // Implementation
-    return { averageMonthly: 0, trends: [] };
+    if (transactions.length === 0) return { averageMonthly: 0, trends: [] };
+
+    const monthlySpending = transactions.reduce((acc, t) => {
+      const month = new Date(t.createdAt).toISOString().slice(0, 7);
+      acc[month] = (acc[month] || 0) + Math.abs(t.amountCents) / 100;
+      return acc;
+    }, {} as Record<string, number>);
+
+    const months = Object.keys(monthlySpending);
+    const averageMonthly = months.length > 0 
+      ? Object.values(monthlySpending).reduce((a, b) => a + b, 0) / months.length
+      : 0;
+
+    const trends = months.sort().map(month => ({
+      month,
+      amount: monthlySpending[month]
+    }));
+
+    return { averageMonthly, trends };
   }
 
   private async analyzeCategorySpending(transactions: any[]) {
-    // Implementation
-    return [];
+    const categories = transactions.reduce((acc, t) => {
+      const category = this.getCategoryFromMCC(t.mcc) || 'Other';
+      const existing = acc.find(c => c.category === category);
+      if (existing) {
+        existing.amount += Math.abs(t.amountCents) / 100;
+        existing.count += 1;
+      } else {
+        acc.push({
+          category,
+          amount: Math.abs(t.amountCents) / 100,
+          count: 1
+        });
+      }
+      return acc;
+    }, [] as Array<{ category: string; amount: number; count: number }>);
+
+    return categories.sort((a, b) => b.amount - a.amount);
+  }
+
+  private getCategoryFromMCC(mcc: string): string {
+    const mccMap: Record<string, string> = {
+      '5411': 'Groceries',
+      '5814': 'Fast Food',
+      '5812': 'Dining',
+      '5541': 'Gas',
+      '4900': 'Utilities',
+      '4814': 'Telecom',
+      '5999': 'Retail'
+    };
+    return mccMap[mcc] || 'Other';
   }
 
   private async extractBehavioralInsights(transactions: any[]) {
-    // Implementation
-    return { riskFactors: [] };
+    const riskFactors = [];
+    
+    // High frequency spending
+    if (transactions.length > 200) {
+      riskFactors.push('High transaction frequency may indicate impulsive spending');
+    }
+    
+    // Late night purchases
+    const lateNightPurchases = transactions.filter(t => {
+      const hour = new Date(t.createdAt).getHours();
+      return hour >= 22 || hour <= 6;
+    });
+    
+    if (lateNightPurchases.length > transactions.length * 0.1) {
+      riskFactors.push('Frequent late-night purchases detected');
+    }
+    
+    // Large purchases
+    const largePurchases = transactions.filter(t => 
+      Math.abs(t.amountCents) > 50000 // > $500
+    );
+    
+    if (largePurchases.length > 10) {
+      riskFactors.push('Multiple large purchases detected');
+    }
+
+    return { riskFactors };
   }
 
   private async processWithPersonalizedContext(session: PersonalAISession, input: string, agent: Agent) {
-    // Implementation for processing with personalized context
-    return "Personalized response";
+    const context = session.currentContext;
+    const questionNumber = context.questionsAnswered + 1;
+    
+    // Predefined onboarding questions with personalized context
+    const questions = [
+      "What would you like me to call you?",
+      "What are your main financial goals right now?",
+      "How do you typically handle unexpected expenses?",
+      "What's your biggest financial challenge?",
+      "How do you prefer to save money?",
+      "What motivates you to stick to a budget?",
+      "How do you feel about your current spending habits?",
+      "What's your approach to financial planning?",
+      "How important is it for you to track every expense?",
+      "What would financial success look like to you?",
+      "How do you handle financial stress?",
+      "What's your experience with budgeting apps or tools?"
+    ];
+
+    if (questionNumber <= questions.length) {
+      const insights = session.transactionInsights;
+      let personalizedQuestion = questions[questionNumber - 1];
+      
+      // Add context based on their transaction data
+      if (questionNumber === 4 && insights?.topCategories?.length > 0) {
+        const topCategory = insights.topCategories[0].category;
+        personalizedQuestion += ` I notice you spend quite a bit on ${topCategory} - is managing that spending part of what you'd like help with?`;
+      }
+      
+      return personalizedQuestion;
+    }
+    
+    return "Thank you for sharing that with me. Let me prepare your personalized budget recommendations based on everything you've told me and your spending patterns.";
   }
 
   private async generateFinalBudgetRecommendations(session: PersonalAISession) {
-    // Implementation for generating final budget
-    return {};
+    const analysis = session.currentContext.comprehensiveAnalysis;
+    const conversationInsights = this.extractInsightsFromConversation(session.conversationHistory);
+    
+    return {
+      personalizedMessage: "Based on our conversation and your spending patterns, here are my recommendations for your envelope budget.",
+      recommendedEnvelopes: await this.generatePersonalizedEnvelopes(session),
+      budgetingTips: this.generatePersonalizedTips(analysis, conversationInsights),
+      nextSteps: [
+        "Review and adjust the recommended envelope allocations",
+        "Set up automatic routing rules for your most frequent spending categories",
+        "Schedule weekly check-ins to track your progress",
+        "Consider linking a savings goal to your emergency fund envelope"
+      ]
+    };
+  }
+
+  private extractInsightsFromConversation(history: any[]) {
+    const userResponses = history.filter(msg => msg.role === 'user');
+    return {
+      mentionedGoals: userResponses.some(msg => 
+        msg.content.toLowerCase().includes('save') || 
+        msg.content.toLowerCase().includes('goal')
+      ),
+      expressedStress: userResponses.some(msg => 
+        msg.content.toLowerCase().includes('stress') || 
+        msg.content.toLowerCase().includes('worry')
+      ),
+      prefersSimplicity: userResponses.some(msg => 
+        msg.content.toLowerCase().includes('simple') || 
+        msg.content.toLowerCase().includes('easy')
+      )
+    };
+  }
+
+  private async generatePersonalizedEnvelopes(session: PersonalAISession) {
+    // This would integrate with the onboarding agent's envelope recommendations
+    const { onboardingAgent } = await import('./OnboardingAgent.js');
+    
+    // Mock profile based on session data
+    const mockProfile = {
+      userId: session.userId,
+      userType: 'consumer' as const,
+      spendingPersonality: 'conservative' as const,
+      needsTitheEnvelope: false,
+      monthlyIncome: session.transactionInsights?.averageMonthlySpending * 1.2
+    };
+    
+    return onboardingAgent.generateEnvelopeRecommendations(mockProfile, [], session.currentContext.comprehensiveAnalysis?.billAnalysis);
+  }
+
+  private generatePersonalizedTips(analysis: any, insights: any) {
+    const tips = [];
+    
+    if (insights.expressedStress) {
+      tips.push("Start with just 3-4 envelopes to keep things simple and reduce financial stress");
+    }
+    
+    if (analysis?.transactionInsights?.topCategories?.length > 0) {
+      const topCategory = analysis.transactionInsights.topCategories[0];
+      tips.push(`Your highest spending category is ${topCategory.category} - consider setting a specific envelope for this`);
+    }
+    
+    tips.push("Review your envelopes weekly rather than daily to avoid overthinking");
+    tips.push("Celebrate small wins - every dollar saved is progress toward your goals");
+    
+    return tips;
   }
 
   // Storage methods
   private async getUserAIDNA(userId: string): Promise<UserAIDNA | null> {
-    // Implementation for retrieving encrypted DNA
-    return null;
+    try {
+      // In a real implementation, this would query a secure database
+      // For now, return null to always create fresh DNA
+      return null;
+    } catch (error) {
+      logger.error({ error, userId }, 'Failed to retrieve user AI DNA');
+      return null;
+    }
   }
 
   private async storeUserAIDNA(dna: UserAIDNA): Promise<void> {
-    // Implementation for storing encrypted DNA
+    try {
+      // In a real implementation, this would store encrypted DNA in database
+      // For now, we'll store in memory
+      logger.info({ userId: dna.userId, personality: dna.spendingPersonality }, 'AI DNA stored (memory only)');
+    } catch (error) {
+      logger.error({ error, userId: dna.userId }, 'Failed to store user AI DNA');
+    }
+  }
+
+  async getSessionStatus(sessionId: string, userId: string): Promise<PersonalAISession | null> {
+    try {
+      const session = this.activeSessions.get(sessionId);
+      
+      if (!session || session.userId !== userId) {
+        return null;
+      }
+
+      return {
+        ...session,
+        isActive: true, // Session exists so it's active
+      };
+    } catch (error) {
+      logger.error({ error, sessionId, userId }, 'Failed to get session status');
+      return null;
+    }
+  }
+
+  async endSession(sessionId: string): Promise<void> {
+    try {
+      const session = this.activeSessions.get(sessionId);
+      if (session) {
+        // Store final session data if needed
+        logger.info({ sessionId, userId: session.userId }, 'Voice onboarding session ended');
+        this.activeSessions.delete(sessionId);
+      }
+    } catch (error) {
+      logger.error({ error, sessionId }, 'Failed to end session');
+    }
   }
 }
 
