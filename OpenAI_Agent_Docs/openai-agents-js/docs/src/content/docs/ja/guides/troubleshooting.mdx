@@ -1,0 +1,40 @@
+---
+title: トラブルシューティング
+description: Learn how to troubleshoot issues with the OpenAI Agents SDK.
+---
+
+## 対応環境
+
+OpenAI Agents SDK は次の サーバー 環境でサポートされています:
+
+- Node.js 22+
+- Deno 2.35+
+- Bun 1.2.5+
+
+### 限定サポート
+
+- **Cloudflare Workers**: Agents SDK は Cloudflare Workers で使用できますが、現時点ではいくつか制限があります:
+  - 現在 SDK は `nodejs_compat` の有効化が必要
+  - リクエストの最後に トレーシング のフラッシュを手動で行う必要があります。詳細は [トレーシング](/openai-agents-js/ja/guides/tracing#export-loop-lifecycle) を参照してください
+  - Cloudflare Workers の `AsyncLocalStorage` サポートが限定的なため、一部のトレースが正確でない可能性があります
+- **ブラウザ**:
+  - ブラウザでは現在 トレーシング はサポートされていません
+- **v8 アイソレート**:
+  - 適切なブラウザ ポリフィルを備えたバンドラを使えば v8 アイソレート向けに SDK をバンドルできるはずですが、トレーシングは動作しません
+  - v8 アイソレートでの検証は十分には行われていません
+
+## デバッグログ
+
+SDK の問題を切り分けるために、デバッグログを有効化して動作状況を詳細に確認できます。
+
+`DEBUG` 環境変数を `openai-agents:*` に設定してデバッグログを有効化します。
+
+```bash
+DEBUG=openai-agents:*
+```
+
+また、SDK の特定部分にスコープを絞ってデバッグすることもできます:
+
+- `openai-agents:core` — SDK の主要な実行ロジック
+- `openai-agents:openai` — OpenAI API 呼び出し
+- `openai-agents:realtime` — Realtime Agents のコンポーネント

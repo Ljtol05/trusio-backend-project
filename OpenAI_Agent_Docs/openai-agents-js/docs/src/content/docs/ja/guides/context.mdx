@@ -1,0 +1,44 @@
+---
+title: コンテキスト管理
+description: Learn how to provide local data via RunContext and expose context to the LLM
+---
+
+import { Aside, Code } from '@astrojs/starlight/components';
+import localContextExample from '../../../../../../examples/docs/context/localContext.ts?raw';
+
+コンテキストは多義的な用語です。ここでは主に 2 つのコンテキストがあります:
+
+1. **ローカルコンテキスト** 実行中にコードがアクセスできるもの: ツールに必要な依存関係やデータ、`onHandoff` のようなコールバック、ライフサイクルフック
+2. **エージェント／LLM コンテキスト** 応答を生成するときに言語モデルが参照できるもの
+
+## ローカルコンテキスト
+
+ローカルコンテキストは `RunContext<T>` 型で表されます。状態や依存関係を保持する任意のオブジェクトを作成して `Runner.run()` に渡します。すべてのツール呼び出しとフックは `RunContext` ラッパーを受け取り、そのオブジェクトを読み書きできます。
+
+<Code
+  lang="typescript"
+  code={localContextExample}
+  title="ローカルコンテキストの例"
+/>
+
+単一の実行に参加するすべてのエージェント、ツール、フックは、同じ **型** のコンテキストを使用する必要があります。
+
+ローカルコンテキストの用途:
+
+- 実行に関するデータ（ユーザー名、ID など）
+- ロガーやデータ取得器といった依存関係
+- ヘルパー関数
+
+<Aside type="note">
+  コンテキストオブジェクトは LLM
+  に送信されません。純粋にローカルであり、自由に読み書きできます。
+</Aside>
+
+## エージェント／LLM コンテキスト
+
+LLM が呼び出されると、参照できるデータは会話履歴のみです。追加情報を利用可能にするには、次のオプションがあります:
+
+1. エージェントの `instructions`（システムまたは開発者メッセージ）に追加する。これは静的文字列でも、コンテキストを受け取って文字列を返す関数でもかまいません
+2. `Runner.run()` を呼ぶ際の `input` に含める。これは instructions と同様ですが、メッセージを [指揮系統](https://cdn.openai.com/spec/model-spec-2024-05-08.html#follow-the-chain-of-command) の下位に配置できます
+3. 関数ツールで公開し、LLM が必要に応じてデータを取得できるようにする
+4. リトリーバル（retrieval）や Web 検索ツールを使用して、ファイル、データベース、Web からの関連データに基づいて応答を裏付ける
