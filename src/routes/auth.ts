@@ -187,12 +187,17 @@ router.post('/register', async (req, res) => {
     const ttl = Number(env.VERIFICATION_CODE_TTL);
 
     // Create user
-    await db.user.create({
+    const newUserRecord = await db.user.create({
       data: {
         name: fullName,
         email,
         password: hashedPassword,
         emailVerified: false,
+        phoneVerified: false, // Initialize phoneVerified to false
+        kycApproved: false,   // Initialize kycApproved to false
+        plaidConnected: false, // Initialize plaidConnected to false
+        transactionDataReady: false, // Initialize transactionDataReady to false
+        onboardingCompleted: false // Initialize onboardingCompleted to false
       },
     });
 
@@ -210,8 +215,7 @@ router.post('/register', async (req, res) => {
     await sendVerificationEmail(email, verificationCode);
 
     // Generate JWT token immediately for frontend to use
-    const newUser = await db.user.findUnique({ where: { email } });
-    const token = generateToken(newUser!.id);
+    const token = generateToken(newUserRecord.id);
 
     logger.info({ email }, 'User registered, verification email sent');
     res.status(201).json({ 
@@ -220,12 +224,17 @@ router.post('/register', async (req, res) => {
       verificationStep: 'email',
       nextStep: 'email',
       user: {
-        id: newUser!.id,
+        id: newUserRecord.id,
         email,
         name: fullName,
         emailVerified: false,
         phoneVerified: false,
-        kycApproved: false
+        kycApproved: false,
+        plaidConnected: false,
+        transactionDataReady: false,
+        onboardingCompleted: false,
+        readyForVoiceKYC: false,
+        createdAt: newUserRecord.createdAt,
       }
     });
   } catch (error) {
@@ -300,6 +309,12 @@ router.post('/verify-email', async (req, res) => {
         emailVerified: true,
         phoneVerified: user.phoneVerified,
         kycApproved: user.kycApproved,
+        plaidConnected: user.plaidConnected,
+        transactionDataReady: user.transactionDataReady,
+        onboardingCompleted: user.onboardingCompleted,
+        readyForVoiceKYC: user.emailVerified && user.phoneVerified && user.kycApproved && 
+                         user.plaidConnected && user.transactionDataReady,
+        createdAt: user.createdAt,
       }
     });
   } catch (error) {
@@ -402,6 +417,12 @@ router.post('/login', async (req, res) => {
           emailVerified: user.emailVerified,
           phoneVerified: user.phoneVerified,
           kycApproved: user.kycApproved,
+          plaidConnected: user.plaidConnected,
+          transactionDataReady: user.transactionDataReady,
+          onboardingCompleted: user.onboardingCompleted,
+          readyForVoiceKYC: user.emailVerified && user.phoneVerified && user.kycApproved && 
+                           user.plaidConnected && user.transactionDataReady,
+          createdAt: user.createdAt,
         }
       });
     }
@@ -420,25 +441,43 @@ router.post('/login', async (req, res) => {
           emailVerified: user.emailVerified,
           phoneVerified: user.phoneVerified,
           kycApproved: user.kycApproved,
+          plaidConnected: user.plaidConnected,
+          transactionDataReady: user.transactionDataReady,
+          onboardingCompleted: user.onboardingCompleted,
+          readyForVoiceKYC: user.emailVerified && user.phoneVerified && user.kycApproved && 
+                           user.plaidConnected && user.transactionDataReady,
+          createdAt: user.createdAt,
         }
       });
     }
 
-    // User is fully verified
-    logger.info({ userId: user.id, email }, 'User logged in successfully');
+    // Check Plaid connection status for voice KYC readiness
+    const plaidStatus = await db.user.findUnique({
+      where: { id: user.id },
+      select: { 
+        plaidConnected: true, 
+        transactionDataReady: true,
+        onboardingCompleted: true
+      }
+    });
+
+    // User is fully verified and ready for voice onboarding
     res.json({
-      token,
-      message: 'Login successful',
-      verificationStep: 'complete',
+      ok: true,
       user: {
         id: user.id,
-        email: user.email,
         name: user.name,
-        phone: user.phone,
+        email: user.email,
         emailVerified: user.emailVerified,
         phoneVerified: user.phoneVerified,
         kycApproved: user.kycApproved,
-      }
+        plaidConnected: plaidStatus?.plaidConnected || false,
+        transactionDataReady: plaidStatus?.transactionDataReady || false,
+        onboardingCompleted: plaidStatus?.onboardingCompleted || false,
+        readyForVoiceKYC: user.emailVerified && user.phoneVerified && user.kycApproved && 
+                         plaidStatus?.plaidConnected && plaidStatus?.transactionDataReady,
+        createdAt: user.createdAt,
+      },
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -490,6 +529,12 @@ router.get('/me', authenticateToken, async (req: any, res) => {
       emailVerified: req.user.emailVerified,
       phoneVerified: req.user.phoneVerified,
       kycApproved: req.user.kycApproved,
+      plaidConnected: req.user.plaidConnected,
+      transactionDataReady: req.user.transactionDataReady,
+      onboardingCompleted: req.user.onboardingCompleted,
+      readyForVoiceKYC: req.user.emailVerified && req.user.phoneVerified && req.user.kycApproved && 
+                       req.user.plaidConnected && req.user.transactionDataReady,
+      createdAt: req.user.createdAt,
     }
   });
 });
@@ -622,6 +667,12 @@ router.post('/verify-phone', authenticateToken, async (req: any, res) => {
         emailVerified: updatedUser.emailVerified,
         phoneVerified: updatedUser.phoneVerified,
         kycApproved: updatedUser.kycApproved,
+        plaidConnected: updatedUser.plaidConnected,
+        transactionDataReady: updatedUser.transactionDataReady,
+        onboardingCompleted: updatedUser.onboardingCompleted,
+        readyForVoiceKYC: updatedUser.emailVerified && updatedUser.phoneVerified && updatedUser.kycApproved && 
+                         updatedUser.plaidConnected && updatedUser.transactionDataReady,
+        createdAt: updatedUser.createdAt,
       }
     });
   } catch (error) {

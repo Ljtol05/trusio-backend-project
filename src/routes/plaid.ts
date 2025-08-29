@@ -1,4 +1,3 @@
-
 import { Router } from 'express';
 import { z } from 'zod';
 import { logger } from '../lib/logger.js';
@@ -32,7 +31,7 @@ const ExchangeTokenSchema = z.object({
 router.post('/create-link-token', auth, async (req, res) => {
   try {
     const userId = req.user!.id;
-    
+
     logger.info({ userId }, 'Creating Plaid Link token for post-KYC integration');
 
     // Verify user has completed KYC
@@ -122,7 +121,7 @@ router.post('/exchange-token', auth, async (req, res) => {
     });
 
     const accounts = accountsResponse.data.accounts;
-    
+
     // Get identity information for verification
     const identityResponse = await plaidClient.identityGet({
       access_token,
@@ -152,7 +151,7 @@ router.post('/exchange-token', auth, async (req, res) => {
 router.post('/enhance-transactions', auth, async (req, res) => {
   try {
     const userId = req.user!.id;
-    
+
     logger.info({ userId }, 'Starting transaction enhancement process');
 
     // Get existing transactions
@@ -169,7 +168,7 @@ router.post('/enhance-transactions', auth, async (req, res) => {
     });
 
     let enhancedCount = 0;
-    
+
     for (const transaction of existingTransactions) {
       const mockPlaidTransaction = {
         merchant_name: transaction.merchant,
@@ -177,10 +176,10 @@ router.post('/enhance-transactions', auth, async (req, res) => {
         amount: transaction.amountCents / 100,
         category: transaction.category ? [transaction.category] : null
       };
-      
+
       const enhancedCategory = await enhanceTransactionCategory(mockPlaidTransaction);
       const inferredMCC = inferMCCFromMerchant(transaction.merchant);
-      
+
       if (enhancedCategory.wasEnhanced || (inferredMCC && !transaction.mcc)) {
         await db.transaction.update({
           where: { id: transaction.id },
@@ -316,7 +315,7 @@ async function startTransactionSync(userId: string, accessToken: string) {
     let allTransactions: any[] = [];
     let offset = 0;
     let hasMore = true;
-    
+
     // Fetch all transactions with pagination
     while (hasMore) {
       const transactionsResponse = await plaidClient.transactionsGet({
@@ -329,10 +328,10 @@ async function startTransactionSync(userId: string, accessToken: string) {
 
       const transactions = transactionsResponse.data.transactions;
       allTransactions = allTransactions.concat(transactions);
-      
+
       hasMore = allTransactions.length < transactionsResponse.data.total_transactions;
       offset = allTransactions.length;
-      
+
       // Prevent infinite loop
       if (offset > 2000) break;
     }
@@ -345,12 +344,12 @@ async function startTransactionSync(userId: string, accessToken: string) {
     // Enhanced transaction processing
     let processedCount = 0;
     let enhancedCount = 0;
-    
+
     for (const transaction of allTransactions) {
       // Enhanced categorization
       const enhancedCategory = await enhanceTransactionCategory(transaction);
       const inferredMCC = inferMCCFromMerchant(transaction.merchant_name || transaction.name);
-      
+
       await db.transaction.upsert({
         where: { 
           plaidTransactionId: transaction.transaction_id 
@@ -392,7 +391,7 @@ async function startTransactionSync(userId: string, accessToken: string) {
           }),
         }
       });
-      
+
       processedCount++;
       if (enhancedCategory.wasEnhanced) enhancedCount++;
     }
@@ -415,13 +414,15 @@ async function startTransactionSync(userId: string, accessToken: string) {
       }
     });
 
-    logger.info({ 
-      userId, 
+    logger.info({
+      userId,
       transactionCount: processedCount,
       enhancedCount,
       enhancementRate: `${Math.round((enhancedCount / processedCount) * 100)}%`,
-      dateRange: `${startDate.toISOString().split('T')[0]} to ${endDate.toISOString().split('T')[0]}`
-    }, 'Enhanced transaction sync completed');
+      dateRange: `${startDate.toISOString().split('T')[0]} to ${endDate.toISOString().split('T')[0]}`,
+      syncDuration: '120 days',
+      readyForVoiceKYC: true
+    }, 'Enhanced 120-day transaction sync completed for voice KYC onboarding');
 
   } catch (error) {
     logger.error({ error, userId }, 'Enhanced transaction sync failed');
@@ -437,7 +438,7 @@ async function enhanceTransactionCategory(transaction: any): Promise<{
 }> {
   const merchantName = (transaction.merchant_name || transaction.name || '').toLowerCase();
   const amount = Math.abs(transaction.amount);
-  
+
   // If Plaid already provided good categories, use them
   if (transaction.category && transaction.category.length > 0 && transaction.category[0] !== 'Other') {
     return {
@@ -446,7 +447,7 @@ async function enhanceTransactionCategory(transaction: any): Promise<{
       wasEnhanced: false
     };
   }
-  
+
   // Enhanced categorization logic
   const categoryMappings = [
     { keywords: ['grocery', 'market', 'walmart', 'target', 'safeway'], primary: 'Groceries', secondary: 'Food' },
@@ -459,7 +460,7 @@ async function enhanceTransactionCategory(transaction: any): Promise<{
     { keywords: ['amazon', 'ebay', 'online'], primary: 'Shopping', secondary: 'Online' },
     { keywords: ['pharmacy', 'cvs', 'walgreens', 'medical'], primary: 'Healthcare', secondary: 'Pharmacy' }
   ];
-  
+
   for (const mapping of categoryMappings) {
     if (mapping.keywords.some(keyword => merchantName.includes(keyword))) {
       return {
@@ -469,19 +470,19 @@ async function enhanceTransactionCategory(transaction: any): Promise<{
       };
     }
   }
-  
+
   // Amount-based categorization
   if (amount > 1000) {
     return { primary: 'Large Purchase', secondary: 'Miscellaneous', wasEnhanced: true };
   }
-  
+
   return { primary: 'Other', secondary: null, wasEnhanced: false };
 }
 
 // Extract MCC helper functions
 function inferMCCFromMerchant(merchantName: string): string | null {
   if (!merchantName) return null;
-  
+
   const merchantLower = merchantName.toLowerCase();
   const mccMappings: { [key: string]: string } = {
     'walmart': '5411', 'target': '5411', 'safeway': '5411',
@@ -492,7 +493,7 @@ function inferMCCFromMerchant(merchantName: string): string | null {
     'uber': '4121', 'lyft': '4121',
     'amazon': '5999', 'ebay': '5999'
   };
-  
+
   for (const [merchant, mcc] of Object.entries(mccMappings)) {
     if (merchantLower.includes(merchant)) {
       return mcc;
