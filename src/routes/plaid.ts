@@ -146,6 +146,23 @@ router.post('/exchange-token', auth, async (req, res) => {
       accounts: accounts.map(account => ({
         id: account.account_id,
         name: account.name,
+        type: account.type,
+        subtype: account.subtype,
+        mask: account.mask,
+      })),
+      nextStep: 'transaction_analysis',
+      estimatedAnalysisTime: '2-3 minutes',
+    });
+
+  } catch (error: any) {
+    logger.error({ error, userId: req.user?.id }, 'Failed to exchange Plaid token');
+    res.status(500).json({
+      ok: false,
+      error: 'Failed to connect bank accounts',
+      code: 'TOKEN_EXCHANGE_ERROR'
+    });
+  }
+});
 
 // POST /api/plaid/enhance-transactions - Re-process existing transactions with enhanced categorization
 router.post('/enhance-transactions', auth, async (req, res) => {
