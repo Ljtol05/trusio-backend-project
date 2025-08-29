@@ -141,7 +141,7 @@ model Rule {
 
 model Card {
   id                    Int           @id @default(autoincrement())
-  userId                String
+  userId                Int
   envelopeId            Int?
   label                 String        @default("Virtual Card")
   last4                 String
@@ -149,7 +149,7 @@ model Card {
   expiryMonth           Int?
   expiryYear            Int?
   cvv                   String?       // CVV for wallet provisioning (encrypted in production)
-  status                CardStatus    @default(ACTIVE)
+  status                String        @default("ACTIVE") // ACTIVE, SUSPENDED, EXPIRED, CANCELED
   isDefault             Boolean       @default(false)
   inWallet              Boolean       @default(false)
 
@@ -177,13 +177,6 @@ model Card {
   transactions          Transaction[]
 
   @@unique([envelopeId])
-}
-
-enum CardStatus {
-  ACTIVE
-  SUSPENDED
-  EXPIRED
-  CANCELED
 }
 
 model RoutingConfig {

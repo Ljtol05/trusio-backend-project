@@ -1,4 +1,3 @@
-
 import { Router } from 'express';
 import { z } from 'zod';
 import { db } from '../lib/db.js';
@@ -35,7 +34,7 @@ router.get('/', async (req: any, res) => {
         { createdAt: 'asc' },
       ],
     });
-    
+
     res.json({ cards });
   } catch (error) {
     logger.error(error, 'Error fetching cards');
@@ -85,12 +84,12 @@ router.get('/analytics', async (req: any, res) => {
       const transactionCount = card.transactions.length;
       const uniqueMerchants = new Set(card.transactions.map(txn => txn.merchant)).size;
       const avgTransactionSize = transactionCount > 0 ? totalSpent / transactionCount : 0;
-      
+
       // Usage frequency
       const daysWithTransactions = new Set(
         card.transactions.map(txn => txn.createdAt.toISOString().split('T')[0])
       ).size;
-      
+
       const usageFrequency = daysWithTransactions / days;
 
       return {
@@ -224,11 +223,11 @@ router.get('/:id', async (req: any, res) => {
     const card = await db.card.findFirst({
       where: { id, userId: req.user.id },
     });
-    
+
     if (!card) {
       return res.status(404).json({ error: 'Card not found' });
     }
-    
+
     res.json({ card });
   } catch (error) {
     logger.error(error, 'Error fetching card');
@@ -240,12 +239,12 @@ router.get('/:id', async (req: any, res) => {
 router.post('/', async (req: any, res) => {
   try {
     const data = CreateCardSchema.parse(req.body);
-    
+
     // Enforce 4-card maximum limit
     const existingCardCount = await db.card.count({
       where: { userId: req.user.id },
     });
-    
+
     if (existingCardCount >= 4) {
       return res.status(400).json({ 
         error: 'Card limit reached', 
@@ -255,14 +254,14 @@ router.post('/', async (req: any, res) => {
         maxAllowed: 4
       });
     }
-    
+
     // Generate mock card number and security details
     const last4 = Math.floor(1000 + Math.random() * 9000).toString();
     const cardNumber = `4000${Math.floor(100000000000 + Math.random() * 900000000000)}`;
     const expiryMonth = Math.floor(Math.random() * 12) + 1;
     const expiryYear = new Date().getFullYear() + Math.floor(Math.random() * 5) + 1;
     const cvv = Math.floor(100 + Math.random() * 900).toString();
-    
+
     const card = await db.card.create({
       data: {
         ...data,
@@ -279,7 +278,7 @@ router.post('/', async (req: any, res) => {
         spendingLimitCents: data.spendingLimitCents || 50000, // Default $500 limit
       },
     });
-    
+
     // Log card creation for audit trail
     logger.info({
       userId: req.user.id,
@@ -288,7 +287,7 @@ router.post('/', async (req: any, res) => {
       label: card.label,
       cardCount: existingCardCount + 1
     }, 'Virtual card created');
-    
+
     // Return card without sensitive data
     const { cardNumber: _, cvv: __, ...safeCard } = card;
     res.status(201).json({ 
@@ -313,7 +312,7 @@ router.patch('/:id', async (req: any, res) => {
   try {
     const id = parseInt(req.params.id);
     const data = UpdateCardSchema.parse(req.body);
-    
+
     // If setting as default, unset other default cards
     if (data.isDefault) {
       await db.card.updateMany({
@@ -321,16 +320,16 @@ router.patch('/:id', async (req: any, res) => {
         data: { isDefault: false },
       });
     }
-    
+
     const card = await db.card.updateMany({
       where: { id, userId: req.user.id },
       data,
     });
-    
+
     if (card.count === 0) {
       return res.status(404).json({ error: 'Card not found' });
     }
-    
+
     const updatedCard = await db.card.findUnique({ where: { id } });
     res.json({ card: updatedCard });
   } catch (error) {
@@ -354,23 +353,23 @@ router.post('/:id/provision-wallet', async (req: any, res) => {
   try {
     const cardId = parseInt(req.params.id);
     const { walletType, deviceId } = req.body;
-    
+
     if (!['apple_pay', 'google_pay'].includes(walletType)) {
       return res.status(400).json({ error: 'Unsupported wallet type' });
     }
-    
+
     const card = await db.card.findFirst({
       where: { id: cardId, userId: req.user.id },
     });
-    
+
     if (!card) {
       return res.status(404).json({ error: 'Card not found' });
     }
-    
+
     if (!card.walletEligible) {
       return res.status(400).json({ error: 'Card not eligible for wallet provisioning' });
     }
-    
+
     // In production, this would integrate with actual wallet APIs
     const provisioningData = {
       cardId: card.id,
@@ -380,7 +379,7 @@ router.post('/:id/provision-wallet', async (req: any, res) => {
       status: 'pending',
       expiresAt: new Date(Date.now() + 10 * 60 * 1000), // 10 minutes
     };
-    
+
     // Update card status
     await db.card.update({
       where: { id: cardId },
@@ -390,14 +389,14 @@ router.post('/:id/provision-wallet', async (req: any, res) => {
         lastWalletActivity: new Date()
       },
     });
-    
+
     logger.info({
       userId: req.user.id,
       cardId,
       walletType,
       deviceId
     }, 'Wallet provisioning initiated');
-    
+
     res.json({
       message: 'Wallet provisioning initiated',
       provisioningData,
@@ -417,7 +416,7 @@ router.post('/:id/provision-wallet', async (req: any, res) => {
 router.get('/:id/wallet-status', async (req: any, res) => {
   try {
     const cardId = parseInt(req.params.id);
-    
+
     const card = await db.card.findFirst({
       where: { id: cardId, userId: req.user.id },
       select: {
@@ -431,11 +430,11 @@ router.get('/:id/wallet-status', async (req: any, res) => {
         status: true,
       },
     });
-    
+
     if (!card) {
       return res.status(404).json({ error: 'Card not found' });
     }
-    
+
     res.json({
       card: {
         id: card.id,
@@ -564,27 +563,27 @@ router.get('/:id/analytics/advanced', async (req: any, res) => {
   }
 });
 
-    
+
     if (typeof inWallet !== 'boolean') {
       return res.status(400).json({ error: 'inWallet must be a boolean' });
     }
-    
+
     const card = await db.card.updateMany({
       where: { id, userId: req.user.id },
       data: { inWallet },
     });
-    
+
     if (card.count === 0) {
       return res.status(404).json({ error: 'Card not found' });
     }
-    
+
     const updatedCard = await db.card.findUnique({
       where: { id },
       include: {
         envelope: { select: { id: true, name: true } },
       },
     });
-    
+
     res.json({ card: updatedCard });
   } catch (error) {
     logger.error(error, 'Error updating card wallet status');
@@ -596,15 +595,15 @@ router.get('/:id/analytics/advanced', async (req: any, res) => {
 router.delete('/:id', async (req: any, res) => {
   try {
     const id = parseInt(req.params.id);
-    
+
     const deleted = await db.card.deleteMany({
       where: { id, userId: req.user.id },
     });
-    
+
     if (deleted.count === 0) {
       return res.status(404).json({ error: 'Card not found' });
     }
-    
+
     res.json({ message: 'Card deleted successfully' });
   } catch (error) {
     logger.error(error, 'Error deleting card');
