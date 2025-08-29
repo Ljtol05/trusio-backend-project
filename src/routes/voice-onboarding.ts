@@ -3,6 +3,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { logger } from '../lib/logger.js';
 import { auth } from '../services/auth.js';
+import { db } from '../lib/db.js';
 import { voiceKYCAgent } from '../agents/core/VoiceKYCAgent.js';
 
 const router = Router();
@@ -346,8 +347,8 @@ router.post('/approve-budget', auth, async (req, res) => {
           name: envelope.name,
           balanceCents: 0, // Start with 0, user will allocate funds
           targetCents: suggestedAmount,
-          icon: this.getIconForCategory(envelope.category),
-          color: this.getColorForCategory(envelope.category),
+          icon: getIconForCategory(envelope.category),
+          color: getColorForCategory(envelope.category),
           category: envelope.category,
           order: order++,
           isActive: true,

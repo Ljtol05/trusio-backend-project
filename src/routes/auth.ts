@@ -74,11 +74,11 @@ function generateToken(userId: number): string {
 // Send phone verification using Twilio Verify API
 async function sendPhoneVerificationSMS(phone: string): Promise<string | null> {
   // Log Twilio configuration status for debugging
-  logger.debug({ 
+  logger.debug({
     hasAccountSid: !!env.TWILIO_ACCOUNT_SID,
     hasAuthToken: !!env.TWILIO_AUTH_TOKEN,
     hasVerifyServiceSid: !!env.TWILIO_VERIFY_SERVICE_SID,
-    phone 
+    phone
   }, 'Attempting to send SMS verification via Twilio Verify API');
 
   // Always try to send real SMS if Twilio is configured
@@ -100,8 +100,8 @@ async function sendPhoneVerificationSMS(phone: string): Promise<string | null> {
       logger.info({ phone, verificationSid: verification.sid }, 'SMS verification sent successfully via Twilio Verify API');
       return verification.sid;
     } catch (error: any) {
-      logger.error({ 
-        error: error.message || error, 
+      logger.error({
+        error: error.message || error,
         phone,
         twilioError: error.code || 'unknown',
         accountSidFormat: env.TWILIO_ACCOUNT_SID ? env.TWILIO_ACCOUNT_SID.substring(0, 5) : 'none'
@@ -136,8 +136,8 @@ async function verifyPhoneCode(phone: string, code: string): Promise<boolean> {
       logger.info({ phone, status: verificationCheck.status }, 'Phone verification check completed');
       return verificationCheck.status === 'approved';
     } catch (error: any) {
-      logger.error({ 
-        error: error.message || error, 
+      logger.error({
+        error: error.message || error,
         phone,
         twilioError: error.code || 'unknown'
       }, 'Failed to verify phone code via Twilio Verify API');
@@ -218,7 +218,7 @@ router.post('/register', async (req, res) => {
     const token = generateToken(newUserRecord.id);
 
     logger.info({ email }, 'User registered, verification email sent');
-    res.status(201).json({ 
+    res.status(201).json({
       message: 'Registration successful. Verification email sent.',
       token,
       verificationStep: 'email',
@@ -296,7 +296,7 @@ router.post('/verify-email', async (req, res) => {
     const token = generateToken(user.id);
 
     logger.info({ userId: user.id, email }, 'Email verified successfully');
-    res.json({ 
+    res.json({
       message: 'Email verified. Please verify your phone number.',
       token,
       verificationStep: 'phone',
@@ -312,7 +312,7 @@ router.post('/verify-email', async (req, res) => {
         plaidConnected: user.plaidConnected,
         transactionDataReady: user.transactionDataReady,
         onboardingCompleted: user.onboardingCompleted,
-        readyForVoiceKYC: user.emailVerified && user.phoneVerified && user.kycApproved && 
+        readyForVoiceKYC: user.emailVerified && user.phoneVerified && user.kycApproved &&
                          user.plaidConnected && user.transactionDataReady,
         createdAt: user.createdAt,
       }
@@ -394,7 +394,7 @@ router.post('/login', async (req, res) => {
 
     // Check email verification first - don't issue tokens for unverified emails
     if (!user.emailVerified) {
-      return res.status(401).json({ 
+      return res.status(401).json({
         error: 'Email not verified. Please verify your email before logging in.',
         verificationStep: 'email',
         nextStep: 'email'
@@ -404,7 +404,7 @@ router.post('/login', async (req, res) => {
     // Progressive verification - check what step user needs to complete
 
     if (!user.phoneVerified) {
-      return res.status(200).json({ 
+      return res.status(200).json({
         message: 'Please verify your phone number.',
         token,
         verificationStep: 'phone',
@@ -420,7 +420,7 @@ router.post('/login', async (req, res) => {
           plaidConnected: user.plaidConnected,
           transactionDataReady: user.transactionDataReady,
           onboardingCompleted: user.onboardingCompleted,
-          readyForVoiceKYC: user.emailVerified && user.phoneVerified && user.kycApproved && 
+          readyForVoiceKYC: user.emailVerified && user.phoneVerified && user.kycApproved &&
                            user.plaidConnected && user.transactionDataReady,
           createdAt: user.createdAt,
         }
@@ -428,7 +428,7 @@ router.post('/login', async (req, res) => {
     }
 
     if (!user.kycApproved) {
-      return res.status(200).json({ 
+      return res.status(200).json({
         message: 'Please complete KYC verification.',
         token,
         verificationStep: 'kyc',
@@ -444,7 +444,7 @@ router.post('/login', async (req, res) => {
           plaidConnected: user.plaidConnected,
           transactionDataReady: user.transactionDataReady,
           onboardingCompleted: user.onboardingCompleted,
-          readyForVoiceKYC: user.emailVerified && user.phoneVerified && user.kycApproved && 
+          readyForVoiceKYC: user.emailVerified && user.phoneVerified && user.kycApproved &&
                            user.plaidConnected && user.transactionDataReady,
           createdAt: user.createdAt,
         }
@@ -454,8 +454,8 @@ router.post('/login', async (req, res) => {
     // Check Plaid connection status for voice KYC readiness
     const plaidStatus = await db.user.findUnique({
       where: { id: user.id },
-      select: { 
-        plaidConnected: true, 
+      select: {
+        plaidConnected: true,
         transactionDataReady: true,
         onboardingCompleted: true
       }
@@ -474,7 +474,7 @@ router.post('/login', async (req, res) => {
         plaidConnected: plaidStatus?.plaidConnected || false,
         transactionDataReady: plaidStatus?.transactionDataReady || false,
         onboardingCompleted: plaidStatus?.onboardingCompleted || false,
-        readyForVoiceKYC: user.emailVerified && user.phoneVerified && user.kycApproved && 
+        readyForVoiceKYC: user.emailVerified && user.phoneVerified && user.kycApproved &&
                          plaidStatus?.plaidConnected && plaidStatus?.transactionDataReady,
         createdAt: user.createdAt,
       },
@@ -532,7 +532,7 @@ router.get('/me', authenticateToken, async (req: any, res) => {
       plaidConnected: req.user.plaidConnected,
       transactionDataReady: req.user.transactionDataReady,
       onboardingCompleted: req.user.onboardingCompleted,
-      readyForVoiceKYC: req.user.emailVerified && req.user.phoneVerified && req.user.kycApproved && 
+      readyForVoiceKYC: req.user.emailVerified && req.user.phoneVerified && req.user.kycApproved &&
                        req.user.plaidConnected && req.user.transactionDataReady,
       createdAt: req.user.createdAt,
     }
@@ -556,8 +556,8 @@ router.post('/start-phone-verification', authenticateToken, async (req: any, res
     logger.debug({ originalPhone: phone, normalizedPhone, formattedPhone }, 'Phone normalization');
 
     // Check if phone is already verified by another user
-    const existingUser = await db.user.findFirst({ 
-      where: { 
+    const existingUser = await db.user.findFirst({
+      where: {
         phone: formattedPhone,
         phoneVerified: true,
         id: { not: req.user.id }
@@ -566,7 +566,7 @@ router.post('/start-phone-verification', authenticateToken, async (req: any, res
 
     if (existingUser) {
       logger.warn({ phone: formattedPhone, userId: req.user.id, associatedEmail: existingUser.email }, 'Phone already verified by another user');
-      return res.status(400).json({ 
+      return res.status(400).json({
         error: 'Phone number already verified by another user',
         associatedEmail: existingUser.email,
         message: `This phone number is already verified with the account: ${existingUser.email}`
@@ -593,7 +593,7 @@ router.post('/start-phone-verification', authenticateToken, async (req: any, res
     });
 
     logger.info({ userId: req.user.id, phone: formattedPhone }, 'Phone verification SMS sent successfully');
-    res.json({ 
+    res.json({
       message: 'Phone verification code sent.',
       phone: formattedPhone
     });
@@ -655,7 +655,7 @@ router.post('/verify-phone', authenticateToken, async (req: any, res) => {
     });
 
     logger.info({ userId: user.id, phone }, 'Phone verified successfully');
-    res.json({ 
+    res.json({
       message: 'Phone verified. Please complete KYC verification.',
       verificationStep: 'kyc',
       nextStep: 'kyc',
@@ -670,7 +670,7 @@ router.post('/verify-phone', authenticateToken, async (req: any, res) => {
         plaidConnected: updatedUser.plaidConnected,
         transactionDataReady: updatedUser.transactionDataReady,
         onboardingCompleted: updatedUser.onboardingCompleted,
-        readyForVoiceKYC: updatedUser.emailVerified && updatedUser.phoneVerified && updatedUser.kycApproved && 
+        readyForVoiceKYC: updatedUser.emailVerified && updatedUser.phoneVerified && updatedUser.kycApproved &&
                          updatedUser.plaidConnected && updatedUser.transactionDataReady,
         createdAt: updatedUser.createdAt,
       }

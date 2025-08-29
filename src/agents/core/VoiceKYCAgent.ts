@@ -2,9 +2,8 @@
 import { logger } from '../../lib/logger.js';
 import { createAgentResponse } from '../../lib/openai.js';
 import { db } from '../../lib/db.js';
-import { onboardingAgent, OnboardingProfile } from './OnboardingAgent.js';
+import { onboardingAgent } from './OnboardingAgent.js';
 import { billAnalyzer } from '../../lib/billAnalyzer.js';
-import { transactionIntelligence } from '../../lib/transactionIntelligence.js';
 
 export interface VoiceSession {
   sessionId: string;
