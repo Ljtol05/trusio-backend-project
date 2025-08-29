@@ -397,7 +397,7 @@ async function startTransactionSync(userId: string, accessToken: string) {
     }
 
     // Mark transaction data as ready and store summary
-    await db.user.update({
+    const updatedUser = await db.user.update({
       where: { id: userId },
       data: { 
         transactionDataReady: true,
@@ -411,8 +411,22 @@ async function startTransactionSync(userId: string, accessToken: string) {
             end: endDate.toISOString().split('T')[0]
           }
         })
+      },
+      select: {
+        emailVerified: true,
+        phoneVerified: true,
+        kycApproved: true,
+        plaidConnected: true,
+        transactionDataReady: true
       }
     });
+
+    // Check if user is now ready for voice KYC
+    const readyForVoiceKYC = updatedUser.emailVerified && 
+                            updatedUser.phoneVerified && 
+                            updatedUser.kycApproved && 
+                            updatedUser.plaidConnected && 
+                            updatedUser.transactionDataReady;
 
     logger.info({
       userId,
@@ -421,8 +435,15 @@ async function startTransactionSync(userId: string, accessToken: string) {
       enhancementRate: `${Math.round((enhancedCount / processedCount) * 100)}%`,
       dateRange: `${startDate.toISOString().split('T')[0]} to ${endDate.toISOString().split('T')[0]}`,
       syncDuration: '120 days',
-      readyForVoiceKYC: true
+      readyForVoiceKYC
     }, 'Enhanced 120-day transaction sync completed for voice KYC onboarding');
+
+    return {
+      transactionCount: processedCount,
+      enhancedCount,
+      readyForVoiceKYC,
+      syncDuration: '120 days'
+    };
 
   } catch (error) {
     logger.error({ error, userId }, 'Enhanced transaction sync failed');

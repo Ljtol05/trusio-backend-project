@@ -4,6 +4,8 @@ import { createAgentResponse } from '../../lib/openai.js';
 import { db } from '../../lib/db.js';
 import { onboardingAgent } from './OnboardingAgent.js';
 import { billAnalyzer } from '../../lib/billAnalyzer.js';
+import type { Agent } from '@openai/agents';
+import { createAgent } from '@openai/agents-openai';
 
 export interface VoiceSession {
   sessionId: string;
@@ -279,62 +281,111 @@ Remember: This is a VOICE conversation, so keep responses natural and spoken-fri
   }
 
   private async performTransactionAnalysis(userId: string): Promise<any> {
-    // Analyze 120 days of transactions
-    const endDate = new Date();
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - 120);
-    
-    const transactions = await db.transaction.findMany({
-      where: {
-        userId,
-        createdAt: { 
-          gte: startDate,
-          lte: endDate 
+    try {
+      // Analyze 120 days of transactions
+      const endDate = new Date();
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - 120);
+      
+      const transactions = await db.transaction.findMany({
+        where: {
+          userId,
+          createdAt: { 
+            gte: startDate,
+            lte: endDate 
+          }
+        },
+        orderBy: { createdAt: 'desc' }
+      });
+
+      if (transactions.length === 0) {
+        // Return default analysis for users with no transactions yet
+        return {
+          totalTransactions: 0,
+          totalSpending: 0,
+          totalIncome: 0,
+          averageMonthlySpending: 0,
+          averageMonthlyIncome: 0,
+          savingsRate: 0,
+          topSpendingCategories: [],
+          dateRange: { start: startDate, end: endDate }
+        };
+      }
+
+      // Calculate comprehensive metrics
+      const totalTransactions = transactions.length;
+      
+      // In Plaid, positive amounts are debits (money spent), negative amounts are credits (money received)
+      const spendingTransactions = transactions.filter(t => t.amountCents > 0);
+      const incomeTransactions = transactions.filter(t => t.amountCents < 0);
+      
+      const totalSpending = spendingTransactions.reduce((sum, t) => sum + t.amountCents, 0) / 100;
+      const totalIncome = Math.abs(incomeTransactions.reduce((sum, t) => sum + t.amountCents, 0)) / 100;
+
+      const averageMonthlySpending = totalSpending / 4; // 120 days = ~4 months
+      const averageMonthlyIncome = totalIncome / 4;
+      const savingsRate = totalIncome > 0 ? ((totalIncome - totalSpending) / totalIncome) * 100 : 0;
+
+      // Categorize spending using MCC codes and merchant names
+      const categorySpending: Record<string, number> = {};
+      spendingTransactions.forEach(transaction => {
+        let category = 'Other';
+        
+        // Categorize based on MCC code
+        if (transaction.mcc) {
+          if (transaction.mcc.startsWith('54')) category = 'Gas & Transportation';
+          else if (transaction.mcc.startsWith('58') || transaction.mcc.startsWith('57')) category = 'Dining & Entertainment';
+          else if (transaction.mcc.startsWith('53') || transaction.mcc.startsWith('52')) category = 'Retail & Shopping';
+          else if (transaction.mcc.startsWith('49')) category = 'Bills & Utilities';
+          else if (transaction.mcc === '5411' || transaction.mcc === '5499') category = 'Groceries';
         }
-      },
-      orderBy: { createdAt: 'desc' }
-    });
+        
+        // Override with merchant-based categorization if more specific
+        const merchant = (transaction.merchant || '').toLowerCase();
+        if (merchant.includes('grocery') || merchant.includes('market') || merchant.includes('safeway')) {
+          category = 'Groceries';
+        } else if (merchant.includes('gas') || merchant.includes('shell') || merchant.includes('chevron')) {
+          category = 'Gas & Transportation';
+        } else if (merchant.includes('restaurant') || merchant.includes('coffee') || merchant.includes('starbucks')) {
+          category = 'Dining & Entertainment';
+        }
+        
+        categorySpending[category] = (categorySpending[category] || 0) + (transaction.amountCents / 100);
+      });
 
-    // Calculate comprehensive metrics
-    const totalTransactions = transactions.length;
-    const totalSpending = transactions
-      .filter(t => t.amountCents > 0)
-      .reduce((sum, t) => sum + t.amountCents, 0) / 100;
-    
-    const totalIncome = Math.abs(transactions
-      .filter(t => t.amountCents < 0)
-      .reduce((sum, t) => sum + t.amountCents, 0)) / 100;
+      const topSpendingCategories = Object.entries(categorySpending)
+        .map(([category, amount]) => ({
+          category,
+          amount,
+          percentage: totalSpending > 0 ? (amount / totalSpending) * 100 : 0
+        }))
+        .sort((a, b) => b.amount - a.amount)
+        .slice(0, 10);
 
-    const averageMonthlySpending = totalSpending / 4; // 120 days = ~4 months
-    const averageMonthlyIncome = totalIncome / 4;
-    const savingsRate = totalIncome > 0 ? ((totalIncome - totalSpending) / totalIncome) * 100 : 0;
-
-    // Categorize spending
-    const categorySpending: Record<string, number> = {};
-    transactions.filter(t => t.amountCents > 0).forEach(transaction => {
-      const category = transaction.category || 'Other';
-      categorySpending[category] = (categorySpending[category] || 0) + (transaction.amountCents / 100);
-    });
-
-    const topSpendingCategories = Object.entries(categorySpending)
-      .map(([category, amount]) => ({
-        category,
-        amount,
-        percentage: (amount / totalSpending) * 100
-      }))
-      .sort((a, b) => b.amount - a.amount)
-      .slice(0, 10);
-
-    return {
-      totalTransactions,
-      totalSpending,
-      totalIncome,
-      averageMonthlySpending,
-      averageMonthlyIncome,
-      savingsRate,
-      topSpendingCategories,
-      dateRange: { start: startDate, end: endDate }
-    };
+      return {
+        totalTransactions,
+        totalSpending,
+        totalIncome,
+        averageMonthlySpending,
+        averageMonthlyIncome,
+        savingsRate,
+        topSpendingCategories,
+        dateRange: { start: startDate, end: endDate }
+      };
+    } catch (error) {
+      logger.error({ error, userId }, 'Failed to perform transaction analysis');
+      // Return safe defaults if analysis fails
+      return {
+        totalTransactions: 0,
+        totalSpending: 0,
+        totalIncome: 0,
+        averageMonthlySpending: 0,
+        averageMonthlyIncome: 0,
+        savingsRate: 0,
+        topSpendingCategories: [],
+        dateRange: { start: new Date(), end: new Date() }
+      };
+    }
   }
 
   private async generateFinancialProfile(userId: string, transactionAnalysis: any, billAnalysis: any): Promise<any> {

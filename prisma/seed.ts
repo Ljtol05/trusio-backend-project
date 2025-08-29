@@ -14,7 +14,10 @@ async function main() {
       password: hashedPassword, // Update password if user exists
       emailVerified: true,
       phoneVerified: true,
-      kycApproved: true
+      kycApproved: true,
+      plaidConnected: true,
+      transactionDataReady: true,
+      phone: '+14155551234'
     },
     create: {
       name: 'Demo User',
@@ -22,7 +25,10 @@ async function main() {
       password: hashedPassword,
       emailVerified: true,
       phoneVerified: true,
-      kycApproved: true
+      kycApproved: true,
+      plaidConnected: true,
+      transactionDataReady: true,
+      phone: '+14155551234'
     },
   });
 

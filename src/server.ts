@@ -22,13 +22,15 @@ import mccRoutes from './routes/mcc.js';
 import creditCardRoutes from './routes/credit-cards.js';
 import creatorRoutes from './routes/creator.js';
 import voiceOnboardingRoutes from './routes/voice-onboarding.js';
+import serviceAccountRoutes from './routes/service-accounts.js';
+import testVoiceKYCRoutes from './routes/test-voice-kyc.js';
 
 const app = express();
 
 // Middleware
 app.use(cors({
-  origin: env.NODE_ENV === 'production' 
-    ? ['https://your-production-domain.com'] 
+  origin: env.NODE_ENV === 'production'
+    ? ['https://your-production-domain.com']
     : true,
   credentials: true
 }));
@@ -38,8 +40,8 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Health check
 app.get('/healthz', (req, res) => {
-  res.json({ 
-    ok: true, 
+  res.json({
+    ok: true,
     timestamp: new Date().toISOString(),
     service: 'envelope-budgeting-api',
     version: '1.0.0',
@@ -64,6 +66,8 @@ app.use('/api/mcc', mccRoutes);
 app.use('/api/credit-cards', creditCardRoutes);
 app.use('/api/creator', creatorRoutes);
 app.use('/api/voice-onboarding', voiceOnboardingRoutes);
+app.use('/api/service-accounts', serviceAccountRoutes);
+app.use('/api/test-voice-kyc', testVoiceKYCRoutes);
 
 // Error handling middleware
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
