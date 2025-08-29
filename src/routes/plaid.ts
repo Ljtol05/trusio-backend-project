@@ -37,13 +37,13 @@ router.post('/create-link-token', auth, async (req, res) => {
     // Verify user has completed KYC
     const user = await db.user.findUnique({
       where: { id: userId },
-      select: { 
-        id: true, 
-        email: true, 
-        firstName: true, 
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
         lastName: true,
-        kycCompleted: true, 
-        plaidConnected: true 
+        kycCompleted: true,
+        plaidConnected: true
       }
     });
 
@@ -157,13 +157,13 @@ router.post('/enhance-transactions', auth, async (req, res) => {
     // Get existing transactions
     const existingTransactions = await db.transaction.findMany({
       where: { userId },
-      select: { 
-        id: true, 
-        merchant: true, 
-        amountCents: true, 
+      select: {
+        id: true,
+        merchant: true,
+        amountCents: true,
         category: true,
         mcc: true,
-        description: true 
+        description: true
       }
     });
 
@@ -245,8 +245,8 @@ router.get('/status', auth, async (req, res) => {
 
     const user = await db.user.findUnique({
       where: { id: userId },
-      select: { 
-        plaidConnected: true, 
+      select: {
+        plaidConnected: true,
         transactionDataReady: true,
         plaidItemId: true,
       }
@@ -336,8 +336,8 @@ async function startTransactionSync(userId: string, accessToken: string) {
       if (offset > 2000) break;
     }
 
-    logger.info({ 
-      userId, 
+    logger.info({
+      userId,
       totalFetched: allTransactions.length,
     }, 'Fetched all available transactions');
 
@@ -351,8 +351,8 @@ async function startTransactionSync(userId: string, accessToken: string) {
       const inferredMCC = inferMCCFromMerchant(transaction.merchant_name || transaction.name);
 
       await db.transaction.upsert({
-        where: { 
-          plaidTransactionId: transaction.transaction_id 
+        where: {
+          plaidTransactionId: transaction.transaction_id
         },
         create: {
           userId,
@@ -364,7 +364,7 @@ async function startTransactionSync(userId: string, accessToken: string) {
           category: enhancedCategory.primary || transaction.category?.[0] || 'Other',
           subcategory: enhancedCategory.secondary || transaction.category?.[1] || null,
           mcc: inferredMCC || extractMCCFromTransaction(transaction),
-          location: transaction.location?.city ? 
+          location: transaction.location?.city ?
             `${transaction.location.city}, ${transaction.location.region}` : null,
           pending: transaction.pending,
           metadata: JSON.stringify({
@@ -399,7 +399,7 @@ async function startTransactionSync(userId: string, accessToken: string) {
     // Mark transaction data as ready and store summary
     const updatedUser = await db.user.update({
       where: { id: userId },
-      data: { 
+      data: {
         transactionDataReady: true,
         plaidSyncMetadata: JSON.stringify({
           lastSyncAt: new Date(),
@@ -422,10 +422,10 @@ async function startTransactionSync(userId: string, accessToken: string) {
     });
 
     // Check if user is now ready for voice KYC
-    const readyForVoiceKYC = updatedUser.emailVerified && 
-                            updatedUser.phoneVerified && 
-                            updatedUser.kycApproved && 
-                            updatedUser.plaidConnected && 
+    const readyForVoiceKYC = updatedUser.emailVerified &&
+                            updatedUser.phoneVerified &&
+                            updatedUser.kycApproved &&
+                            updatedUser.plaidConnected &&
                             updatedUser.transactionDataReady;
 
     logger.info({
@@ -525,8 +525,8 @@ function inferMCCFromMerchant(merchantName: string): string | null {
 
 function extractMCCFromTransaction(transaction: any): string | null {
   // Plaid sometimes provides MCC in different fields
-  return transaction.merchant_entity_id || 
-         transaction.payment_meta?.ppd_id || 
+  return transaction.merchant_entity_id ||
+         transaction.payment_meta?.ppd_id ||
          null;
 }
 
