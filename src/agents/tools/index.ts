@@ -1,23 +1,33 @@
-// Export tool registry
-export { toolRegistry } from './registry.ts';
 
-// Export individual tools
-export { budgetAnalysisTool } from './budget.ts';
-export { createEnvelopeTool, updateEnvelopeTool } from './envelope.ts';
-export { categorizeTransactionTool, spendingPatternsTool } from './transaction-tools.ts';
-export { transferFundsTool } from './transfer_funds.ts';
-export { trackAchievementsTool } from './track_achievements.ts';
-export { identifyOpportunitiesTool } from './identify_opportunities.ts';
-export { generateInsightTool } from './insight.ts';
-export { memoryStoreTool, memoryRetrieveTool } from './memory.ts';
-export { agentHandoffTool, agentCapabilityCheckTool } from './handoff.ts';
-export { analyzeSpendingTool, generateReportTool } from './analysis.ts';
-
-// Export types
+// Export all tool types and interfaces
 export type {
+  FinancialContext,
   ToolExecutionContext,
   ToolExecutionResult,
-  FinancialContext,
+  AgentConfig,
+  AgentResponse,
   ToolDefinition,
-  ToolCategory,
 } from './types.ts';
+
+// Import and export all tool implementations
+export { budgetAnalysisTool, createEnvelopeTool, budgetCreationTool } from './budget.ts';
+export { envelopeTransferTool, getEnvelopeBalanceTool } from './envelope.ts';
+export { 
+  categorizeTransactionTool, 
+  automaticAllocationTool,
+  patternDetectionTool,
+  detectAnomaliesTool 
+} from './transaction-tools.ts';
+export { agentHandoffTool } from './handoff.ts';
+export { memoryStoreTool, memoryRetrieveTool } from './memory.ts';
+export { 
+  spendingPatternsTool,
+  varianceAnalysisTool,
+  riskAssessmentTool 
+} from './analysis.ts';
+
+// Export the main registry
+export { toolRegistry } from './registry.ts';
+
+// Re-export everything from registry for convenience
+export * from './registry.ts';
