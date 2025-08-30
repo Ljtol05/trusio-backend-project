@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<testsuites name="vitest tests" tests="5" failures="5" errors="0" time="3.597">
-    <testsuite name="src/agents/__tests__/agentRegistry.test.ts" timestamp="2025-08-30T17:35:54.825Z" hostname="b4f2503ccc25" tests="1" failures="1" errors="0" skipped="0" time="0">
+<testsuites name="vitest tests" tests="5" failures="5" errors="0" time="1.623">
+    <testsuite name="src/agents/__tests__/agentRegistry.test.ts" timestamp="2025-08-30T17:44:49.349Z" hostname="b4f2503ccc25" tests="1" failures="1" errors="0" skipped="0" time="0">
         <testcase classname="src/agents/__tests__/agentRegistry.test.ts" name="src/agents/__tests__/agentRegistry.test.ts" time="0">
             <failure message="Failed to load url ../agents/index.js (resolved id: ../agents/index.js) in /home/runner/workspace/src/agents/core/AgentManager.ts. Does the file exist?" type="Error">
 Error: Failed to load url ../agents/index.js (resolved id: ../agents/index.js) in /home/runner/workspace/src/agents/core/AgentManager.ts. Does the file exist?
@@ -8,7 +8,7 @@ Error: Failed to load url ../agents/index.js (resolved id: ../agents/index.js) i
             </failure>
         </testcase>
     </testsuite>
-    <testsuite name="src/agents/__tests__/integration.test.ts" timestamp="2025-08-30T17:35:54.830Z" hostname="b4f2503ccc25" tests="1" failures="1" errors="0" skipped="0" time="0">
+    <testsuite name="src/agents/__tests__/integration.test.ts" timestamp="2025-08-30T17:44:49.354Z" hostname="b4f2503ccc25" tests="1" failures="1" errors="0" skipped="0" time="0">
         <testcase classname="src/agents/__tests__/integration.test.ts" name="src/agents/__tests__/integration.test.ts" time="0">
             <failure message="Failed to load url ./lib/ai/globalAIBrain.js (resolved id: ./lib/ai/globalAIBrain.js) in /home/runner/workspace/src/server.ts. Does the file exist?" type="Error">
 Error: Failed to load url ./lib/ai/globalAIBrain.js (resolved id: ./lib/ai/globalAIBrain.js) in /home/runner/workspace/src/server.ts. Does the file exist?
@@ -16,7 +16,7 @@ Error: Failed to load url ./lib/ai/globalAIBrain.js (resolved id: ./lib/ai/globa
             </failure>
         </testcase>
     </testsuite>
-    <testsuite name="src/agents/__tests__/performance.test.ts" timestamp="2025-08-30T17:35:54.856Z" hostname="b4f2503ccc25" tests="1" failures="1" errors="0" skipped="0" time="0">
+    <testsuite name="src/agents/__tests__/performance.test.ts" timestamp="2025-08-30T17:44:49.358Z" hostname="b4f2503ccc25" tests="1" failures="1" errors="0" skipped="0" time="0">
         <testcase classname="src/agents/__tests__/performance.test.ts" name="src/agents/__tests__/performance.test.ts" time="0">
             <failure message="Failed to load url ../agents/index.js (resolved id: ../agents/index.js) in /home/runner/workspace/src/agents/core/AgentManager.ts. Does the file exist?" type="Error">
 Error: Failed to load url ../agents/index.js (resolved id: ../agents/index.js) in /home/runner/workspace/src/agents/core/AgentManager.ts. Does the file exist?
@@ -24,7 +24,7 @@ Error: Failed to load url ../agents/index.js (resolved id: ../agents/index.js) i
             </failure>
         </testcase>
     </testsuite>
-    <testsuite name="src/agents/__tests__/tools.test.ts" timestamp="2025-08-30T17:35:54.860Z" hostname="b4f2503ccc25" tests="1" failures="1" errors="0" skipped="0" time="0">
+    <testsuite name="src/agents/__tests__/tools.test.ts" timestamp="2025-08-30T17:44:49.360Z" hostname="b4f2503ccc25" tests="1" failures="1" errors="0" skipped="0" time="0">
         <testcase classname="src/agents/__tests__/tools.test.ts" name="src/agents/__tests__/tools.test.ts" time="0">
             <failure message="Transform failed with 1 error:
 /home/runner/workspace/src/agents/core/ToolRegistry.ts:43:14: ERROR: Expected identifier but found &quot;{&quot;" type="Error">
@@ -39,7 +39,7 @@ Error: Transform failed with 1 error:
             </failure>
         </testcase>
     </testsuite>
-    <testsuite name="src/agents/__tests__/validation.test.ts" timestamp="2025-08-30T17:35:54.863Z" hostname="b4f2503ccc25" tests="1" failures="1" errors="0" skipped="0" time="0">
+    <testsuite name="src/agents/__tests__/validation.test.ts" timestamp="2025-08-30T17:44:49.364Z" hostname="b4f2503ccc25" tests="1" failures="1" errors="0" skipped="0" time="0">
         <testcase classname="src/agents/__tests__/validation.test.ts" name="src/agents/__tests__/validation.test.ts" time="0">
             <failure message="Failed to load url ../agents/index.js (resolved id: ../agents/index.js) in /home/runner/workspace/src/agents/core/AgentManager.ts. Does the file exist?" type="Error">
 Error: Failed to load url ../agents/index.js (resolved id: ../agents/index.js) in /home/runner/workspace/src/agents/core/AgentManager.ts. Does the file exist?
