@@ -1,14 +1,13 @@
-import { Agent, run } from '@openai/agents';
-import { logger } from '../lib/logger.js';
+
 import { agentManager } from './core/AgentManager.js';
 import { agentContextManager } from './core/AgentContextManager.js';
 import { agentValidator } from './core/AgentValidator.js';
-import { AGENT_CAPABILITIES } from './config.js';
-import type { FinancialContext, AgentConfig, AgentRole } from './types.js';
+import { logger } from '../lib/logger.js';
+import { AgentConfig, FinancialContext } from './types.js';
 
-export class AgentRegistry {
+class AgentRegistry {
   private isRegistryInitialized = false;
-  private agents = new Map<string, Agent>();
+  private agents = new Map<string, any>();
   private agentConfigs = new Map<string, AgentConfig>();
 
   constructor() {
@@ -115,13 +114,6 @@ export class AgentRegistry {
 
   /**
    * Get agent capabilities
-   */
-  getAgentCapabilities(agentName: string): string[] {
-    return agentManager.getAgentCapabilities(agentName);
-  }
-
-  /**
-   * Get all agents
    */
   getAgentCapabilities(agentName: string): string[] {
     return agentManager.getAgentCapabilities(agentName);

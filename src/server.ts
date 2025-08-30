@@ -26,6 +26,14 @@ import voiceOnboardingRoutes from './routes/voice-onboarding.js';
 import serviceAccountRoutes from './routes/service-accounts.js';
 import testVoiceKYCRoutes from './routes/test-voice-kyc.js';
 
+// Initialize agent registry
+import { agentRegistry } from './agents/agentRegistry.js';
+
+// Ensure agent registry is initialized
+if (!agentRegistry.isInitialized()) {
+  throw new Error('Agent registry failed to initialize');
+}
+
 const app = express();
 
 // Middleware

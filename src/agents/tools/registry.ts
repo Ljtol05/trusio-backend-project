@@ -1,12 +1,12 @@
 
-import { tool, defineTool } from '@openai/agents';
 import { logger } from '../../lib/logger.js';
-import type { FinancialContext, ToolExecutionResult, ToolExecutionContext } from '../types.js';
+import { FinancialContext, ToolExecutionContext, ToolExecutionResult } from '../types.js';
 
-// Import all tools
-import { budgetAnalysisTool, createEnvelopeTool, updateEnvelopeTool } from './budget.js';
-import { transferFundsTool } from './transfer_funds.js';
+// Import all tool implementations
+import { budgetAnalysisTool } from './budget.js';
+import { createEnvelopeTool, updateEnvelopeTool } from './envelope.js';
 import { categorizeTransactionTool, spendingPatternsTool } from './transaction-tools.js';
+import { transferFundsTool } from './transfer_funds.js';
 import { trackAchievementsTool } from './track_achievements.js';
 import { identifyOpportunitiesTool } from './identify_opportunities.js';
 import { generateInsightTool } from './insight.js';
@@ -213,4 +213,5 @@ class ToolRegistry {
   }
 }
 
+// Export singleton instance
 export const toolRegistry = new ToolRegistry();
