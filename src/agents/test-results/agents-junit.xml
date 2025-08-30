@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<testsuites name="vitest tests" tests="18" failures="4" errors="0" time="2.214">
+    <testsuite name="src/agents/__tests__/agentRegistry.test.ts" timestamp="2025-08-30T18:58:13.531Z" hostname="39c96b6516b9" tests="1" failures="1" errors="0" skipped="0" time="0">
+        <testcase classname="src/agents/__tests__/agentRegistry.test.ts" name="src/agents/__tests__/agentRegistry.test.ts" time="0">
+            <failure message="Cannot read properties of undefined (reading &apos;map&apos;)" type="TypeError">
+TypeError: Cannot read properties of undefined (reading &apos;map&apos;)
+ ❯ AgentRegistry.initializeAgents src/agents/agentRegistry.ts:28:41
+ ❯ new AgentRegistry src/agents/agentRegistry.ts:12:10
+ ❯ src/agents/agentRegistry.ts:139:30
+ ❯ src/agents/__tests__/agentRegistry.test.ts:25:25
+            </failure>
+        </testcase>
+    </testsuite>
+    <testsuite name="src/agents/__tests__/integration.test.ts" timestamp="2025-08-30T18:58:13.534Z" hostname="39c96b6516b9" tests="1" failures="1" errors="0" skipped="0" time="0">
+        <testcase classname="src/agents/__tests__/integration.test.ts" name="src/agents/__tests__/integration.test.ts" time="0">
+            <failure message="[vitest] There was an error when mocking a module. If you are using &quot;vi.mock&quot; factory, make sure there are no top level variables inside, since this call is hoisted to top of the file. Read more: https://vitest.dev/api/vi.html#vi-mock" type="Error">
+Error: [vitest] There was an error when mocking a module. If you are using &quot;vi.mock&quot; factory, make sure there are no top level variables inside, since this call is hoisted to top of the file. Read more: https://vitest.dev/api/vi.html#vi-mock
+ ❯ src/agents/__tests__/integration.test.ts:3:31
+
+Caused by: Caused by: TypeError: Cannot read properties of undefined (reading &apos;map&apos;)
+ ❯ AgentRegistry.initializeAgents src/agents/agentRegistry.ts:28:41
+ ❯ new AgentRegistry src/agents/agentRegistry.ts:12:10
+ ❯ src/agents/agentRegistry.ts:139:30
+ ❯ src/server.ts:26:32
+            </failure>
+        </testcase>
+    </testsuite>
+    <testsuite name="src/agents/__tests__/performance.test.ts" timestamp="2025-08-30T18:58:13.536Z" hostname="39c96b6516b9" tests="1" failures="1" errors="0" skipped="0" time="0">
+        <testcase classname="src/agents/__tests__/performance.test.ts" name="src/agents/__tests__/performance.test.ts" time="0">
+            <failure message="Cannot read properties of undefined (reading &apos;map&apos;)" type="TypeError">
+TypeError: Cannot read properties of undefined (reading &apos;map&apos;)
+ ❯ AgentRegistry.initializeAgents src/agents/agentRegistry.ts:28:41
+ ❯ new AgentRegistry src/agents/agentRegistry.ts:12:10
+ ❯ src/agents/agentRegistry.ts:139:30
+ ❯ src/agents/__tests__/performance.test.ts:22:25
+            </failure>
+        </testcase>
+    </testsuite>
+    <testsuite name="src/agents/__tests__/tools.test.ts" timestamp="2025-08-30T18:58:13.538Z" hostname="39c96b6516b9" tests="14" failures="0" errors="0" skipped="0" time="0.113">
+        <testcase classname="src/agents/__tests__/tools.test.ts" name="Financial Tools &gt; Tool Registry &gt; should have all required transaction tools registered" time="0.002">
+        </testcase>
+        <testcase classname="src/agents/__tests__/tools.test.ts" name="Financial Tools &gt; Tool Registry &gt; should return correct tool count" time="0.001">
+        </testcase>
+        <testcase classname="src/agents/__tests__/tools.test.ts" name="Financial Tools &gt; Budget Tools &gt; should execute budget analysis tool successfully" time="0">
+        </testcase>
+        <testcase classname="src/agents/__tests__/tools.test.ts" name="Financial Tools &gt; Budget Tools &gt; should handle budget analysis errors gracefully" time="0">
+        </testcase>
+        <testcase classname="src/agents/__tests__/tools.test.ts" name="Financial Tools &gt; Envelope Tools &gt; should create envelope successfully" time="0.001">
+        </testcase>
+        <testcase classname="src/agents/__tests__/tools.test.ts" name="Financial Tools &gt; Envelope Tools &gt; should transfer funds between envelopes" time="0">
+        </testcase>
+        <testcase classname="src/agents/__tests__/tools.test.ts" name="Financial Tools &gt; Transaction Tools &gt; should categorize transactions correctly" time="0.001">
+        </testcase>
+        <testcase classname="src/agents/__tests__/tools.test.ts" name="Financial Tools &gt; Transaction Tools &gt; should analyze spending patterns" time="0.001">
+        </testcase>
+        <testcase classname="src/agents/__tests__/tools.test.ts" name="Financial Tools &gt; Analysis Tools &gt; should analyze budget variance" time="0">
+        </testcase>
+        <testcase classname="src/agents/__tests__/tools.test.ts" name="Financial Tools &gt; Insight Tools &gt; should generate personalized recommendations" time="0.001">
+        </testcase>
+        <testcase classname="src/agents/__tests__/tools.test.ts" name="Financial Tools &gt; Insight Tools &gt; should identify financial opportunities" time="0">
+        </testcase>
+        <testcase classname="src/agents/__tests__/tools.test.ts" name="Financial Tools &gt; Agent Handoff Tool &gt; should execute agent handoff successfully" time="0">
+        </testcase>
+        <testcase classname="src/agents/__tests__/tools.test.ts" name="Financial Tools &gt; Tool Error Handling &gt; should handle non-existent tool gracefully" time="0">
+        </testcase>
+        <testcase classname="src/agents/__tests__/tools.test.ts" name="Financial Tools &gt; Tool Error Handling &gt; should handle tool execution timeout" time="0.102">
+        </testcase>
+    </testsuite>
+    <testsuite name="src/agents/__tests__/validation.test.ts" timestamp="2025-08-30T18:58:13.544Z" hostname="39c96b6516b9" tests="1" failures="1" errors="0" skipped="0" time="0">
+        <testcase classname="src/agents/__tests__/validation.test.ts" name="src/agents/__tests__/validation.test.ts" time="0">
+            <failure message="Cannot read properties of undefined (reading &apos;map&apos;)" type="TypeError">
+TypeError: Cannot read properties of undefined (reading &apos;map&apos;)
+ ❯ AgentRegistry.initializeAgents src/agents/agentRegistry.ts:28:41
+ ❯ new AgentRegistry src/agents/agentRegistry.ts:12:10
+ ❯ src/agents/agentRegistry.ts:139:30
+ ❯ src/agents/__tests__/validation.test.ts:23:25
+            </failure>
+        </testcase>
+    </testsuite>
+</testsuites>

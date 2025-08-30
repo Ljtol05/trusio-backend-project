@@ -1,0 +1,51 @@
+~/workspace$ npm run test:agents 2>&1 | head -50
+
+> envelope-app-backend@1.0.0 test:agents
+> vitest run --config vitest.config.agents.ts
+
+
+ RUN  v1.6.1 /home/runner/workspace
+
+stdout | src/config/env.ts:65:11
+[env] ✅ OpenAI client initialized
+
+stdout | src/config/env.ts:65:11
+[env] ✅ OpenAI client initialized
+
+stdout | src/config/env.ts:65:11
+[env] ✅ OpenAI client initialized
+
+ ✓ src/agents/__tests__/tools.test.ts > Financial Tools > Tool Registry > should have all required transaction tools registered
+ ✓ src/agents/__tests__/tools.test.ts > Financial Tools > Tool Registry > should return correct tool count
+ ✓ src/agents/__tests__/tools.test.ts > Financial Tools > Budget Tools > should execute budget analysis tool successfully
+ ✓ src/agents/__tests__/tools.test.ts > Financial Tools > Budget Tools > should handle budget analysis errors gracefully
+ ✓ src/agents/__tests__/tools.test.ts > Financial Tools > Envelope Tools > should create envelope successfully
+ ✓ src/agents/__tests__/tools.test.ts > Financial Tools > Envelope Tools > should transfer funds between envelopes
+ ✓ src/agents/__tests__/tools.test.ts > Financial Tools > Transaction Tools > should categorize transactions correctly
+ ✓ src/agents/__tests__/tools.test.ts > Financial Tools > Transaction Tools > should analyze spending patterns
+ ✓ src/agents/__tests__/tools.test.ts > Financial Tools > Analysis Tools > should analyze budget variance
+ ✓ src/agents/__tests__/tools.test.ts > Financial Tools > Insight Tools > should generate personalized recommendations
+ ✓ src/agents/__tests__/tools.test.ts > Financial Tools > Insight Tools > should identify financial opportunities
+ ✓ src/agents/__tests__/tools.test.ts > Financial Tools > Agent Handoff Tool > should execute agent handoff successfully
+ ✓ src/agents/__tests__/tools.test.ts > Financial Tools > Tool Error Handling > should handle non-existent tool gracefully
+ ✓ src/agents/__tests__/tools.test.ts > Financial Tools > Tool Error Handling > should handle tool execution timeout
+stdout | src/config/env.ts:65:11
+[env] ✅ OpenAI client initialized
+
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 4 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |agents| src/agents/__tests__/agentRegistry.test.ts [ src/agents/__tests__/agentRegistry.test.ts ]
+TypeError: Cannot read properties of undefined (reading 'map')
+ ❯ AgentRegistry.initializeAgents src/agents/agentRegistry.ts:28:41
+     26| 
+     27|       for (const [agentName, config] of agentConfigs) {
+     28|         const agentTools = config.tools.map(toolName => {
+       |                                         ^
+     29|           const tool = toolRegistry.getTool(toolName);
+     30|           if (!tool) {
+ ❯ new AgentRegistry src/agents/agentRegistry.ts:12:10
+ ❯ src/agents/agentRegistry.ts:139:30
+ ❯ src/agents/__tests__/agentRegistry.test.ts:25:25
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯
