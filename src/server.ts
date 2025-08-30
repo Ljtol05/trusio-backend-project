@@ -4,6 +4,7 @@ import { env } from './config/env.js';
 import { logger } from './lib/logger.js';
 import { db } from './lib/db.js';
 import { configureOpenAIFromEnv } from './lib/openai.js';
+import { globalAIBrain } from './lib/ai/globalAIBrain.js'; // Assuming this is where globalAIBrain is exported
 
 // Import routes
 import authRoutes from './routes/auth.js';
@@ -100,6 +101,14 @@ async function startServer() {
     // Test database connection
     await db.$connect();
     logger.info('Database connected successfully');
+
+    // Initialize Global AI Brain
+    try {
+      await globalAIBrain.initialize();
+      logger.info('Global AI Brain initialized successfully');
+    } catch (aiError) {
+      logger.warn({ error: aiError }, 'Global AI Brain initialization failed, continuing without AI features');
+    }
 
     // Configure OpenAI
     const openaiConfigured = configureOpenAIFromEnv();

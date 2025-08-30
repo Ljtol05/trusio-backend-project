@@ -1,3 +1,4 @@
+
 import { openai } from './openai.js';
 import { db } from './db.js';
 import { logger } from './logger.js';
@@ -24,7 +25,7 @@ export interface FinancialKnowledge {
 
 export interface UserMemory {
   userId: string;
-  type: 'conversation' | 'bank_statement' | 'spending_pattern' | 'goal' | 'preference' | 'tithe_setting';
+  type: 'conversation' | 'bank_statement' | 'spending_pattern' | 'goal' | 'preference' | 'tithe_setting' | 'coaching';
   content: string;
   embedding?: number[];
   metadata: any;
@@ -515,61 +516,43 @@ class GlobalAIBrain {
 // Export singleton instance
 export const globalAIBrain = new GlobalAIBrain();
 
-// TODO: Implement vector storage for AI context and memory
-// This will be used for storing user context, financial insights, and conversation history
-
-export const globalAIBrain = {
-  // Placeholder for global AI context
-};
-
-export const storeUserContext = async (userId: string, context: any) => {
-  // TODO: Implement vector storage for user context
-  console.log('Storing user context for user:', userId, context);
-};
-
-export const getUserContext = async (userId: string) => {
-  // TODO: Implement vector retrieval for user context
-  console.log('Getting user context for user:', userId);
-  return null;
-};
-
-
 // Store user interactions for AI context (enhanced)
-export async function storeUserMemory(
+export async function storeUserContext(
   userId: string,
-  type: UserMemory['type'],
-  content: string,
-  metadata: any = {}
+  contextTitle: string,
+  contextData: any,
+  type: UserMemory['type'] = 'conversation'
 ): Promise<UserMemory | null> {
   if (!openai) {
     logger.warn('OpenAI not configured, storing memory without embedding');
-    return { userId, type, content, metadata, timestamp: new Date() };
+    return { userId, type, content: JSON.stringify(contextData), metadata: { title: contextTitle }, timestamp: new Date() };
   }
 
   try {
+    const content = typeof contextData === 'string' ? contextData : JSON.stringify(contextData);
+    
     // Generate embedding for semantic search
     const embedding = await openai.embeddings.create({
       model: 'text-embedding-3-small',
-      input: content
+      input: `${contextTitle}\n\n${content}`
     });
 
-    // TODO: Store in UserMemory table when schema is updated
     const memory: UserMemory = {
       userId,
       type,
       content,
       embedding: embedding.data[0].embedding,
       metadata: {
-        ...metadata,
+        title: contextTitle,
         storedAt: new Date().toISOString(),
       },
       timestamp: new Date()
     };
 
-    logger.debug({ userId, type }, 'User memory stored with embedding');
+    logger.debug({ userId, type, title: contextTitle }, 'User context stored with embedding');
     return memory;
   } catch (error) {
-    logger.error({ error, userId, type }, 'Failed to store user memory');
+    logger.error({ error, userId, type }, 'Failed to store user context');
     return null;
   }
 }
@@ -578,10 +561,13 @@ export async function storeUserMemory(
 export async function getUserContext(
   userId: string,
   query: string,
-  userType: 'consumer' | 'creator' = 'consumer',
+  type?: UserMemory['type'],
   limit: number = 5
 ): Promise<{ memories: UserMemory[]; knowledge: FinancialKnowledge[] }> {
   try {
+    // Determine user type based on context or default to consumer
+    const userType = query.toLowerCase().includes('creator') || query.toLowerCase().includes('business') ? 'creator' : 'consumer';
+    
     // Get relevant knowledge from Global AI Brain
     const relevantKnowledge = await globalAIBrain.getRelevantKnowledge(
       query,
@@ -653,16 +639,16 @@ export async function analyzeBankStatement(userId: string, transactions: any[]) 
   const userType = patterns.businessExpenseRatio > 5 ? 'creator' : 'consumer';
   const analysisQuery = `Analyze spending patterns: monthly average $${patterns.monthlyAverage.toFixed(2)}, business expenses ${patterns.businessExpenseRatio.toFixed(1)}%, tithe detected: ${patterns.titheDetection}`;
 
-  const context = await getUserContext(userId, analysisQuery, userType, 3);
+  const context = await getUserContext(userId, analysisQuery, 'bank_statement', 3);
 
   // Store analysis as user memory
-  await storeUserMemory(userId, 'spending_pattern', JSON.stringify(patterns), {
-    source: 'bank_statement',
-    transactionCount: transactions.length,
+  await storeUserContext(userId, 'Bank Statement Analysis', {
+    patterns,
     userType,
+    transactionCount: transactions.length,
     analysisDate: new Date().toISOString(),
     insights: context.knowledge.map(k => k.title)
-  });
+  }, 'spending_pattern');
 
   return {
     patterns,
