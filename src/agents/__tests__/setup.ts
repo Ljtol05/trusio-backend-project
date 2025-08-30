@@ -1,12 +1,17 @@
 
 import { beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
-import type { FinancialContext, ToolExecutionContext } from '../tools/types.js';
+import type { FinancialContext, ToolExecutionContext } from '../tools/types.ts';
 
 // Global test setup
 beforeAll(async () => {
   // Initialize test environment
   process.env.NODE_ENV = 'test';
   process.env.OPENAI_API_KEY = 'test-key';
+  process.env.OPENAI_PROJECT_ID = 'test-project';
+  process.env.OPENAI_ORG_ID = 'test-org';
+  process.env.OPENAI_MODEL_AGENTIC = 'gpt-4o';
+  process.env.OPENAI_MODEL_PRIMARY = 'gpt-4o-mini';
+  process.env.JWT_SECRET = 'test-jwt-secret';
   
   // Mock console methods to reduce noise in tests
   vi.spyOn(console, 'log').mockImplementation(() => {});
@@ -22,12 +27,71 @@ afterAll(() => {
 beforeEach(() => {
   // Reset all mocks before each test
   vi.clearAllMocks();
+  
+  // Reset agent system state
+  mockDbResponses.conversation.findMany.mockResolvedValue([]);
+  mockDbResponses.conversation.createMany.mockResolvedValue({ count: 2 });
+  mockDbResponses.conversation.count.mockResolvedValue(0);
 });
 
 afterEach(() => {
   // Cleanup after each test
   vi.clearAllTimers();
 });
+
+// Mock the OpenAI Agents SDK module
+vi.mock('@openai/agents', () => mockAgentsSDK);
+
+// Mock the database module
+vi.mock('../../lib/db.ts', () => ({
+  db: mockDbResponses,
+}));
+
+// Mock the logger
+vi.mock('../../lib/logger.ts', () => ({
+  logger: {
+    info: vi.fn(),
+    error: vi.fn(),
+    warn: vi.fn(),
+    debug: vi.fn(),
+  },
+}));
+
+// Mock OpenAI client
+vi.mock('../../lib/openai.ts', () => ({
+  openai: {
+    chat: {
+      completions: {
+        create: vi.fn().mockResolvedValue({
+          choices: [{
+            message: {
+              content: 'Mock OpenAI response',
+              role: 'assistant',
+            },
+          }],
+          usage: {
+            prompt_tokens: 100,
+            completion_tokens: 50,
+            total_tokens: 150,
+          },
+        }),
+      },
+    },
+  },
+}));
+
+// Mock environment configuration
+vi.mock('../../config/env.ts', () => ({
+  env: {
+    NODE_ENV: 'test',
+    JWT_SECRET: 'test-jwt-secret',
+    OPENAI_API_KEY: 'test-key',
+    OPENAI_PROJECT_ID: 'test-project',
+    OPENAI_ORG_ID: 'test-org',
+    OPENAI_MODEL_AGENTIC: 'gpt-4o',
+    OPENAI_MODEL_PRIMARY: 'gpt-4o-mini',
+  },
+}));
 
 // Test utilities
 export const createMockFinancialContext = (overrides: Partial<FinancialContext> = {}): FinancialContext => ({
@@ -178,15 +242,36 @@ export const mockAgentsSDK = {
     name: config.name,
     instructions: config.instructions,
     model: config.model,
-    tools: config.tools,
+    tools: config.tools || [],
+    run: vi.fn().mockResolvedValue({
+      success: true,
+      response: 'Mock agent response',
+      duration: 1000,
+      timestamp: new Date(),
+    }),
+    isReady: vi.fn().mockReturnValue(true),
+    getCapabilities: vi.fn().mockReturnValue(['financial_analysis', 'budget_coaching']),
   })),
-  run: vi.fn().mockResolvedValue('Mock agent response'),
+  run: vi.fn().mockResolvedValue({
+    success: true,
+    response: 'Mock agent response',
+    duration: 1000,
+    timestamp: new Date(),
+  }),
   tool: vi.fn().mockImplementation((config) => ({
     name: config.name,
     description: config.description,
     parameters: config.parameters,
-    handler: config.handler,
+    execute: config.execute || vi.fn().mockResolvedValue({ success: true, result: 'Mock tool result' }),
   })),
+  defineTool: vi.fn().mockImplementation((config) => ({
+    name: config.name,
+    description: config.description,
+    parameters: config.parameters,
+    execute: config.execute || vi.fn().mockResolvedValue({ success: true, result: 'Mock tool result' }),
+  })),
+  setDefaultOpenAIKey: vi.fn(),
+  setDefaultOpenAIClient: vi.fn(),
 };
 
 // Test assertion helpers

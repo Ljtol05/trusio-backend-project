@@ -38,9 +38,13 @@ export default defineConfig({
       '@/agents': path.resolve(__dirname, './src/agents'),
       '@/lib': path.resolve(__dirname, './src/lib'),
       '@/types': path.resolve(__dirname, './src/types'),
-    }
+    },
+    extensions: ['.ts', '.js', '.mts', '.mjs']
   },
   esbuild: {
     target: 'node18'
+  },
+  define: {
+    'process.env.NODE_ENV': '"test"'
   }
 });
