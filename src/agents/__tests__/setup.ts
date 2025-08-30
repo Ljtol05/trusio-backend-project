@@ -115,22 +115,12 @@ vi.mock('../../lib/openai.ts', () => ({
   },
 }));
 
-// Mock server to prevent startup during tests
+// Mock server startup to prevent actual server from running during tests
 vi.mock('../../server.ts', async (importOriginal) => {
-  const mockApp = {
-    listen: vi.fn().mockReturnValue({ address: () => ({ port: 5000 }) }),
-    use: vi.fn(),
-    get: vi.fn(),
-    post: vi.fn(),
-    put: vi.fn(),
-    delete: vi.fn(),
-    patch: vi.fn(),
-    address: vi.fn().mockReturnValue({ port: 5000 }),
-  };
-  
-  return {
-    default: mockApp,
-  };
+  const actual = await importOriginal();
+  // Return the actual app but prevent server startup
+  process.env.TEST_MODE = 'true';
+  return actual;
 });
 
 // Prevent process.exit during tests

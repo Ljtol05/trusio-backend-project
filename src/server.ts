@@ -154,7 +154,10 @@ async function startServer() {
   }
 }
 
-startServer();
+// Only start server if not in test mode
+if (process.env.TEST_MODE !== 'true') {
+  startServer();
+}
 
 // Export app for testing
 export default app;
