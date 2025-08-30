@@ -1,51 +1,385 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<testsuites name="vitest tests" tests="18" failures="4" errors="0" time="2.214">
-    <testsuite name="src/agents/__tests__/agentRegistry.test.ts" timestamp="2025-08-30T18:58:13.531Z" hostname="39c96b6516b9" tests="1" failures="1" errors="0" skipped="0" time="0">
-        <testcase classname="src/agents/__tests__/agentRegistry.test.ts" name="src/agents/__tests__/agentRegistry.test.ts" time="0">
-            <failure message="Cannot read properties of undefined (reading &apos;map&apos;)" type="TypeError">
-TypeError: Cannot read properties of undefined (reading &apos;map&apos;)
- ❯ AgentRegistry.initializeAgents src/agents/agentRegistry.ts:28:41
- ❯ new AgentRegistry src/agents/agentRegistry.ts:12:10
- ❯ src/agents/agentRegistry.ts:139:30
- ❯ src/agents/__tests__/agentRegistry.test.ts:25:25
+<testsuites name="vitest tests" tests="74" failures="43" errors="0" time="2.656">
+    <testsuite name="src/agents/__tests__/agentRegistry.test.ts" timestamp="2025-08-30T19:01:52.164Z" hostname="39c96b6516b9" tests="12" failures="6" errors="0" skipped="0" time="0.012">
+        <testcase classname="src/agents/__tests__/agentRegistry.test.ts" name="AgentRegistry &gt; Agent Initialization &gt; should initialize all required agents" time="0.003">
+            <failure message="expected [ &apos;defaultModel&apos;, …(20) ] to include &apos;financial_advisor&apos;" type="AssertionError">
+AssertionError: expected [ &apos;defaultModel&apos;, …(20) ] to include &apos;financial_advisor&apos;
+ ❯ src/agents/__tests__/agentRegistry.test.ts:82:26
             </failure>
         </testcase>
-    </testsuite>
-    <testsuite name="src/agents/__tests__/integration.test.ts" timestamp="2025-08-30T18:58:13.534Z" hostname="39c96b6516b9" tests="1" failures="1" errors="0" skipped="0" time="0">
-        <testcase classname="src/agents/__tests__/integration.test.ts" name="src/agents/__tests__/integration.test.ts" time="0">
-            <failure message="[vitest] There was an error when mocking a module. If you are using &quot;vi.mock&quot; factory, make sure there are no top level variables inside, since this call is hoisted to top of the file. Read more: https://vitest.dev/api/vi.html#vi-mock" type="Error">
-Error: [vitest] There was an error when mocking a module. If you are using &quot;vi.mock&quot; factory, make sure there are no top level variables inside, since this call is hoisted to top of the file. Read more: https://vitest.dev/api/vi.html#vi-mock
- ❯ src/agents/__tests__/integration.test.ts:3:31
+        <testcase classname="src/agents/__tests__/agentRegistry.test.ts" name="AgentRegistry &gt; Agent Initialization &gt; should properly assign tools to agents" time="0.001">
+            <failure message="expected undefined not to be undefined" type="AssertionError">
+AssertionError: expected undefined not to be undefined
+ ❯ src/agents/__tests__/agentRegistry.test.ts:90:27
+            </failure>
+        </testcase>
+        <testcase classname="src/agents/__tests__/agentRegistry.test.ts" name="AgentRegistry &gt; Agent Routing &gt; should route budget-related messages to budget coach" time="0">
+        </testcase>
+        <testcase classname="src/agents/__tests__/agentRegistry.test.ts" name="AgentRegistry &gt; Agent Routing &gt; should route transaction-related messages to transaction analyst" time="0.001">
+        </testcase>
+        <testcase classname="src/agents/__tests__/agentRegistry.test.ts" name="AgentRegistry &gt; Agent Routing &gt; should route insight-related messages to insight generator" time="0">
+        </testcase>
+        <testcase classname="src/agents/__tests__/agentRegistry.test.ts" name="AgentRegistry &gt; Agent Routing &gt; should default to financial advisor for general messages" time="0">
+        </testcase>
+        <testcase classname="src/agents/__tests__/agentRegistry.test.ts" name="AgentRegistry &gt; Agent Execution &gt; should successfully run an agent with context" time="0.001">
+            <failure message="Agent &apos;financial_advisor&apos; not found" type="Error">
+Error: Agent &apos;financial_advisor&apos; not found
+ ❯ AgentRegistry.runAgent src/agents/agentRegistry.ts:98:13
+ ❯ src/agents/__tests__/agentRegistry.test.ts:119:44
+            </failure>
+        </testcase>
+        <testcase classname="src/agents/__tests__/agentRegistry.test.ts" name="AgentRegistry &gt; Agent Execution &gt; should handle agent execution errors gracefully" time="0.003">
+            <failure message="expected [Function] to throw error including &apos;Failed to process request with financ…&apos; but got &apos;Agent \&apos;financial_advisor\&apos; not found&apos;" type="AssertionError">
+AssertionError: expected [Function] to throw error including &apos;Failed to process request with financ…&apos; but got &apos;Agent \&apos;financial_advisor\&apos; not found&apos;
 
-Caused by: Caused by: TypeError: Cannot read properties of undefined (reading &apos;map&apos;)
- ❯ AgentRegistry.initializeAgents src/agents/agentRegistry.ts:28:41
- ❯ new AgentRegistry src/agents/agentRegistry.ts:12:10
- ❯ src/agents/agentRegistry.ts:139:30
- ❯ src/server.ts:26:32
+- Expected
++ Received
+
+- Failed to process request with financial agent
++ Agent &apos;financial_advisor&apos; not found
+            </failure>
+        </testcase>
+        <testcase classname="src/agents/__tests__/agentRegistry.test.ts" name="AgentRegistry &gt; Agent Execution &gt; should throw error for non-existent agent" time="0">
+        </testcase>
+        <testcase classname="src/agents/__tests__/agentRegistry.test.ts" name="AgentRegistry &gt; Agent Capabilities &gt; should return correct capabilities for each agent" time="0.001">
+            <failure message="expected [] to include &apos;comprehensive_financial_guidance&apos;" type="AssertionError">
+AssertionError: expected [] to include &apos;comprehensive_financial_guidance&apos;
+ ❯ src/agents/__tests__/agentRegistry.test.ts:148:35
+            </failure>
+        </testcase>
+        <testcase classname="src/agents/__tests__/agentRegistry.test.ts" name="AgentRegistry &gt; Agent Capabilities &gt; should return empty array for non-existent agent capabilities" time="0">
+        </testcase>
+        <testcase classname="src/agents/__tests__/agentRegistry.test.ts" name="AgentRegistry &gt; Agent Metrics &gt; should return comprehensive metrics for all agents" time="0.001">
+            <failure message="expected { defaultModel: { …(4) }, …(20) } to have property &quot;financial_advisor&quot;" type="AssertionError">
+AssertionError: expected { defaultModel: { …(4) }, …(20) } to have property &quot;financial_advisor&quot;
+ ❯ src/agents/__tests__/agentRegistry.test.ts:166:23
             </failure>
         </testcase>
     </testsuite>
-    <testsuite name="src/agents/__tests__/performance.test.ts" timestamp="2025-08-30T18:58:13.536Z" hostname="39c96b6516b9" tests="1" failures="1" errors="0" skipped="0" time="0">
-        <testcase classname="src/agents/__tests__/performance.test.ts" name="src/agents/__tests__/performance.test.ts" time="0">
-            <failure message="Cannot read properties of undefined (reading &apos;map&apos;)" type="TypeError">
-TypeError: Cannot read properties of undefined (reading &apos;map&apos;)
- ❯ AgentRegistry.initializeAgents src/agents/agentRegistry.ts:28:41
- ❯ new AgentRegistry src/agents/agentRegistry.ts:12:10
- ❯ src/agents/agentRegistry.ts:139:30
- ❯ src/agents/__tests__/performance.test.ts:22:25
+    <testsuite name="src/agents/__tests__/integration.test.ts" timestamp="2025-08-30T19:01:52.189Z" hostname="39c96b6516b9" tests="16" failures="16" errors="0" skipped="0" time="0.136">
+        <testcase classname="src/agents/__tests__/integration.test.ts" name="Agent API Integration Tests &gt; POST /api/ai/chat &gt; should handle basic chat request successfully" time="0.065">
+            <failure message="expected 404 to be 200 // Object.is equality" type="AssertionError">
+AssertionError: expected 404 to be 200 // Object.is equality
+
+- Expected
++ Received
+
+- 200
++ 404
+
+ ❯ src/agents/__tests__/integration.test.ts:77:31
+            </failure>
+        </testcase>
+        <testcase classname="src/agents/__tests__/integration.test.ts" name="Agent API Integration Tests &gt; POST /api/ai/chat &gt; should route to appropriate agent based on message" time="0.011">
+            <failure message="expected 404 to be 200 // Object.is equality" type="AssertionError">
+AssertionError: expected 404 to be 200 // Object.is equality
+
+- Expected
++ Received
+
+- 200
++ 404
+
+ ❯ src/agents/__tests__/integration.test.ts:93:31
+            </failure>
+        </testcase>
+        <testcase classname="src/agents/__tests__/integration.test.ts" name="Agent API Integration Tests &gt; POST /api/ai/chat &gt; should include conversation history when requested" time="0.007">
+            <failure message="expected 404 to be 200 // Object.is equality" type="AssertionError">
+AssertionError: expected 404 to be 200 // Object.is equality
+
+- Expected
++ Received
+
+- 200
++ 404
+
+ ❯ src/agents/__tests__/integration.test.ts:123:31
+            </failure>
+        </testcase>
+        <testcase classname="src/agents/__tests__/integration.test.ts" name="Agent API Integration Tests &gt; POST /api/ai/chat &gt; should handle validation errors" time="0.004">
+            <failure message="expected 404 to be 400 // Object.is equality" type="AssertionError">
+AssertionError: expected 404 to be 400 // Object.is equality
+
+- Expected
++ Received
+
+- 400
++ 404
+
+ ❯ src/agents/__tests__/integration.test.ts:135:31
+            </failure>
+        </testcase>
+        <testcase classname="src/agents/__tests__/integration.test.ts" name="Agent API Integration Tests &gt; POST /api/ai/chat &gt; should require authentication" time="0.008">
+            <failure message="expected 404 to be 401 // Object.is equality" type="AssertionError">
+AssertionError: expected 404 to be 401 // Object.is equality
+
+- Expected
++ Received
+
+- 401
++ 404
+
+ ❯ src/agents/__tests__/integration.test.ts:147:31
+            </failure>
+        </testcase>
+        <testcase classname="src/agents/__tests__/integration.test.ts" name="Agent API Integration Tests &gt; POST /api/ai/tools/execute &gt; should execute tool directly" time="0.004">
+            <failure message="expected 404 to be 200 // Object.is equality" type="AssertionError">
+AssertionError: expected 404 to be 200 // Object.is equality
+
+- Expected
++ Received
+
+- 200
++ 404
+
+ ❯ src/agents/__tests__/integration.test.ts:165:31
+            </failure>
+        </testcase>
+        <testcase classname="src/agents/__tests__/integration.test.ts" name="Agent API Integration Tests &gt; POST /api/ai/tools/execute &gt; should handle tool execution errors" time="0.004">
+            <failure message="expected 404 to be 200 // Object.is equality" type="AssertionError">
+AssertionError: expected 404 to be 200 // Object.is equality
+
+- Expected
++ Received
+
+- 200
++ 404
+
+ ❯ src/agents/__tests__/integration.test.ts:180:31
+            </failure>
+        </testcase>
+        <testcase classname="src/agents/__tests__/integration.test.ts" name="Agent API Integration Tests &gt; POST /api/ai/handoff &gt; should handle agent handoff successfully" time="0.003">
+            <failure message="expected 404 to be 200 // Object.is equality" type="AssertionError">
+AssertionError: expected 404 to be 200 // Object.is equality
+
+- Expected
++ Received
+
+- 200
++ 404
+
+ ❯ src/agents/__tests__/integration.test.ts:199:31
+            </failure>
+        </testcase>
+        <testcase classname="src/agents/__tests__/integration.test.ts" name="Agent API Integration Tests &gt; POST /api/ai/handoff &gt; should validate agent names in handoff" time="0.006">
+            <failure message="expected 404 to be 400 // Object.is equality" type="AssertionError">
+AssertionError: expected 404 to be 400 // Object.is equality
+
+- Expected
++ Received
+
+- 400
++ 404
+
+ ❯ src/agents/__tests__/integration.test.ts:217:31
+            </failure>
+        </testcase>
+        <testcase classname="src/agents/__tests__/integration.test.ts" name="Agent API Integration Tests &gt; GET /api/ai/agents &gt; should return list of available agents" time="0.005">
+            <failure message="expected 404 to be 200 // Object.is equality" type="AssertionError">
+AssertionError: expected 404 to be 200 // Object.is equality
+
+- Expected
++ Received
+
+- 200
++ 404
+
+ ❯ src/agents/__tests__/integration.test.ts:228:31
+            </failure>
+        </testcase>
+        <testcase classname="src/agents/__tests__/integration.test.ts" name="Agent API Integration Tests &gt; GET /api/ai/tools &gt; should return list of available tools" time="0.003">
+            <failure message="expected 404 to be 200 // Object.is equality" type="AssertionError">
+AssertionError: expected 404 to be 200 // Object.is equality
+
+- Expected
++ Received
+
+- 200
++ 404
+
+ ❯ src/agents/__tests__/integration.test.ts:249:31
+            </failure>
+        </testcase>
+        <testcase classname="src/agents/__tests__/integration.test.ts" name="Agent API Integration Tests &gt; GET /api/ai/tools &gt; should filter tools by category" time="0.003">
+            <failure message="expected 404 to be 200 // Object.is equality" type="AssertionError">
+AssertionError: expected 404 to be 200 // Object.is equality
+
+- Expected
++ Received
+
+- 200
++ 404
+
+ ❯ src/agents/__tests__/integration.test.ts:261:31
+            </failure>
+        </testcase>
+        <testcase classname="src/agents/__tests__/integration.test.ts" name="Agent API Integration Tests &gt; GET /api/ai/sessions/:sessionId/history &gt; should return conversation history" time="0.003">
+            <failure message="expected 404 to be 200 // Object.is equality" type="AssertionError">
+AssertionError: expected 404 to be 200 // Object.is equality
+
+- Expected
++ Received
+
+- 200
++ 404
+
+ ❯ src/agents/__tests__/integration.test.ts:286:31
+            </failure>
+        </testcase>
+        <testcase classname="src/agents/__tests__/integration.test.ts" name="Agent API Integration Tests &gt; GET /api/ai/status &gt; should return system status" time="0.003">
+            <failure message="expected 404 to be 200 // Object.is equality" type="AssertionError">
+AssertionError: expected 404 to be 200 // Object.is equality
+
+- Expected
++ Received
+
+- 200
++ 404
+
+ ❯ src/agents/__tests__/integration.test.ts:299:31
+            </failure>
+        </testcase>
+        <testcase classname="src/agents/__tests__/integration.test.ts" name="Agent API Integration Tests &gt; Error Handling &gt; should handle database connection errors gracefully" time="0.003">
+            <failure message="expected 404 to be 500 // Object.is equality" type="AssertionError">
+AssertionError: expected 404 to be 500 // Object.is equality
+
+- Expected
++ Received
+
+- 500
++ 404
+
+ ❯ src/agents/__tests__/integration.test.ts:319:31
+            </failure>
+        </testcase>
+        <testcase classname="src/agents/__tests__/integration.test.ts" name="Agent API Integration Tests &gt; Error Handling &gt; should handle agent unavailability" time="0.003">
+            <failure message="expected 404 to be 500 // Object.is equality" type="AssertionError">
+AssertionError: expected 404 to be 500 // Object.is equality
+
+- Expected
++ Received
+
+- 500
++ 404
+
+ ❯ src/agents/__tests__/integration.test.ts:333:31
             </failure>
         </testcase>
     </testsuite>
-    <testsuite name="src/agents/__tests__/tools.test.ts" timestamp="2025-08-30T18:58:13.538Z" hostname="39c96b6516b9" tests="14" failures="0" errors="0" skipped="0" time="0.113">
-        <testcase classname="src/agents/__tests__/tools.test.ts" name="Financial Tools &gt; Tool Registry &gt; should have all required transaction tools registered" time="0.002">
+    <testsuite name="src/agents/__tests__/performance.test.ts" timestamp="2025-08-30T19:01:52.232Z" hostname="39c96b6516b9" tests="12" failures="10" errors="0" skipped="0" time="0.014">
+        <testcase classname="src/agents/__tests__/performance.test.ts" name="Agent Performance Tests &gt; Agent Response Times &gt; should respond within acceptable time limits" time="0.002">
+            <failure message="Agent &apos;financial_advisor&apos; not found" type="Error">
+Error: Agent &apos;financial_advisor&apos; not found
+ ❯ AgentRegistry.runAgent src/agents/agentRegistry.ts:98:13
+ ❯ src/agents/__tests__/performance.test.ts:89:23
+ ❯ measureExecutionTime src/agents/__tests__/performance.test.ts:10:24
+ ❯ src/agents/__tests__/performance.test.ts:88:34
+            </failure>
         </testcase>
-        <testcase classname="src/agents/__tests__/tools.test.ts" name="Financial Tools &gt; Tool Registry &gt; should return correct tool count" time="0.001">
+        <testcase classname="src/agents/__tests__/performance.test.ts" name="Agent Performance Tests &gt; Agent Response Times &gt; should handle multiple concurrent agent requests" time="0.001">
+            <failure message="Agent &apos;financial_advisor&apos; not found" type="Error">
+Error: Agent &apos;financial_advisor&apos; not found
+ ❯ AgentRegistry.runAgent src/agents/agentRegistry.ts:98:13
+ ❯ src/agents/__tests__/performance.test.ts:100:23
+ ❯ src/agents/__tests__/performance.test.ts:19:60
+ ❯ runConcurrentOperations src/agents/__tests__/performance.test.ts:19:50
+ ❯ src/agents/__tests__/performance.test.ts:104:9
+ ❯ measureExecutionTime src/agents/__tests__/performance.test.ts:10:24
+ ❯ src/agents/__tests__/performance.test.ts:103:34
+            </failure>
         </testcase>
-        <testcase classname="src/agents/__tests__/tools.test.ts" name="Financial Tools &gt; Budget Tools &gt; should execute budget analysis tool successfully" time="0">
+        <testcase classname="src/agents/__tests__/performance.test.ts" name="Agent Performance Tests &gt; Agent Response Times &gt; should maintain performance with large financial context" time="0.002">
+            <failure message="Agent &apos;transaction_analyst&apos; not found" type="Error">
+Error: Agent &apos;transaction_analyst&apos; not found
+ ❯ AgentRegistry.runAgent src/agents/agentRegistry.ts:98:13
+ ❯ src/agents/__tests__/performance.test.ts:132:23
+ ❯ measureExecutionTime src/agents/__tests__/performance.test.ts:10:24
+ ❯ src/agents/__tests__/performance.test.ts:131:34
+            </failure>
+        </testcase>
+        <testcase classname="src/agents/__tests__/performance.test.ts" name="Agent Performance Tests &gt; Tool Performance &gt; should execute tools within acceptable time limits" time="0">
+        </testcase>
+        <testcase classname="src/agents/__tests__/performance.test.ts" name="Agent Performance Tests &gt; Tool Performance &gt; should handle concurrent tool executions" time="0.002">
+            <failure message="expected false to be true // Object.is equality" type="AssertionError">
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/agents/__tests__/performance.test.ts:171:36
+ ❯ src/agents/__tests__/performance.test.ts:170:14
+            </failure>
+        </testcase>
+        <testcase classname="src/agents/__tests__/performance.test.ts" name="Agent Performance Tests &gt; Memory and Resource Usage &gt; should not leak memory during repeated operations" time="0.001">
+            <failure message="Agent &apos;financial_advisor&apos; not found" type="Error">
+Error: Agent &apos;financial_advisor&apos; not found
+ ❯ AgentRegistry.runAgent src/agents/agentRegistry.ts:98:13
+ ❯ src/agents/__tests__/performance.test.ts:188:29
+            </failure>
+        </testcase>
+        <testcase classname="src/agents/__tests__/performance.test.ts" name="Agent Performance Tests &gt; Memory and Resource Usage &gt; should handle agent registry operations efficiently" time="0.001">
+        </testcase>
+        <testcase classname="src/agents/__tests__/performance.test.ts" name="Agent Performance Tests &gt; Stress Testing &gt; should handle high-frequency agent requests" time="0.001">
+            <failure message="Agent &apos;financial_advisor&apos; not found" type="Error">
+Error: Agent &apos;financial_advisor&apos; not found
+ ❯ AgentRegistry.runAgent src/agents/agentRegistry.ts:98:13
+ ❯ src/agents/__tests__/performance.test.ts:231:23
+ ❯ src/agents/__tests__/performance.test.ts:19:60
+ ❯ runConcurrentOperations src/agents/__tests__/performance.test.ts:19:50
+ ❯ src/agents/__tests__/performance.test.ts:234:29
+            </failure>
+        </testcase>
+        <testcase classname="src/agents/__tests__/performance.test.ts" name="Agent Performance Tests &gt; Stress Testing &gt; should gracefully degrade under extreme load" time="0.001">
+            <failure message="Agent &apos;financial_advisor&apos; not found" type="Error">
+Error: Agent &apos;financial_advisor&apos; not found
+ ❯ AgentRegistry.runAgent src/agents/agentRegistry.ts:98:13
+ ❯ src/agents/__tests__/performance.test.ts:250:23
+ ❯ src/agents/__tests__/performance.test.ts:19:60
+ ❯ runConcurrentOperations src/agents/__tests__/performance.test.ts:19:50
+ ❯ src/agents/__tests__/performance.test.ts:254:29
+            </failure>
+        </testcase>
+        <testcase classname="src/agents/__tests__/performance.test.ts" name="Agent Performance Tests &gt; Edge Cases and Resilience &gt; should handle malformed context gracefully" time="0">
+            <failure message="Agent &apos;financial_advisor&apos; not found" type="Error">
+Error: Agent &apos;financial_advisor&apos; not found
+ ❯ AgentRegistry.runAgent src/agents/agentRegistry.ts:98:13
+ ❯ src/agents/__tests__/performance.test.ts:274:23
+ ❯ measureExecutionTime src/agents/__tests__/performance.test.ts:10:24
+ ❯ src/agents/__tests__/performance.test.ts:273:34
+            </failure>
+        </testcase>
+        <testcase classname="src/agents/__tests__/performance.test.ts" name="Agent Performance Tests &gt; Edge Cases and Resilience &gt; should handle very long messages efficiently" time="0.001">
+            <failure message="Agent &apos;financial_advisor&apos; not found" type="Error">
+Error: Agent &apos;financial_advisor&apos; not found
+ ❯ AgentRegistry.runAgent src/agents/agentRegistry.ts:98:13
+ ❯ src/agents/__tests__/performance.test.ts:285:23
+ ❯ measureExecutionTime src/agents/__tests__/performance.test.ts:10:24
+ ❯ src/agents/__tests__/performance.test.ts:284:34
+            </failure>
+        </testcase>
+        <testcase classname="src/agents/__tests__/performance.test.ts" name="Agent Performance Tests &gt; Edge Cases and Resilience &gt; should maintain performance with frequent agent switching" time="0">
+            <failure message="Agent &apos;financial_advisor&apos; not found" type="Error">
+Error: Agent &apos;financial_advisor&apos; not found
+ ❯ AgentRegistry.runAgent src/agents/agentRegistry.ts:98:13
+ ❯ src/agents/__tests__/performance.test.ts:299:31
+ ❯ measureExecutionTime src/agents/__tests__/performance.test.ts:10:24
+ ❯ src/agents/__tests__/performance.test.ts:296:34
+            </failure>
+        </testcase>
+    </testsuite>
+    <testsuite name="src/agents/__tests__/tools.test.ts" timestamp="2025-08-30T19:01:52.245Z" hostname="39c96b6516b9" tests="14" failures="0" errors="0" skipped="0" time="0.109">
+        <testcase classname="src/agents/__tests__/tools.test.ts" name="Financial Tools &gt; Tool Registry &gt; should have all required transaction tools registered" time="0.001">
+        </testcase>
+        <testcase classname="src/agents/__tests__/tools.test.ts" name="Financial Tools &gt; Tool Registry &gt; should return correct tool count" time="0">
+        </testcase>
+        <testcase classname="src/agents/__tests__/tools.test.ts" name="Financial Tools &gt; Budget Tools &gt; should execute budget analysis tool successfully" time="0.001">
         </testcase>
         <testcase classname="src/agents/__tests__/tools.test.ts" name="Financial Tools &gt; Budget Tools &gt; should handle budget analysis errors gracefully" time="0">
         </testcase>
-        <testcase classname="src/agents/__tests__/tools.test.ts" name="Financial Tools &gt; Envelope Tools &gt; should create envelope successfully" time="0.001">
+        <testcase classname="src/agents/__tests__/tools.test.ts" name="Financial Tools &gt; Envelope Tools &gt; should create envelope successfully" time="0">
         </testcase>
         <testcase classname="src/agents/__tests__/tools.test.ts" name="Financial Tools &gt; Envelope Tools &gt; should transfer funds between envelopes" time="0">
         </testcase>
@@ -53,27 +387,173 @@ TypeError: Cannot read properties of undefined (reading &apos;map&apos;)
         </testcase>
         <testcase classname="src/agents/__tests__/tools.test.ts" name="Financial Tools &gt; Transaction Tools &gt; should analyze spending patterns" time="0.001">
         </testcase>
-        <testcase classname="src/agents/__tests__/tools.test.ts" name="Financial Tools &gt; Analysis Tools &gt; should analyze budget variance" time="0">
+        <testcase classname="src/agents/__tests__/tools.test.ts" name="Financial Tools &gt; Analysis Tools &gt; should analyze budget variance" time="0.001">
         </testcase>
-        <testcase classname="src/agents/__tests__/tools.test.ts" name="Financial Tools &gt; Insight Tools &gt; should generate personalized recommendations" time="0.001">
+        <testcase classname="src/agents/__tests__/tools.test.ts" name="Financial Tools &gt; Insight Tools &gt; should generate personalized recommendations" time="0">
         </testcase>
         <testcase classname="src/agents/__tests__/tools.test.ts" name="Financial Tools &gt; Insight Tools &gt; should identify financial opportunities" time="0">
         </testcase>
-        <testcase classname="src/agents/__tests__/tools.test.ts" name="Financial Tools &gt; Agent Handoff Tool &gt; should execute agent handoff successfully" time="0">
+        <testcase classname="src/agents/__tests__/tools.test.ts" name="Financial Tools &gt; Agent Handoff Tool &gt; should execute agent handoff successfully" time="0.001">
         </testcase>
         <testcase classname="src/agents/__tests__/tools.test.ts" name="Financial Tools &gt; Tool Error Handling &gt; should handle non-existent tool gracefully" time="0">
         </testcase>
         <testcase classname="src/agents/__tests__/tools.test.ts" name="Financial Tools &gt; Tool Error Handling &gt; should handle tool execution timeout" time="0.102">
         </testcase>
     </testsuite>
-    <testsuite name="src/agents/__tests__/validation.test.ts" timestamp="2025-08-30T18:58:13.544Z" hostname="39c96b6516b9" tests="1" failures="1" errors="0" skipped="0" time="0">
-        <testcase classname="src/agents/__tests__/validation.test.ts" name="src/agents/__tests__/validation.test.ts" time="0">
-            <failure message="Cannot read properties of undefined (reading &apos;map&apos;)" type="TypeError">
-TypeError: Cannot read properties of undefined (reading &apos;map&apos;)
- ❯ AgentRegistry.initializeAgents src/agents/agentRegistry.ts:28:41
- ❯ new AgentRegistry src/agents/agentRegistry.ts:12:10
- ❯ src/agents/agentRegistry.ts:139:30
- ❯ src/agents/__tests__/validation.test.ts:23:25
+    <testsuite name="src/agents/__tests__/validation.test.ts" timestamp="2025-08-30T19:01:52.251Z" hostname="39c96b6516b9" tests="20" failures="11" errors="0" skipped="0" time="0.036">
+        <testcase classname="src/agents/__tests__/validation.test.ts" name="Data Validation Tests &gt; Schema Validation &gt; AgentConfigSchema &gt; should validate correct agent configuration" time="0.012">
+            <failure message="expected false to be true // Object.is equality" type="AssertionError">
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/agents/__tests__/validation.test.ts:57:32
+            </failure>
+        </testcase>
+        <testcase classname="src/agents/__tests__/validation.test.ts" name="Data Validation Tests &gt; Schema Validation &gt; AgentConfigSchema &gt; should reject invalid agent configuration" time="0.001">
+        </testcase>
+        <testcase classname="src/agents/__tests__/validation.test.ts" name="Data Validation Tests &gt; Schema Validation &gt; FinancialContextSchema &gt; should validate correct financial context" time="0.001">
+        </testcase>
+        <testcase classname="src/agents/__tests__/validation.test.ts" name="Data Validation Tests &gt; Schema Validation &gt; FinancialContextSchema &gt; should accept minimal financial context" time="0.001">
+        </testcase>
+        <testcase classname="src/agents/__tests__/validation.test.ts" name="Data Validation Tests &gt; Schema Validation &gt; FinancialContextSchema &gt; should reject invalid financial context" time="0.001">
+        </testcase>
+        <testcase classname="src/agents/__tests__/validation.test.ts" name="Data Validation Tests &gt; Schema Validation &gt; AgentResponseSchema &gt; should validate correct agent response" time="0.001">
+        </testcase>
+        <testcase classname="src/agents/__tests__/validation.test.ts" name="Data Validation Tests &gt; Schema Validation &gt; AgentResponseSchema &gt; should reject invalid agent response" time="0">
+        </testcase>
+        <testcase classname="src/agents/__tests__/validation.test.ts" name="Data Validation Tests &gt; Tool Parameter Validation &gt; should validate budget analysis parameters" time="0.002">
+        </testcase>
+        <testcase classname="src/agents/__tests__/validation.test.ts" name="Data Validation Tests &gt; Tool Parameter Validation &gt; should reject invalid tool parameters" time="0.001">
+            <failure message="expected &apos;Tool not found: create_envelope&apos; to contain &apos;validation&apos;" type="AssertionError">
+AssertionError: expected &apos;Tool not found: create_envelope&apos; to contain &apos;validation&apos;
+
+- Expected
++ Received
+
+- validation
++ Tool not found: create_envelope
+
+ ❯ src/agents/__tests__/validation.test.ts:217:28
+            </failure>
+        </testcase>
+        <testcase classname="src/agents/__tests__/validation.test.ts" name="Data Validation Tests &gt; Error Handling Validation &gt; should handle database validation errors gracefully" time="0.002">
+            <failure message="expected &apos;Tool not found: budget_analysis&apos; to contain &apos;Validation failed&apos;" type="AssertionError">
+AssertionError: expected &apos;Tool not found: budget_analysis&apos; to contain &apos;Validation failed&apos;
+
+- Expected
++ Received
+
+- Validation failed
++ Tool not found: budget_analysis
+
+ ❯ src/agents/__tests__/validation.test.ts:242:28
+            </failure>
+        </testcase>
+        <testcase classname="src/agents/__tests__/validation.test.ts" name="Data Validation Tests &gt; Error Handling Validation &gt; should validate agent handoff parameters" time="0.001">
+            <failure message="expected false to be true // Object.is equality" type="AssertionError">
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/agents/__tests__/validation.test.ts:260:30
+            </failure>
+        </testcase>
+        <testcase classname="src/agents/__tests__/validation.test.ts" name="Data Validation Tests &gt; Error Handling Validation &gt; should reject invalid handoff parameters" time="0.002">
+            <failure message="expected &apos;Tool not found: agent_handoff&apos; to contain &apos;validation&apos;" type="AssertionError">
+AssertionError: expected &apos;Tool not found: agent_handoff&apos; to contain &apos;validation&apos;
+
+- Expected
++ Received
+
+- validation
++ Tool not found: agent_handoff
+
+ ❯ src/agents/__tests__/validation.test.ts:278:28
+            </failure>
+        </testcase>
+        <testcase classname="src/agents/__tests__/validation.test.ts" name="Data Validation Tests &gt; Input Sanitization &gt; should sanitize user input messages" time="0.002">
+            <failure message="Agent &apos;financial_advisor&apos; not found" type="Error">
+Error: Agent &apos;financial_advisor&apos; not found
+ ❯ AgentRegistry.runAgent src/agents/agentRegistry.ts:98:13
+ ❯ src/agents/__tests__/validation.test.ts:286:42
+            </failure>
+        </testcase>
+        <testcase classname="src/agents/__tests__/validation.test.ts" name="Data Validation Tests &gt; Input Sanitization &gt; should handle SQL injection attempts in parameters" time="0.001">
+            <failure message="expected &apos;Tool not found: categorize_transaction&apos; to contain &apos;validation&apos;" type="AssertionError">
+AssertionError: expected &apos;Tool not found: categorize_transaction&apos; to contain &apos;validation&apos;
+
+- Expected
++ Received
+
+- validation
++ Tool not found: categorize_transaction
+
+ ❯ src/agents/__tests__/validation.test.ts:311:28
+            </failure>
+        </testcase>
+        <testcase classname="src/agents/__tests__/validation.test.ts" name="Data Validation Tests &gt; Input Sanitization &gt; should validate envelope creation with proper limits" time="0.001">
+            <failure message="expected &apos;Tool not found: create_envelope&apos; to contain &apos;validation&apos;" type="AssertionError">
+AssertionError: expected &apos;Tool not found: create_envelope&apos; to contain &apos;validation&apos;
+
+- Expected
++ Received
+
+- validation
++ Tool not found: create_envelope
+
+ ❯ src/agents/__tests__/validation.test.ts:329:28
+            </failure>
+        </testcase>
+        <testcase classname="src/agents/__tests__/validation.test.ts" name="Data Validation Tests &gt; Type Safety Validation &gt; should enforce type safety in agent responses" time="0">
+        </testcase>
+        <testcase classname="src/agents/__tests__/validation.test.ts" name="Data Validation Tests &gt; Type Safety Validation &gt; should enforce type safety in financial context" time="0">
+        </testcase>
+        <testcase classname="src/agents/__tests__/validation.test.ts" name="Data Validation Tests &gt; Business Logic Validation &gt; should validate financial constraints" time="0">
+            <failure message="expected &apos;Tool not found: transfer_funds&apos; to contain &apos;positive amount&apos;" type="AssertionError">
+AssertionError: expected &apos;Tool not found: transfer_funds&apos; to contain &apos;positive amount&apos;
+
+- Expected
++ Received
+
+- positive amount
++ Tool not found: transfer_funds
+
+ ❯ src/agents/__tests__/validation.test.ts:373:28
+            </failure>
+        </testcase>
+        <testcase classname="src/agents/__tests__/validation.test.ts" name="Data Validation Tests &gt; Business Logic Validation &gt; should validate budget constraints" time="0.002">
+            <failure message="expected &apos;Tool not found: create_envelope&apos; to contain &apos;validation&apos;" type="AssertionError">
+AssertionError: expected &apos;Tool not found: create_envelope&apos; to contain &apos;validation&apos;
+
+- Expected
++ Received
+
+- validation
++ Tool not found: create_envelope
+
+ ❯ src/agents/__tests__/validation.test.ts:391:28
+            </failure>
+        </testcase>
+        <testcase classname="src/agents/__tests__/validation.test.ts" name="Data Validation Tests &gt; Business Logic Validation &gt; should validate date constraints" time="0.001">
+            <failure message="expected false to be true // Object.is equality" type="AssertionError">
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/agents/__tests__/validation.test.ts:409:30
             </failure>
         </testcase>
     </testsuite>
