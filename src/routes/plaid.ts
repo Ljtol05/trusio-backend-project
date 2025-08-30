@@ -237,24 +237,6 @@ router.post('/enhance-transactions', auth, async (req, res) => {
 });
 
 
-        type: account.type,
-        subtype: account.subtype,
-        mask: account.mask,
-      })),
-      nextStep: 'transaction_analysis',
-      estimatedAnalysisTime: '2-3 minutes',
-    });
-
-  } catch (error: any) {
-    logger.error({ error, userId: req.user?.id }, 'Failed to exchange Plaid token');
-    res.status(500).json({
-      ok: false,
-      error: 'Failed to connect bank accounts',
-      code: 'TOKEN_EXCHANGE_ERROR'
-    });
-  }
-});
-
 // GET /api/plaid/status - Check Plaid connection and transaction sync status
 router.get('/status', auth, async (req, res) => {
   try {
