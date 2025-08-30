@@ -25,7 +25,7 @@ class AgentRegistry {
       const agentConfigs = Object.entries(AGENT_CONFIG);
 
       for (const [agentName, config] of agentConfigs) {
-        const agentTools = config.tools.map(toolName => {
+        const agentTools = (config.tools || []).map(toolName => {
           const tool = toolRegistry.getTool(toolName);
           if (!tool) {
             logger.warn(`Tool ${toolName} not found for agent ${agentName}`);
