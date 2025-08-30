@@ -118,10 +118,11 @@ vi.mock('../../lib/openai.ts', () => ({
 // Mock server to prevent startup during tests
 vi.mock('../../server.ts', () => ({
   default: {
-    listen: vi.fn(),
+    listen: vi.fn().mockReturnValue({ address: () => ({ port: 5000 }) }),
     use: vi.fn(),
     get: vi.fn(),
     post: vi.fn(),
+    address: vi.fn().mockReturnValue({ port: 5000 }),
   },
 }));
 
@@ -162,7 +163,7 @@ beforeEach(() => {
 
 afterEach(() => {
   // Cleanup after each test
-  vi.clearTimers();
+  vi.clearAllTimers();
 });
 
 // Test utilities

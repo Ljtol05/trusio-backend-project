@@ -1,4 +1,3 @@
-
 import { Agent } from '@openai/agents';
 import { logger } from '../lib/logger.ts';
 import { toolRegistry } from './tools/registry.ts';
@@ -13,11 +12,18 @@ class AgentRegistry {
     this.initializeAgents();
   }
 
-  private initializeAgents() {
+  private initializeAgents(): void {
     try {
-      // Initialize agents with proper tool assignment
+      logger.info('Initializing agents...');
+
+      // Ensure agents array is initialized
+      if (!this.agents || !Array.isArray(this.agents)) {
+        this.agents = new Map<string, Agent>(); // Correctly initialize as a Map
+        logger.warn('Agents map was not properly initialized, creating empty map');
+      }
+
       const agentConfigs = Object.entries(AGENT_CONFIG);
-      
+
       for (const [agentName, config] of agentConfigs) {
         const agentTools = config.tools.map(toolName => {
           const tool = toolRegistry.getTool(toolName);
@@ -64,20 +70,20 @@ class AgentRegistry {
 
   routeToAgent(message: string): Agent | undefined {
     const lowerMessage = message.toLowerCase();
-    
+
     // Simple routing logic based on keywords
     if (lowerMessage.includes('budget') || lowerMessage.includes('envelope')) {
       return this.getAgent('budget_coach');
     }
-    
+
     if (lowerMessage.includes('transaction') || lowerMessage.includes('categorize') || lowerMessage.includes('spending')) {
       return this.getAgent('transaction_analyst');
     }
-    
+
     if (lowerMessage.includes('trend') || lowerMessage.includes('insight') || lowerMessage.includes('pattern')) {
       return this.getAgent('insight_generator');
     }
-    
+
     // Default to financial advisor
     return this.getAgent('financial_advisor');
   }
@@ -115,7 +121,7 @@ class AgentRegistry {
 
   getAgentMetrics() {
     const metrics: Record<string, any> = {};
-    
+
     for (const [name, agent] of this.agents) {
       const config = AGENT_CONFIG[name as keyof typeof AGENT_CONFIG];
       metrics[name] = {
@@ -125,7 +131,7 @@ class AgentRegistry {
         toolCount: agent.tools?.length || 0,
       };
     }
-    
+
     return metrics;
   }
 }

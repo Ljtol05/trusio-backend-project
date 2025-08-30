@@ -1,7 +1,6 @@
-
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import request from 'supertest';
-import app from '../../server.ts';
+import { app as testApp } from '../../server.ts'; // Renamed to testApp to avoid conflict with the original app
 import { db } from '../../lib/db.ts';
 import jwt from 'jsonwebtoken';
 import { env } from '../../config/env.ts';
@@ -67,7 +66,7 @@ describe('Agent API Integration Tests', () => {
     it('should handle basic chat request successfully', async () => {
       mockDbResponses.conversation.createMany.mockResolvedValue({ count: 2 });
 
-      const response = await request(app)
+      const response = await request(testApp)
         .post('/api/ai/chat')
         .set('Authorization', `Bearer ${authToken}`)
         .send({
@@ -83,7 +82,7 @@ describe('Agent API Integration Tests', () => {
     });
 
     it('should route to appropriate agent based on message', async () => {
-      const response = await request(app)
+      const response = await request(testApp)
         .post('/api/ai/chat')
         .set('Authorization', `Bearer ${authToken}`)
         .send({
@@ -109,7 +108,7 @@ describe('Agent API Integration Tests', () => {
         },
       ]);
 
-      const response = await request(app)
+      const response = await request(testApp)
         .post('/api/ai/chat')
         .set('Authorization', `Bearer ${authToken}`)
         .send({
@@ -126,7 +125,7 @@ describe('Agent API Integration Tests', () => {
     });
 
     it('should handle validation errors', async () => {
-      const response = await request(app)
+      const response = await request(testApp)
         .post('/api/ai/chat')
         .set('Authorization', `Bearer ${authToken}`)
         .send({
@@ -139,7 +138,7 @@ describe('Agent API Integration Tests', () => {
     });
 
     it('should require authentication', async () => {
-      const response = await request(app)
+      const response = await request(testApp)
         .post('/api/ai/chat')
         .send({
           message: 'Help me with my budget',
@@ -151,7 +150,7 @@ describe('Agent API Integration Tests', () => {
 
   describe('POST /api/ai/tools/execute', () => {
     it('should execute tool directly', async () => {
-      const response = await request(app)
+      const response = await request(testApp)
         .post('/api/ai/tools/execute')
         .set('Authorization', `Bearer ${authToken}`)
         .send({
@@ -170,7 +169,7 @@ describe('Agent API Integration Tests', () => {
     });
 
     it('should handle tool execution errors', async () => {
-      const response = await request(app)
+      const response = await request(testApp)
         .post('/api/ai/tools/execute')
         .set('Authorization', `Bearer ${authToken}`)
         .send({
@@ -186,7 +185,7 @@ describe('Agent API Integration Tests', () => {
 
   describe('POST /api/ai/handoff', () => {
     it('should handle agent handoff successfully', async () => {
-      const response = await request(app)
+      const response = await request(testApp)
         .post('/api/ai/handoff')
         .set('Authorization', `Bearer ${authToken}`)
         .send({
@@ -205,7 +204,7 @@ describe('Agent API Integration Tests', () => {
     });
 
     it('should validate agent names in handoff', async () => {
-      const response = await request(app)
+      const response = await request(testApp)
         .post('/api/ai/handoff')
         .set('Authorization', `Bearer ${authToken}`)
         .send({
@@ -222,7 +221,7 @@ describe('Agent API Integration Tests', () => {
 
   describe('GET /api/ai/agents', () => {
     it('should return list of available agents', async () => {
-      const response = await request(app)
+      const response = await request(testApp)
         .get('/api/ai/agents')
         .set('Authorization', `Bearer ${authToken}`);
 
@@ -243,7 +242,7 @@ describe('Agent API Integration Tests', () => {
 
   describe('GET /api/ai/tools', () => {
     it('should return list of available tools', async () => {
-      const response = await request(app)
+      const response = await request(testApp)
         .get('/api/ai/tools')
         .set('Authorization', `Bearer ${authToken}`);
 
@@ -255,7 +254,7 @@ describe('Agent API Integration Tests', () => {
     });
 
     it('should filter tools by category', async () => {
-      const response = await request(app)
+      const response = await request(testApp)
         .get('/api/ai/tools?category=budget')
         .set('Authorization', `Bearer ${authToken}`);
 
@@ -280,7 +279,7 @@ describe('Agent API Integration Tests', () => {
       ]);
       mockDbResponses.conversation.count.mockResolvedValue(1);
 
-      const response = await request(app)
+      const response = await request(testApp)
         .get('/api/ai/sessions/test-session/history')
         .set('Authorization', `Bearer ${authToken}`);
 
@@ -293,7 +292,7 @@ describe('Agent API Integration Tests', () => {
 
   describe('GET /api/ai/status', () => {
     it('should return system status', async () => {
-      const response = await request(app)
+      const response = await request(testApp)
         .get('/api/ai/status')
         .set('Authorization', `Bearer ${authToken}`);
 
@@ -310,7 +309,7 @@ describe('Agent API Integration Tests', () => {
     it('should handle database connection errors gracefully', async () => {
       mockDbResponses.envelope.findMany.mockRejectedValue(new Error('Database connection failed'));
 
-      const response = await request(app)
+      const response = await request(testApp)
         .post('/api/ai/chat')
         .set('Authorization', `Bearer ${authToken}`)
         .send({
@@ -324,7 +323,7 @@ describe('Agent API Integration Tests', () => {
     it('should handle agent unavailability', async () => {
       mockAgentsSDK.run.mockRejectedValue(new Error('Agent service unavailable'));
 
-      const response = await request(app)
+      const response = await request(testApp)
         .post('/api/ai/chat')
         .set('Authorization', `Bearer ${authToken}`)
         .send({
