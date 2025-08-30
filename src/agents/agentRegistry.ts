@@ -1,13 +1,15 @@
-
+import { Agent, run } from '@openai/agents';
 import { logger } from '../lib/logger.js';
 import { agentManager } from './core/AgentManager.js';
 import { agentContextManager } from './core/AgentContextManager.js';
 import { agentValidator } from './core/AgentValidator.js';
 import { AGENT_CAPABILITIES } from './config.js';
-import type { FinancialContext, AgentExecutionResult } from './types.js';
+import type { FinancialContext, AgentConfig, AgentRole } from './types.js';
 
 export class AgentRegistry {
   private isRegistryInitialized = false;
+  private agents = new Map<string, Agent>();
+  private agentConfigs = new Map<string, AgentConfig>();
 
   constructor() {
     this.initialize();
@@ -121,8 +123,15 @@ export class AgentRegistry {
   /**
    * Get all agents
    */
-  getAllAgents(): Record<string, any> {
-    return agentManager.getAllAgents();
+  getAgentCapabilities(agentName: string): string[] {
+    return agentManager.getAgentCapabilities(agentName);
+  }
+
+  /**
+   * Get all agents
+   */
+  getAllAgents(): Record<string, AgentConfig> {
+    return Object.fromEntries(this.agentConfigs);
   }
 
   /**
@@ -198,7 +207,7 @@ export class AgentRegistry {
    */
   async healthCheck(): Promise<Record<string, boolean>> {
     const health: Record<string, boolean> = {};
-    
+
     agentManager.getAgentNames().forEach(agentName => {
       const agent = agentManager.getAgent(agentName);
       health[agentName] = agent?.isReady() || false;

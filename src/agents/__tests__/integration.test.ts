@@ -1,7 +1,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import request from 'supertest';
-import { app } from '../../server.js';
+import app from '../../server.js';
 import { db } from '../../lib/db.js';
 import jwt from 'jsonwebtoken';
 import { env } from '../../config/env.js';

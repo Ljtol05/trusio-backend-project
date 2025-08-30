@@ -85,18 +85,26 @@ export function registerAllTools(): void {
   }
 }
 
-// Export all financial tools
+// Export all tools for easy importing
 export * from './budget.js';
 export * from './envelope.js';
-export * from './transaction-tools.js';
-export * from './analysis.js';
-export * from './insight.js';
-export * from './handoff.js';
 export * from './transfer_funds.js';
+export * from './transaction-tools.js';
 export * from './track_achievements.js';
 export * from './identify_opportunities.js';
+export * from './insight.js';
 export * from './memory.js';
-export * from './types.js';
+export * from './handoff.js';
+export * from './analysis.js';
+export * from './registry.js';
+
+// Re-export types from main types file
+export type { 
+  FinancialContext,
+  ToolExecutionContext,
+  ToolExecutionResult,
+  AgentContext 
+} from '../types.js';
 
 // Export the tool registry
 export { toolRegistry } from '../core/ToolRegistry.js';

@@ -1,352 +1,137 @@
-import { z } from "zod";
-import { Agent, RunContext, ToolFunction } from "@openai/agents";
 
-// Core agent configuration schema
+import { z } from 'zod';
+
+// Agent role types
+export type AgentRole = 
+  | 'financial_advisor'
+  | 'budget_coach'
+  | 'transaction_analyst'
+  | 'insight_generator'
+  | 'voice_kyc'
+  | 'onboarding'
+  | 'content_creator'
+  | 'personal_ai';
+
+// Agent configuration schema
 export const AgentConfigSchema = z.object({
-  name: z.string().min(1, "Agent name is required"),
-  role: z.enum([
-    "financial_coach",
-    "budget_analyzer",
-    "envelope_manager",
-    "transaction_processor",
-    "insight_generator",
-    "triage"
-  ]),
-  instructions: z.string().min(1, "Agent instructions are required"),
-  model: z.string().optional(),
-  temperature: z.number().min(0).max(2).optional(),
-  maxTokens: z.number().positive().optional(),
-  max_tokens: z.number().positive().optional(), // SDK uses max_tokens
-  tools: z.array(z.string()).optional(),
-  handoffs: z.array(z.string()).optional(),
+  name: z.string().min(1, 'Agent name is required'),
+  role: z.enum(['financial_advisor', 'budget_coach', 'transaction_analyst', 'insight_generator', 'voice_kyc', 'onboarding', 'content_creator', 'personal_ai']),
+  instructions: z.string().min(1, 'Instructions are required'),
+  model: z.string().default('gpt-4'),
+  temperature: z.number().min(0).max(2).default(0.7),
+  maxTokens: z.number().min(1).max(4096).default(1000),
+  tools: z.array(z.string()).default([]),
+  handoffs: z.array(z.string()).default([]),
   isActive: z.boolean().default(true),
-  priority: z.number().int().min(1).max(10).default(5),
-  specializations: z.array(z.string()).optional(),
-  contextWindow: z.number().positive().optional(),
+  priority: z.number().min(1).max(10).default(5),
+  specializations: z.array(z.string()).default([]),
 });
 
-// Agent execution context
-export const AgentContextSchema = z.object({
-  userId: z.string(),
-  sessionId: z.string().optional(),
-  conversationHistory: z.array(z.object({
-    role: z.enum(["user", "assistant", "system"]),
-    content: z.string(),
-    timestamp: z.string().datetime(),
-    metadata: z.record(z.unknown()).optional(),
-  })).optional(),
-  userProfile: z.object({
-    name: z.string().optional(),
-    isNewUser: z.boolean(),
-    preferences: z.record(z.unknown()).optional(),
-    financialGoals: z.array(z.string()).optional(),
-  }).optional(),
-  financialContext: z.object({
-    totalBalance: z.number(),
-    envelopes: z.array(z.object({
-      id: z.string(),
-      name: z.string(),
-      balance: z.number(),
-      budget: z.number(),
-      category: z.string().optional(),
-    })),
-    recentTransactions: z.array(z.object({
-      id: z.string(),
-      amount: z.number(),
-      description: z.string(),
-      envelopeId: z.string().optional(),
-      timestamp: z.string().datetime(),
-    })).optional(),
-    monthlyIncome: z.number().optional(),
-    monthlyExpenses: z.number().optional(),
-  }).optional(),
-});
-
-// Agent response schema
-export const AgentResponseSchema = z.object({
-  response: z.string(),
-  confidence: z.number().min(0).max(100),
-  suggestedActions: z.array(z.object({
-    type: z.enum([
-      "create_envelope",
-      "transfer_funds",
-      "analyze_spending",
-      "set_budget",
-      "review_goals",
-      "gather_info"
-    ]),
-    description: z.string(),
-    parameters: z.record(z.unknown()).optional(),
-    priority: z.enum(["low", "medium", "high"]).default("medium"),
-  })).optional(),
-  handoffTarget: z.string().optional(),
-  followUpQuestions: z.array(z.string()).optional(),
-  metadata: z.record(z.unknown()).optional(),
-});
-
-// Agent performance metrics
-export const AgentMetricsSchema = z.object({
-  agentName: z.string(),
-  totalInteractions: z.number().int().min(0),
-  successfulInteractions: z.number().int().min(0),
-  averageResponseTime: z.number().positive(),
-  averageConfidence: z.number().min(0).max(100),
-  lastUsed: z.string().datetime(),
-  errorCount: z.number().int().min(0),
-  handoffCount: z.number().int().min(0),
-});
-
-// Type exports
 export type AgentConfig = z.infer<typeof AgentConfigSchema>;
-export type AgentContext = z.infer<typeof AgentContextSchema>;
-export type AgentResponse = z.infer<typeof AgentResponseSchema>;
-export type AgentMetrics = z.infer<typeof AgentMetricsSchema>;
 
-// Agent role definitions
-export const AGENT_ROLES = {
-  FINANCIAL_COACH: "financial_coach",
-  BUDGET_ANALYZER: "budget_analyzer",
-  ENVELOPE_MANAGER: "envelope_manager",
-  TRANSACTION_PROCESSOR: "transaction_processor",
-  INSIGHT_GENERATOR: "insight_generator",
-  TRIAGE: "triage"
-} as const;
+// Financial context schemas
+export const EnvelopeSchema = z.object({
+  id: z.string(),
+  name: z.string().min(1),
+  balance: z.number(),
+  target: z.number().positive(),
+  category: z.string(),
+});
 
-// Agent capabilities mapping
-export const AGENT_CAPABILITIES = {
-  [AGENT_ROLES.FINANCIAL_COACH]: [
-    "conversation",
-    "goal_setting",
-    "financial_advice",
-    "motivation",
-    "education"
-  ],
-  [AGENT_ROLES.BUDGET_ANALYZER]: [
-    "budget_analysis",
-    "spending_patterns",
-    "variance_analysis",
-    "forecasting"
-  ],
-  [AGENT_ROLES.ENVELOPE_MANAGER]: [
-    "envelope_creation",
-    "fund_allocation",
-    "balance_management",
-    "category_optimization"
-  ],
-  [AGENT_ROLES.TRANSACTION_PROCESSOR]: [
-    "transaction_categorization",
-    "automatic_allocation",
-    "pattern_recognition",
-    "anomaly_detection"
-  ],
-  [AGENT_ROLES.INSIGHT_GENERATOR]: [
-    "trend_analysis",
-    "insights_generation",
-    "recommendations",
-    "predictive_analysis"
-  ],
-  [AGENT_ROLES.TRIAGE]: [
-    "intent_classification",
-    "agent_routing",
-    "priority_assessment",
-    "context_switching"
-  ]
-} as const;
+export const TransactionSchema = z.object({
+  id: z.string(),
+  amount: z.number(),
+  description: z.string().min(1),
+  category: z.string(),
+  date: z.string().datetime(),
+});
 
-// Agent instance type for runtime
-export interface AgentInstance {
-  config: AgentConfig;
-  agent: Agent;
-  isInitialized: boolean;
-  lastUsed: Date;
-  metrics: AgentMetrics;
-  contextManager?: any;
-  validator?: any;
-}
+export const GoalSchema = z.object({
+  id: z.string(),
+  description: z.string().min(1),
+  targetAmount: z.number().positive(),
+  currentAmount: z.number().min(0),
+  deadline: z.string().datetime(),
+});
 
-// Enhanced agent execution context
-export interface EnhancedAgentContext extends FinancialContext {
-  sessionId: string;
-  timestamp: Date;
-  previousInteractions: AgentInteraction[];
-  userProfile?: {
-    id: string;
-    name?: string;
-    email?: string;
-    isNewUser?: boolean;
-    preferences?: Record<string, any>;
-    financialGoals?: string[];
-  };
-  agentMetadata?: {
-    startTime: Date;
-    maxDuration: number;
-    riskLevel: 'low' | 'medium' | 'high';
-    capabilities: string[];
-  };
-}
-
-// Agent registry type
-export interface AgentRegistry {
-  [agentName: string]: AgentInstance;
-}
-
-// Financial context for agents (consolidated)
 export const FinancialContextSchema = z.object({
-  userId: z.string(),
-  totalIncome: z.number().optional(),
-  totalExpenses: z.number().optional(),
-  envelopes: z.array(z.object({
-    id: z.string(),
-    name: z.string(),
-    balance: z.number(),
-    target: z.number(),
-    category: z.string(),
-  })).optional(),
-  transactions: z.array(z.object({
-    id: z.string(),
-    amount: z.number(),
-    description: z.string(),
-    category: z.string(),
-    date: z.string(),
-  })).optional(),
-  goals: z.array(z.object({
-    id: z.string(),
-    description: z.string(),
-    targetAmount: z.number(),
-    currentAmount: z.number(),
-    deadline: z.string().optional(),
-  })).optional(),
-  riskTolerance: z.enum(['conservative', 'moderate', 'aggressive']).optional(),
+  userId: z.string().min(1, 'User ID is required'),
+  totalIncome: z.number().min(0).optional(),
+  totalExpenses: z.number().min(0).optional(),
+  monthlyIncome: z.number().min(0).optional(),
+  emergencyFund: z.number().min(0).optional(),
+  envelopes: z.array(EnvelopeSchema).optional(),
+  transactions: z.array(TransactionSchema).optional(),
+  goals: z.array(GoalSchema).optional(),
+  riskTolerance: z.enum(['low', 'moderate', 'high']).optional(),
   timeHorizon: z.enum(['short', 'medium', 'long']).optional(),
 });
 
 export type FinancialContext = z.infer<typeof FinancialContextSchema>;
 
-// Agent interaction history
-export const AgentInteractionSchema = z.object({
-  role: z.enum(['user', 'assistant', 'system']),
-  content: z.string(),
-  timestamp: z.string(),
-  agentName: z.string().optional(),
-  metadata: z.record(z.unknown()).optional(),
+// Agent response schemas
+export const SuggestedActionSchema = z.object({
+  type: z.enum(['create_envelope', 'transfer_funds', 'set_goal', 'review_budget', 'categorize_transaction']),
+  description: z.string().min(1),
+  parameters: z.record(z.any()).optional(),
+  priority: z.enum(['low', 'medium', 'high']).default('medium'),
 });
 
-export type AgentInteraction = z.infer<typeof AgentInteractionSchema>;
+export const AgentResponseSchema = z.object({
+  response: z.string().min(1, 'Response cannot be empty'),
+  confidence: z.number().min(0).max(100),
+  suggestedActions: z.array(SuggestedActionSchema).default([]),
+  handoffTarget: z.string().optional(),
+  followUpQuestions: z.array(z.string()).default([]),
+  metadata: z.record(z.any()).optional(),
+});
 
-// Extended run context for financial agents
-export interface FinancialRunContext extends RunContext<FinancialContext> {
-  sessionId: string;
-  timestamp: Date;
-  previousInteractions: AgentInteraction[];
-}
+export type AgentResponse = z.infer<typeof AgentResponseSchema>;
 
-// Agent execution result
-export interface AgentExecutionResult {
+// Agent context schema
+export const AgentContextSchema = z.object({
+  sessionId: z.string().min(1),
+  agentName: z.string().min(1),
+  userId: z.string().min(1),
+  timestamp: z.date().default(() => new Date()),
+  conversationHistory: z.array(z.object({
+    role: z.enum(['user', 'assistant']),
+    content: z.string(),
+    timestamp: z.date(),
+  })).optional(),
+  metadata: z.record(z.any()).optional(),
+});
+
+export type AgentContext = z.infer<typeof AgentContextSchema>;
+
+// Tool execution types
+export interface ToolExecutionResult {
   success: boolean;
-  response: string;
-  agentName: string;
-  sessionId: string;
-  timestamp: Date;
-  duration: number;
+  result?: any;
   error?: string;
-  metadata?: Record<string, any>;
+  duration: number;
+  timestamp: Date;
+  toolName: string;
 }
 
-export interface AgentMemoryContext {
-  userId: string;
-  agentName: string;
+export interface ToolExecutionContext extends FinancialContext {
   sessionId: string;
-  userProfile: UserMemoryProfile | null;
-  conversationHistory: any[];
-  relevantInsights: any[];
-  contextSummary: string;
-  personalizations: Record<string, any>;
+  agentName: string;
   timestamp: Date;
-}
-
-export interface UserMemoryProfile {
-  userId: string;
-  preferences: {
-    budgetingStyle: 'strict' | 'flexible' | 'aggressive' | 'conservative';
-    communicationStyle: 'detailed' | 'concise' | 'encouraging' | 'analytical';
-    riskTolerance: 'low' | 'medium' | 'high';
-    goalPriorities: string[];
-    reminderFrequency: 'daily' | 'weekly' | 'monthly';
-  };
-  learnings: {
-    spendingPatterns: Record<string, any>;
-    successfulStrategies: string[];
-    challenges: string[];
-    improvements: string[];
-  };
-  context: {
-    financialSituation: string;
-    majorGoals: string[];
-    currentFocus: string;
-    lastInteraction: Date;
+  userProfile?: {
+    id: string;
+    name: string;
+    email: string;
   };
 }
 
-export interface GoalTrackingContext {
-  goalId: string;
-  description: string;
-  targetAmount: number;
-  currentAmount: number;
-  deadline?: string;
-  progress: {
-    percentage: number;
-    trend: 'improving' | 'stable' | 'declining';
-    milestones: string[];
-    nextMilestone?: string;
-  };
-  insights: string[];
-  recommendations: string[];
-}
-
-// Handoff-related types
-export interface HandoffContext {
-  fromAgent: string;
-  toAgent: string;
-  reason: string;
-  priority: 'low' | 'medium' | 'high' | 'urgent';
-  preserveHistory: boolean;
-  escalationLevel: number;
-  contextData: Record<string, any>;
-  timestamp: Date;
-}
-
-export interface HandoffRule {
-  name: string;
-  fromAgents: string[];
-  toAgents: string[];
-  conditions: (context: any) => boolean;
-  priority: number;
-  autoApprove: boolean;
-  preserveContext: boolean;
-  escalationThreshold?: number;
-}
-
-export interface HandoffMetrics {
-  totalHandoffs: number;
-  successRate: number;
-  averageDuration: number;
-  escalationRate: number;
-  mostCommonRoutes: Array<{
-    from: string;
-    to: string;
-    count: number;
-  }>;
-  recentFailures: number;
-}
-
-export interface AgentRoutingDecision {
-  targetAgent: string;
-  reason: string;
-  confidence: number;
-  metadata?: {
-    keywords: string[];
-    intent: string;
-    urgency: 'low' | 'medium' | 'high';
-    contextFactors: string[];
-  };
-}
+// Export all types
+export type {
+  AgentRole,
+  AgentConfig,
+  FinancialContext,
+  AgentResponse,
+  AgentContext,
+  ToolExecutionResult,
+  ToolExecutionContext,
+};
