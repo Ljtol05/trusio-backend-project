@@ -1,3 +1,4 @@
+
 import { logger } from '../../lib/logger.js';
 
 export interface ToolMetrics {
@@ -38,42 +39,6 @@ export interface ToolExecutionContext {
     email?: string;
   };
   timeout?: number;
-}
-
-export import { logger } from '../../lib/logger.js';
-
-interface Tool {
-  name: string;
-  description: string;
-  category: string;
-  riskLevel: 'low' | 'medium' | 'high';
-  requiresAuth: boolean;
-  estimatedDuration: number;
-  schema?: any;
-  execute: (parameters: Record<string, unknown>, context: ToolExecutionContext) => Promise<any> | any;
-}
-
-interface ToolMetrics {
-  executionCount: number;
-  averageExecutionTime: number;
-  successRate: number;
-  totalErrors: number;
-  lastExecution?: Date;
-}
-
-interface ToolExecutionContext {
-  userId?: string;
-  sessionId?: string;
-  timeout?: number;
-  [key: string]: any;
-}
-
-interface ToolExecutionResult {
-  success: boolean;
-  result?: any;
-  error?: string;
-  timestamp: Date;
-  duration: number;
 }
 
 export class ToolRegistry {
