@@ -44,20 +44,8 @@ task = "shell.exec"
 args = "cd places-proxy && npm run dev"
 
 [[ports]]
-localPort = 5000
-externalPort = 80
-
-[[ports]]
-localPort = 5555
-externalPort = 3000
-
-[[ports]]
-localPort = 8787
-externalPort = 8000
-
-[[ports]]
 localPort = 24678
-externalPort = 3001
+externalPort = 80
 
 [agent]
 expertMode = true
