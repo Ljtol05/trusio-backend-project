@@ -4,7 +4,7 @@ import { env } from './config/env.js';
 import { logger } from './lib/logger.js';
 import { db } from './lib/db.js';
 import { configureOpenAIFromEnv } from './lib/openai.js';
-import { globalAIBrain } from './lib/ai/globalAIBrain.js'; // Assuming this is where globalAIBrain is exported
+import { globalAIBrain } from './lib/ai/globalAIBrain.js';
 
 // Import routes
 import authRoutes from './routes/auth.js';
