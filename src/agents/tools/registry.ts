@@ -1,18 +1,17 @@
-
-import { logger } from '../../lib/logger.js';
-import { FinancialContext, ToolExecutionContext, ToolExecutionResult } from '../types.js';
+import { logger } from '../../lib/logger.ts';
+import type { ToolDefinition, ToolExecutionContext, ToolExecutionResult, FinancialContext } from './types.ts';
 
 // Import all tool implementations
-import { budgetAnalysisTool } from './budget.js';
-import { createEnvelopeTool, updateEnvelopeTool } from './envelope.js';
-import { categorizeTransactionTool, spendingPatternsTool } from './transaction-tools.js';
-import { transferFundsTool } from './transfer_funds.js';
-import { trackAchievementsTool } from './track_achievements.js';
-import { identifyOpportunitiesTool } from './identify_opportunities.js';
-import { generateInsightTool } from './insight.js';
-import { memoryStoreTool, memoryRetrieveTool } from './memory.js';
-import { agentHandoffTool, agentCapabilityCheckTool } from './handoff.js';
-import { analyzeSpendingTool, generateReportTool } from './analysis.js';
+import { budgetAnalysisTool } from './budget.ts';
+import { createEnvelopeTool, updateEnvelopeTool } from './envelope.ts';
+import { categorizeTransactionTool, spendingPatternsTool } from './transaction-tools.ts';
+import { transferFundsTool } from './transfer_funds.ts';
+import { trackAchievementsTool } from './track_achievements.ts';
+import { identifyOpportunitiesTool } from './identify_opportunities.ts';
+import { generateInsightTool } from './insight.ts';
+import { memoryStoreTool, memoryRetrieveTool } from './memory.ts';
+import { agentHandoffTool, agentCapabilityCheckTool } from './handoff.ts';
+import { analyzeSpendingTool, generateReportTool } from './analysis.ts';
 
 class ToolRegistry {
   private tools = new Map<string, any>();
@@ -65,7 +64,7 @@ class ToolRegistry {
       this.tools.set(name, toolDefinition);
       this.toolCategories.set(name, category);
       this.toolMetrics.set(name, { calls: 0, errors: 0, totalDuration: 0 });
-      
+
       logger.debug({ toolName: name, category }, 'Tool registered');
     } catch (error) {
       logger.error({ error, toolName: name }, 'Failed to register tool');
@@ -160,13 +159,13 @@ class ToolRegistry {
 
   getToolsByCategory(category: string): Record<string, any> {
     const tools: Record<string, any> = {};
-    
+
     for (const [toolName, tool] of this.tools.entries()) {
       if (this.toolCategories.get(toolName) === category) {
         tools[toolName] = tool;
       }
     }
-    
+
     return tools;
   }
 

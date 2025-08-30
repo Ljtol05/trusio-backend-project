@@ -1,9 +1,9 @@
 
-import { logger } from '../lib/logger.js';
-import { agentRegistry } from './agentRegistry.js';
-import { toolRegistry } from './tools/registry.js';
-import { agentManager } from './registry.js';
-import type { FinancialContext } from './tools/types.js';
+import { logger } from '../lib/logger.ts';
+import { agentRegistry } from './agentRegistry.ts';
+import { toolRegistry } from './tools/registry.ts';
+import { agentManager } from './core/AgentManager.ts';
+import type { FinancialContext } from './tools/types.ts';
 
 export interface AgentHealthMetrics {
   agentName: string;
@@ -214,7 +214,7 @@ class AgentHealthMonitor {
     responseTime?: number;
   }> {
     try {
-      const { db } = await import('../lib/db.js');
+      const { db } = await import('../lib/db.ts');
       const startTime = performance.now();
       
       // Simple query to test database connectivity
@@ -239,7 +239,7 @@ class AgentHealthMonitor {
     responseTime?: number;
   }> {
     try {
-      const { openaiPing } = await import('../lib/openai.js');
+      const { openaiPing } = await import('../lib/openai.ts');
       const startTime = performance.now();
       
       const result = await openaiPing();

@@ -1,9 +1,9 @@
 
-import { agentManager } from './core/AgentManager.js';
-import { agentContextManager } from './core/AgentContextManager.js';
-import { agentValidator } from './core/AgentValidator.js';
-import { logger } from '../lib/logger.js';
-import { AgentConfig, FinancialContext } from './types.js';
+import { agentManager } from './core/AgentManager.ts';
+import { agentContextManager } from './core/AgentContextManager.ts';
+import { agentValidator } from './core/AgentValidator.ts';
+import { logger } from '../lib/logger.ts';
+import { AgentConfig, FinancialContext } from './types.ts';
 
 class AgentRegistry {
   private isRegistryInitialized = false;

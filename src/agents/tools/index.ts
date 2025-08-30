@@ -1,17 +1,17 @@
 // Export tool registry
-export { toolRegistry } from './registry.js';
+export { toolRegistry } from './registry.ts';
 
 // Export individual tools
-export { budgetAnalysisTool } from './budget.js';
-export { createEnvelopeTool, updateEnvelopeTool } from './envelope.js';
-export { categorizeTransactionTool, spendingPatternsTool } from './transaction-tools.js';
-export { transferFundsTool } from './transfer_funds.js';
-export { trackAchievementsTool } from './track_achievements.js';
-export { identifyOpportunitiesTool } from './identify_opportunities.js';
-export { generateInsightTool } from './insight.js';
-export { memoryStoreTool, memoryRetrieveTool } from './memory.js';
-export { agentHandoffTool, agentCapabilityCheckTool } from './handoff.js';
-export { analyzeSpendingTool, generateReportTool } from './analysis.js';
+export { budgetAnalysisTool } from './budget.ts';
+export { createEnvelopeTool, updateEnvelopeTool } from './envelope.ts';
+export { categorizeTransactionTool, spendingPatternsTool } from './transaction-tools.ts';
+export { transferFundsTool } from './transfer_funds.ts';
+export { trackAchievementsTool } from './track_achievements.ts';
+export { identifyOpportunitiesTool } from './identify_opportunities.ts';
+export { generateInsightTool } from './insight.ts';
+export { memoryStoreTool, memoryRetrieveTool } from './memory.ts';
+export { agentHandoffTool, agentCapabilityCheckTool } from './handoff.ts';
+export { analyzeSpendingTool, generateReportTool } from './analysis.ts';
 
 // Export types
 export type {
@@ -20,4 +20,4 @@ export type {
   FinancialContext,
   ToolDefinition,
   ToolCategory,
-} from './types.js';
+} from './types.ts';

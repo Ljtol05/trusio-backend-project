@@ -1,7 +1,7 @@
 import { tool } from '@openai/agents';
 import { z } from 'zod';
-import { logger } from '../../lib/logger.js';
-import type { ToolRegistry } from '../core/ToolRegistry.js';
+import { logger } from '../../lib/logger.ts';
+import type { ToolRegistry } from '../core/ToolRegistry.ts';
 
 const agentHandoffSchema = z.object({
   targetAgent: z.enum(['financial_advisor', 'budget_coach', 'transaction_analyst', 'insight_generator']).describe('Name of the target agent to hand off to'),
@@ -35,7 +35,7 @@ const agentHandoffTool = tool({
       }, 'Executing agent handoff tool via HandoffManager');
 
       // Import handoffManager locally to avoid circular imports
-      const { handoffManager } = await import('../core/HandoffManager.js');
+      const { handoffManager } = await import('../core/HandoffManager.ts');
 
       // Execute comprehensive handoff using HandoffManager
       const handoffResult = await handoffManager.executeHandoff({

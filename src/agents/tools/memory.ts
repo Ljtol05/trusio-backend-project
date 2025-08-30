@@ -1,9 +1,8 @@
-
 import { z } from 'zod';
-import { logger } from '../../lib/logger.js';
-import { memoryManager } from '../core/MemoryManager.js';
-import { goalTracker } from '../core/GoalTracker.js';
-import type { ToolFunction, FinancialContext } from './types.js';
+import { logger } from '../../lib/logger.ts';
+import { memoryManager } from '../core/MemoryManager.ts';
+import { goalTracker } from '../core/GoalTracker.ts';
+import type { ToolFunction, FinancialContext } from './types.ts';
 
 // Store user preference tool
 export const storeUserPreference: ToolFunction = {
@@ -283,7 +282,7 @@ export const getContextualRecommendations: ToolFunction = {
 
       // Get user memory profile
       const memoryProfile = await memoryManager.getUserMemoryProfile(userId);
-      
+
       if (!memoryProfile) {
         return {
           success: true,

@@ -1,8 +1,8 @@
 
 import { z } from 'zod';
-import { logger } from '../lib/logger.js';
-import { env } from '../config/env.js';
-import type { AgentConfig, FinancialContext } from './types.js';
+import { logger } from '../lib/logger.ts';
+import { env } from '../config/env.ts';
+import type { AgentConfig, FinancialContext } from './types.ts';
 
 // Agent configuration schema
 export const AgentConfigurationSchema = z.object({
