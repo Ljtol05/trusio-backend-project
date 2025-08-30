@@ -1,4 +1,3 @@
-
 import { logger } from '../../lib/logger.js';
 import { createAgentResponse } from '../../lib/openai.js';
 import { globalAIBrain, getUserContext } from '../../lib/vectorstore.js';
@@ -78,7 +77,7 @@ Respond with detailed analysis and warm, personalized recommendations.
 
       // Analyze responses to build user profile
       const profile = await this.analyzeUserProfile(userId, responses);
-      
+
       // Get relevant knowledge from Global AI Brain
       const userContext = await getUserContext(
         userId,
@@ -91,7 +90,7 @@ Respond with detailed analysis and warm, personalized recommendations.
       let transactionAnalysis = null;
       let billAnalysis = null;
       let enhancedProfile = profile;
-      
+
       try {
         // Check if user has transaction data (Plaid connected)
         const user = await db.user.findUnique({
@@ -105,24 +104,24 @@ Respond with detailed analysis and warm, personalized recommendations.
 
         if (user?.plaidConnected && user?.transactionDataReady && transactionCount > 0) {
           logger.info({ userId, transactionCount }, 'Performing comprehensive 90-day transaction analysis');
-          
+
           // Import analyzers
           const { billAnalyzer } = await import('../../lib/billAnalyzer.js');
           const { transactionIntelligence } = await import('../../lib/transactionIntelligence.js');
-          
+
           // Comprehensive transaction analysis
           transactionAnalysis = await this.performComprehensiveTransactionAnalysis(userId, responses);
-          
+
           // Bill analysis from transaction patterns
           billAnalysis = await billAnalyzer.analyzeBillsFromTransactions(userId, 90);
-          
+
           // Enhance profile with transaction insights
           enhancedProfile = await this.enhanceProfileWithTransactionAnalysis(
             profile, 
             transactionAnalysis, 
             billAnalysis
           );
-          
+
           logger.info({
             userId,
             transactionCount,
@@ -220,7 +219,7 @@ Respond with detailed analysis and warm, personalized recommendations.
     const incomeDescription = responses.income?.toLowerCase() || '';
     const churchResponse = responses.church?.toLowerCase() || '';
     const titheResponse = responses.tithe?.toLowerCase() || responses.giving?.toLowerCase() || '';
-    
+
     // Determine user type
     let userType: 'consumer' | 'creator' | 'hybrid' = 'consumer';
     if (workDescription.includes('content') || workDescription.includes('youtube') || 
@@ -240,10 +239,10 @@ Respond with detailed analysis and warm, personalized recommendations.
     // Church and tithe detection (CRITICAL LOGIC)
     const churchAttendance = churchResponse.includes('yes') || churchResponse.includes('regularly') ||
                            churchResponse.includes('weekly') || churchResponse.includes('attend');
-    
+
     const paysTithes = (titheResponse.includes('yes') || titheResponse.includes('tithe') || 
                        titheResponse.includes('10%')) && churchAttendance;
-    
+
     // Only create tithe envelope if BOTH conditions are true
     const needsTitheEnvelope = churchAttendance && paysTithes;
 
@@ -278,13 +277,13 @@ Respond with detailed analysis and warm, personalized recommendations.
 
     if (decisions.includes('research') || planning.includes('spreadsheet') || 
         decisions.includes('analyze')) return 'analytical';
-    
+
     if (shopping.includes('impulse') || decisions.includes('quickly') || 
         shopping.includes('mood')) return 'impulsive';
-    
+
     if (shopping.includes('social') || decisions.includes('emotion') || 
         planning.includes('stress')) return 'emotional';
-    
+
     return 'conservative'; // Default to conservative
   }
 
@@ -293,12 +292,12 @@ Respond with detailed analysis and warm, personalized recommendations.
     responses: Record<string, any>
   ): Promise<any> {
     const { transactionIntelligence } = await import('../../lib/transactionIntelligence.js');
-    
+
     // Analyze 90 days of transactions
     const endDate = new Date();
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - 90);
-    
+
     const transactions = await db.transaction.findMany({
       where: {
         userId,
@@ -314,14 +313,14 @@ Respond with detailed analysis and warm, personalized recommendations.
     const spendingByCategory = await transactionIntelligence.analyzeSpendingByCategory(userId, 90);
     const monthlyPatterns = await transactionIntelligence.analyzeMonthlyPatterns(userId, 90);
     const merchantAnalysis = await transactionIntelligence.analyzeMerchantPatterns(userId, 90);
-    
+
     // Calculate key metrics
     const totalSpending = transactions
       .filter(t => t.amountCents > 0)
       .reduce((sum, t) => sum + t.amountCents, 0) / 100;
-    
+
     const averageMonthlySpending = totalSpending / 3; // 90 days = ~3 months
-    
+
     const topSpendingCategories = spendingByCategory
       .sort((a, b) => b.totalAmount - a.totalAmount)
       .slice(0, 10);
@@ -355,7 +354,7 @@ Respond with detailed analysis and warm, personalized recommendations.
     // Enhance income estimate with actual transaction data
     if (!profile.monthlyIncome && transactionAnalysis.averageMonthlyIncome > 0) {
       profile.monthlyIncome = Math.round(transactionAnalysis.averageMonthlyIncome / 100) * 100;
-      
+
       logger.info({
         userId: profile.userId,
         estimatedIncome: profile.monthlyIncome,
@@ -494,7 +493,7 @@ Respond with detailed analysis and warm, personalized recommendations.
 
     // Additional envelopes based on user preferences and remaining allocation
     const remainingAllocation = 100 - envelopes.reduce((sum, env) => sum + env.suggestedAllocation, 0);
-    
+
     const additionalEnvelopes = [
       {
         name: 'Personal & Entertainment',

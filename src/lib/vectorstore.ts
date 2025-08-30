@@ -1,4 +1,3 @@
-
 import { openai } from './openai.js';
 import { db } from './db.js';
 import { logger } from './logger.js';
@@ -39,14 +38,14 @@ class GlobalAIBrain {
   // Initialize the Global AI Brain with financial knowledge
   async initialize(): Promise<void> {
     logger.info('Initializing Global AI Brain with financial knowledge base');
-    
+
     try {
       await this.loadBudgetingPlaybooks();
       await this.loadIRSCodes();
       await this.loadConsumerStrategies();
       await this.loadCreatorStrategies();
       await this.loadTitheGuidance();
-      
+
       logger.info('Global AI Brain initialized successfully');
     } catch (error) {
       logger.error({ error }, 'Failed to initialize Global AI Brain');
@@ -64,13 +63,13 @@ class GlobalAIBrain {
         content: `
         Envelope budgeting is a powerful method where you allocate specific amounts of money to different spending categories (envelopes). 
         Each envelope represents a budget category like groceries, rent, entertainment, etc. 
-        
+
         Key principles:
         1. Assign every dollar a purpose before spending
         2. Use only the money allocated to each envelope
         3. When an envelope is empty, stop spending in that category
         4. Adjust allocations monthly based on actual spending
-        
+
         For new users, start with 5-7 basic envelopes:
         - Housing (25-30% of income)
         - Transportation (10-15%)
@@ -95,7 +94,7 @@ class GlobalAIBrain {
         title: 'Envelope Budgeting for Content Creators',
         content: `
         Content creators face unique budgeting challenges with irregular income and business expenses mixed with personal expenses.
-        
+
         Recommended envelope structure:
         1. Emergency Fund (30-40% when possible) - irregular income buffer
         2. Equipment & Software (10-15%) - cameras, editing software, computers
@@ -103,7 +102,7 @@ class GlobalAIBrain {
         4. Tax Savings (25-30%) - quarterly tax payments, self-employment tax
         5. Business Insurance (2-5%) - liability, equipment protection
         6. Personal Living Expenses (remaining 40-50%)
-        
+
         Monthly Income Strategy:
         - Use 3-month rolling average for budgeting
         - Prioritize tax and emergency savings during high-income months
@@ -136,7 +135,7 @@ class GlobalAIBrain {
         title: 'Tax Deductions for Content Creators',
         content: `
         IRS Publication 535 - Business Expenses for Content Creators:
-        
+
         Qualifying Business Expenses (100% deductible):
         - Equipment: Cameras, microphones, lighting, computers
         - Software: Editing software, streaming software, design tools
@@ -146,11 +145,11 @@ class GlobalAIBrain {
         - Professional Services: Accountant, lawyer, editor fees
         - Travel: Business-related travel expenses
         - Education: Courses, workshops, conferences related to content creation
-        
+
         Partially Deductible:
         - Meals with business associates (50%)
         - Entertainment for business purposes (varies)
-        
+
         Record-keeping Requirements:
         - Keep receipts for all business expenses
         - Document business purpose
@@ -173,22 +172,22 @@ class GlobalAIBrain {
         title: 'Tax Implications of Tithing and Charitable Giving',
         content: `
         IRS regulations for charitable deductions (IRC Section 170):
-        
+
         Qualified Organizations:
         - Churches and religious organizations (501(c)(3))
         - Qualified charitable organizations
         - Must be organized in the US
-        
+
         Deduction Limits:
         - Generally 50% of adjusted gross income for cash donations
         - Churches and qualified organizations: up to 60% AGI limit
         - Carry forward unused deductions up to 5 years
-        
+
         Documentation Requirements:
         - Cash donations: bank record or written receipt
         - $250+: written acknowledgment from organization
         - Non-cash $500+: Form 8283
-        
+
         Timing:
         - Deductions taken in year payment is made
         - Credit card donations: deductible when charged
@@ -220,12 +219,12 @@ class GlobalAIBrain {
         title: 'Salary-Based Budgeting Strategy',
         content: `
         For consumers with predictable salary income:
-        
+
         50/30/20 Rule Foundation:
         - 50% Needs (housing, utilities, transportation, minimum debt payments)
         - 30% Wants (entertainment, dining out, hobbies)
         - 20% Savings & Debt Repayment
-        
+
         Enhanced Envelope Allocation:
         1. Housing (25-30%) - rent/mortgage, insurance, taxes
         2. Transportation (10-15%) - car payment, gas, maintenance
@@ -235,9 +234,9 @@ class GlobalAIBrain {
         6. Emergency Fund (10-15%) - 3-6 months expenses
         7. Debt Repayment (5-15%) - credit cards, student loans
         8. Entertainment (5-10%) - movies, subscriptions, hobbies
-        9. Personal Care (3-5%) - clothing, haircuts, healthcare
+        9. Personal Care (3-5%) - haircuts, healthcare
         10. Savings/Investments (5-10%) - retirement, goals
-        
+
         Automation Strategy:
         - Set up automatic transfers on payday
         - Use direct deposit to fund multiple accounts
@@ -269,7 +268,7 @@ class GlobalAIBrain {
         title: 'Multi-Platform Income Management',
         content: `
         Strategy for creators earning from multiple platforms:
-        
+
         Platform Income Tracking:
         - YouTube: Ad revenue, memberships, Super Chat
         - Twitch: Subscriptions, bits, donations
@@ -277,20 +276,20 @@ class GlobalAIBrain {
         - Instagram: Reels Play Bonus, brand partnerships
         - Patreon: Monthly subscriptions
         - Affiliate Marketing: Commission-based earnings
-        
+
         Income Smoothing Strategy:
         1. Calculate 3-month rolling average income
         2. Use lowest month as base budget
         3. Treat excess income as "bonus months"
         4. Build larger emergency fund (6-12 months)
-        
+
         Envelope Structure for Creators:
         - Tax Savings (30-35%) - most important!
         - Emergency Fund (20-25%)
         - Equipment/Software (10-15%)
         - Business Expenses (5-10%)
         - Personal Living (40-50%)
-        
+
         Quarterly Tax Planning:
         - Set aside 25-30% for federal taxes
         - Add 5-10% for state taxes (if applicable)
@@ -323,30 +322,30 @@ class GlobalAIBrain {
         title: 'Incorporating Tithing into Envelope Budgeting',
         content: `
         Biblical and practical principles for tithing within envelope budgeting:
-        
+
         Tithe Calculation Methods:
         1. Gross Income Tithing: 10% of total income before taxes
         2. Net Income Tithing: 10% of take-home pay
         3. First Fruits: Give first, then budget remaining income
-        
+
         Envelope Integration:
         - Tithe Envelope: Auto-allocate 10% on income receipt
         - Make tithing the first "expense" in your budget
         - Consider tithing as non-negotiable fixed expense
-        
+
         Practical Implementation:
         - Set up automatic transfer to tithing envelope
         - Schedule giving to align with church's needs
         - Track giving for tax deduction purposes
         - Consider stock or asset donations for tax efficiency
-        
+
         Budgeting After Tithing:
         - Remaining 90% becomes your working budget
         - Adjust other envelope percentages accordingly
         - Housing: 22-27% (instead of 25-30%)
         - Transportation: 9-13% (instead of 10-15%)
         - All other categories scale proportionally
-        
+
         Emergency Fund Considerations:
         - Some choose to tithe from emergency fund withdrawals
         - Others set aside tithe amount before building emergency fund
@@ -422,7 +421,7 @@ class GlobalAIBrain {
 
       // Get all relevant knowledge
       const allKnowledge = this.getAllKnowledge(userType, category);
-      
+
       // Calculate similarity scores
       const scoredKnowledge = allKnowledge
         .filter(k => k.embedding)
@@ -515,6 +514,25 @@ class GlobalAIBrain {
 
 // Export singleton instance
 export const globalAIBrain = new GlobalAIBrain();
+
+// TODO: Implement vector storage for AI context and memory
+// This will be used for storing user context, financial insights, and conversation history
+
+export const globalAIBrain = {
+  // Placeholder for global AI context
+};
+
+export const storeUserContext = async (userId: string, context: any) => {
+  // TODO: Implement vector storage for user context
+  console.log('Storing user context for user:', userId, context);
+};
+
+export const getUserContext = async (userId: string) => {
+  // TODO: Implement vector retrieval for user context
+  console.log('Getting user context for user:', userId);
+  return null;
+};
+
 
 // Store user interactions for AI context (enhanced)
 export async function storeUserMemory(
@@ -612,15 +630,15 @@ export async function analyzeBankStatement(userId: string, transactions: any[]) 
     const merchant = txn.merchant || 'Unknown';
     const amount = Math.abs(txn.amount || 0);
     const description = txn.description?.toLowerCase() || '';
-    
+
     patterns.topMerchants[merchant] = (patterns.topMerchants[merchant] || 0) + amount;
-    
+
     // Detect potential tithe/charitable giving
     if (description.includes('church') || description.includes('tithe') || 
         description.includes('donation') || description.includes('offering')) {
       patterns.titheDetection = true;
     }
-    
+
     // Detect business expenses for creators
     if (description.includes('equipment') || description.includes('software') || 
         description.includes('camera') || description.includes('microphone')) {
@@ -634,9 +652,9 @@ export async function analyzeBankStatement(userId: string, transactions: any[]) 
   // Get insights from Global AI Brain
   const userType = patterns.businessExpenseRatio > 5 ? 'creator' : 'consumer';
   const analysisQuery = `Analyze spending patterns: monthly average $${patterns.monthlyAverage.toFixed(2)}, business expenses ${patterns.businessExpenseRatio.toFixed(1)}%, tithe detected: ${patterns.titheDetection}`;
-  
+
   const context = await getUserContext(userId, analysisQuery, userType, 3);
-  
+
   // Store analysis as user memory
   await storeUserMemory(userId, 'spending_pattern', JSON.stringify(patterns), {
     source: 'bank_statement',

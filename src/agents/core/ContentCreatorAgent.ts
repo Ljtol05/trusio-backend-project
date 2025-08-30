@@ -1,4 +1,3 @@
-
 import { logger } from '../../lib/logger.js';
 import { createAgentResponse } from '../../lib/openai.js';
 import { db } from '../../lib/db.js';
@@ -87,19 +86,19 @@ Communication Style:
       const revenueStreams = await this.analyzeRevenueStreams(userId);
       const equipmentExpenses = await this.analyzeEquipmentExpenses(userId);
       const incomePatterns = await this.analyzeIncomePatterns(userId, context);
-      
+
       // Platform diversification analysis
       const platformAnalysis = this.analyzePlatformDiversification(revenueStreams);
-      
+
       // Equipment ROI analysis
       const equipmentROI = this.analyzeEquipmentROI(equipmentExpenses, revenueStreams);
-      
+
       // Income stability assessment
       const stabilityAnalysis = this.analyzeIncomeStability(incomePatterns);
-      
+
       // Tax optimization opportunities
       const taxOptimization = await this.analyzeTaxOptimization(equipmentExpenses, revenueStreams);
-      
+
       // Generate creator-specific insights
       const insights = await this.generateCreatorInsights(
         revenueStreams,
@@ -144,7 +143,7 @@ Communication Style:
     for (const transaction of transactions) {
       const platform = this.identifyPlatform(transaction.description, transaction.merchantName);
       const revenueType = this.identifyRevenueType(transaction.description, transaction.merchantName);
-      
+
       if (platform && revenueType) {
         revenueStreams.push({
           platform,
@@ -173,7 +172,7 @@ Communication Style:
 
     for (const transaction of transactions) {
       const category = this.identifyEquipmentCategory(transaction.description, transaction.merchantName);
-      
+
       if (category) {
         equipmentExpenses.push({
           category,
@@ -193,14 +192,14 @@ Communication Style:
   private async analyzeIncomePatterns(userId: string, context: FinancialContext): Promise<IncomePattern[]> {
     const revenueStreams = await this.analyzeRevenueStreams(userId);
     const platformGroups = this.groupRevenueByPlatform(revenueStreams);
-    
+
     const patterns: IncomePattern[] = [];
 
     for (const [platform, revenues] of Object.entries(platformGroups)) {
       const monthlyAmounts = this.getMonthlyAmounts(revenues as CreatorRevenue[]);
       const average = monthlyAmounts.reduce((sum, amt) => sum + amt, 0) / monthlyAmounts.length;
       const volatility = this.calculateVolatility(monthlyAmounts, average);
-      
+
       patterns.push({
         platform,
         averageMonthly: average,
@@ -216,7 +215,7 @@ Communication Style:
 
   private identifyPlatform(description: string, merchant?: string): CreatorRevenue['platform'] | null {
     const text = `${description} ${merchant || ''}`.toLowerCase();
-    
+
     if (text.includes('youtube') || text.includes('google adsense')) return 'youtube';
     if (text.includes('twitch') || text.includes('amazon twitch')) return 'twitch';
     if (text.includes('tiktok') || text.includes('tik tok')) return 'tiktok';
@@ -224,18 +223,18 @@ Communication Style:
     if (text.includes('patreon')) return 'patreon';
     if (text.includes('onlyfans')) return 'onlyfans';
     if (text.includes('substack')) return 'substack';
-    
+
     // Check for common creator payment processors
     if (text.includes('stripe') || text.includes('paypal') || text.includes('venmo')) {
       return 'other'; // Could be from various platforms
     }
-    
+
     return null;
   }
 
   private identifyRevenueType(description: string, merchant?: string): CreatorRevenue['revenueType'] | null {
     const text = `${description} ${merchant || ''}`.toLowerCase();
-    
+
     if (text.includes('adsense') || text.includes('ad revenue')) return 'ad_revenue';
     if (text.includes('sponsor') || text.includes('brand') || text.includes('collab')) return 'sponsorship';
     if (text.includes('subscription') || text.includes('member') || text.includes('tier')) return 'subscription';
@@ -243,37 +242,37 @@ Communication Style:
     if (text.includes('merch') || text.includes('merchandise') || text.includes('store')) return 'merchandise';
     if (text.includes('affiliate') || text.includes('commission')) return 'affiliate';
     if (text.includes('course') || text.includes('coaching') || text.includes('consultation')) return 'course_sales';
-    
+
     return 'other' as any;
   }
 
   private identifyEquipmentCategory(description: string, merchant?: string): EquipmentExpense['category'] | null {
     const text = `${description} ${merchant || ''}`.toLowerCase();
-    
+
     // Camera equipment
     if (text.includes('camera') || text.includes('lens') || text.includes('canon') || 
         text.includes('sony') || text.includes('nikon') || text.includes('gopro')) return 'camera';
-    
+
     // Audio equipment
     if (text.includes('microphone') || text.includes('mic') || text.includes('audio') || 
         text.includes('rode') || text.includes('shure') || text.includes('blue yeti')) return 'audio';
-    
+
     // Lighting
     if (text.includes('light') || text.includes('led') || text.includes('softbox') || 
         text.includes('ring light') || text.includes('godox')) return 'lighting';
-    
+
     // Computer equipment
     if (text.includes('macbook') || text.includes('imac') || text.includes('pc') || 
         text.includes('laptop') || text.includes('processor') || text.includes('graphics card')) return 'computer';
-    
+
     // Software
     if (text.includes('adobe') || text.includes('final cut') || text.includes('software') || 
         text.includes('subscription') || text.includes('license')) return 'software';
-    
+
     // Storage
     if (text.includes('hard drive') || text.includes('ssd') || text.includes('storage') || 
         text.includes('cloud') || text.includes('dropbox')) return 'storage';
-    
+
     return null;
   }
 
@@ -288,7 +287,7 @@ Communication Style:
       networking: 60,
       accessories: 24, // 2 years
     };
-    
+
     return periods[category] || 36;
   }
 
@@ -305,14 +304,14 @@ Communication Style:
       networking: 70,
       accessories: 85,
     };
-    
+
     return businessUseMap[category] || 80;
   }
 
   private analyzePlatformDiversification(revenues: CreatorRevenue[]) {
     const platformGroups = this.groupRevenueByPlatform(revenues);
     const totalRevenue = revenues.reduce((sum, r) => sum + r.amount, 0);
-    
+
     const diversification = Object.entries(platformGroups).map(([platform, platformRevenues]) => {
       const platformTotal = (platformRevenues as CreatorRevenue[]).reduce((sum, r) => sum + r.amount, 0);
       return {
@@ -337,10 +336,10 @@ Communication Style:
   private analyzeEquipmentROI(equipment: EquipmentExpense[], revenues: CreatorRevenue[]) {
     const totalEquipmentCost = equipment.reduce((sum, e) => sum + e.cost, 0);
     const totalRevenue = revenues.reduce((sum, r) => sum + r.amount, 0);
-    
+
     // Simple ROI calculation - more sophisticated analysis could consider depreciation
     const monthlyROI = totalRevenue > 0 ? (totalRevenue * 12) / totalEquipmentCost : 0;
-    
+
     const categoryBreakdown = equipment.reduce((acc, e) => {
       if (!acc[e.category]) acc[e.category] = { cost: 0, items: 0 };
       acc[e.category].cost += e.cost;
@@ -364,7 +363,7 @@ Communication Style:
     );
 
     const stabilityScore = Math.max(0, 100 - (weightedVolatility * 100));
-    
+
     return {
       stabilityScore,
       averageMonthlyIncome: totalIncome,
@@ -480,16 +479,16 @@ Communication Style:
 
   private calculateGrowthTrend(revenues: CreatorRevenue[]): 'increasing' | 'decreasing' | 'stable' {
     if (revenues.length < 4) return 'stable';
-    
+
     const sortedRevenues = revenues.sort((a, b) => a.date.getTime() - b.date.getTime());
     const firstHalf = sortedRevenues.slice(0, Math.floor(sortedRevenues.length / 2));
     const secondHalf = sortedRevenues.slice(Math.floor(sortedRevenues.length / 2));
-    
+
     const firstHalfAvg = firstHalf.reduce((sum, r) => sum + r.amount, 0) / firstHalf.length;
     const secondHalfAvg = secondHalf.reduce((sum, r) => sum + r.amount, 0) / secondHalf.length;
-    
+
     const growthRate = (secondHalfAvg - firstHalfAvg) / firstHalfAvg;
-    
+
     if (growthRate > 0.1) return 'increasing';
     if (growthRate < -0.1) return 'decreasing';
     return 'stable';
@@ -497,36 +496,36 @@ Communication Style:
 
   private getMonthlyAmounts(revenues: CreatorRevenue[]): number[] {
     const monthlyTotals: Record<string, number> = {};
-    
+
     revenues.forEach(revenue => {
       const monthKey = `${revenue.date.getFullYear()}-${revenue.date.getMonth()}`;
       monthlyTotals[monthKey] = (monthlyTotals[monthKey] || 0) + revenue.amount;
     });
-    
+
     return Object.values(monthlyTotals);
   }
 
   private calculateVolatility(amounts: number[], average: number): number {
     if (amounts.length < 2) return 0;
-    
+
     const variance = amounts.reduce((sum, amount) => sum + Math.pow(amount - average, 2), 0) / amounts.length;
     const standardDeviation = Math.sqrt(variance);
-    
+
     return average > 0 ? standardDeviation / average : 0; // Coefficient of variation
   }
 
   private identifySeasonality(revenues: CreatorRevenue[]): string[] {
     // Simplified seasonality detection
     const monthlyData: Record<number, number> = {};
-    
+
     revenues.forEach(revenue => {
       const month = revenue.date.getMonth();
       monthlyData[month] = (monthlyData[month] || 0) + revenue.amount;
     });
-    
+
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     const average = Object.values(monthlyData).reduce((sum, val) => sum + val, 0) / Object.keys(monthlyData).length;
-    
+
     return Object.entries(monthlyData)
       .filter(([_, amount]) => amount > average * 1.2)
       .map(([monthIndex, _]) => months[parseInt(monthIndex)])
@@ -548,7 +547,7 @@ Communication Style:
       substack: 'low',
       other: 'medium',
     };
-    
+
     return riskMap[platform] || 'medium';
   }
 
@@ -561,39 +560,39 @@ Communication Style:
 
   private getEquipmentRecommendations(breakdown: any, roi: number): string[] {
     const recommendations: string[] = [];
-    
+
     if (roi < 2) {
       recommendations.push('Focus on revenue generation before major equipment purchases');
       recommendations.push('Consider renting equipment for special projects');
     }
-    
+
     if (breakdown.camera && breakdown.camera.cost > 10000) {
       recommendations.push('High camera investment - ensure you\'re maximizing video content production');
     }
-    
+
     if (!breakdown.audio || breakdown.audio.cost < 500) {
       recommendations.push('Audio quality is crucial - consider investing in better microphones');
     }
-    
+
     return recommendations;
   }
 
   private getStabilityRecommendations(score: number, patterns: IncomePattern[]): string[] {
     const recommendations: string[] = [];
-    
+
     if (score < 50) {
       recommendations.push('Build 6-12 months emergency fund due to income volatility');
       recommendations.push('Focus on recurring revenue streams (subscriptions, memberships)');
     }
-    
+
     const unreliablePlatforms = patterns.filter(p => p.reliability === 'low');
     if (unreliablePlatforms.length > 0) {
       recommendations.push(`Reduce dependence on volatile platforms: ${unreliablePlatforms.map(p => p.platform).join(', ')}`);
     }
-    
+
     recommendations.push('Track income patterns to identify seasonal trends');
     recommendations.push('Consider diversifying into more stable revenue streams');
-    
+
     return recommendations;
   }
 
@@ -617,7 +616,7 @@ Communication Style:
   ): Promise<string> {
     try {
       const analysis = await this.analyzeCreatorFinances(userId, context);
-      
+
       const advisorPrompt = `
       Creator Financial Profile:
       - Total Monthly Revenue: $${analysis.revenueAnalysis.totalMonthly.toFixed(2)}

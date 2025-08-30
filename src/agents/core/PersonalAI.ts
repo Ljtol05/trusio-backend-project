@@ -1,4 +1,3 @@
-
 import { logger } from '../../lib/logger.js';
 import { createAgentResponse } from '../../lib/openai.js';
 import { db } from '../../lib/db.js';
@@ -49,10 +48,10 @@ class PersonalAI {
     const iv = crypto.randomBytes(16);
     const cipher = crypto.createCipherGCM('aes-256-gcm', this.encryptionKey);
     cipher.setAAD(Buffer.from('personal-ai-data'));
-    
+
     let encrypted = cipher.update(data, 'utf8', 'hex');
     encrypted += cipher.final('hex');
-    
+
     const authTag = cipher.getAuthTag();
     return iv.toString('hex') + ':' + authTag.toString('hex') + ':' + encrypted;
   }
@@ -62,14 +61,14 @@ class PersonalAI {
     const iv = Buffer.from(parts[0], 'hex');
     const authTag = Buffer.from(parts[1], 'hex');
     const encrypted = parts[2];
-    
+
     const decipher = crypto.createDecipherGCM('aes-256-gcm', this.encryptionKey);
     decipher.setAAD(Buffer.from('personal-ai-data'));
     decipher.setAuthTag(authTag);
-    
+
     let decrypted = decipher.update(encrypted, 'hex', 'utf8');
     decrypted += decipher.final('utf8');
-    
+
     return decrypted;
   }
 
@@ -214,10 +213,10 @@ class PersonalAI {
 
       // Update session state
       session.currentContext.questionsAnswered++;
-      
+
       // Check if onboarding is complete
       const onboardingComplete = session.currentContext.questionsAnswered >= session.currentContext.totalQuestions;
-      
+
       if (onboardingComplete && !session.onboardingComplete) {
         // Generate final budget recommendations
         session.budgetRecommendations = await this.generateFinalBudgetRecommendations(session);
@@ -303,7 +302,7 @@ class PersonalAI {
     });
 
     const userName = user?.firstName || user?.name || 'there';
-    
+
     if (!analysis) {
       return `Hi ${userName}! I'm your personal AI financial coach. I'm excited to help you create a budget that works perfectly for your lifestyle. Let's start by getting to know each other better. What would you like me to call you?`;
     }
@@ -318,19 +317,19 @@ class PersonalAI {
   private async createPersonalizedAgent(userId: string, dna: UserAIDNA): Promise<void> {
     const personalizedPrompt = `
     You are ${await this.getUserName(userId)}'s personal AI financial coach and companion.
-    
+
     User's Financial DNA:
     - Spending Personality: ${dna.spendingPersonality}
     - Communication Style: ${dna.communicationStyle}
     - Risk Tolerance: ${dna.riskTolerance}
-    
+
     Your personality and approach:
     - Warm, encouraging, and deeply personal
     - Remember every conversation and build on previous insights
     - Adapt your communication style to match their preferences
     - Be proactive in identifying opportunities and risks
     - Celebrate their wins and support them through challenges
-    
+
     You have access to their complete financial history and can reference specific transactions,
     patterns, and behaviors. Always speak as their dedicated personal coach who knows them well.
     `;
@@ -405,22 +404,22 @@ class PersonalAI {
 
     const avgTransaction = analysis.averageTransaction || 0;
     const transactionCount = analysis.totalTransactions || 0;
-    
+
     // High frequency, low amounts = impulsive
     if (transactionCount > 100 && avgTransaction < 50) return 'impulsive';
-    
+
     // High amounts, low frequency = analytical
     if (transactionCount < 50 && avgTransaction > 100) return 'analytical';
-    
+
     // Medium patterns with emotional spending indicators
     const hasEmotionalMerchants = analysis.frequentMerchants?.some(([merchant]: [string, number]) => 
       merchant.toLowerCase().includes('amazon') || 
       merchant.toLowerCase().includes('starbucks') ||
       merchant.toLowerCase().includes('target')
     );
-    
+
     if (hasEmotionalMerchants) return 'emotional';
-    
+
     return 'conservative';
   }
 
@@ -489,27 +488,27 @@ class PersonalAI {
 
   private async extractBehavioralInsights(transactions: any[]) {
     const riskFactors = [];
-    
+
     // High frequency spending
     if (transactions.length > 200) {
       riskFactors.push('High transaction frequency may indicate impulsive spending');
     }
-    
+
     // Late night purchases
     const lateNightPurchases = transactions.filter(t => {
       const hour = new Date(t.createdAt).getHours();
       return hour >= 22 || hour <= 6;
     });
-    
+
     if (lateNightPurchases.length > transactions.length * 0.1) {
       riskFactors.push('Frequent late-night purchases detected');
     }
-    
+
     // Large purchases
     const largePurchases = transactions.filter(t => 
       Math.abs(t.amountCents) > 50000 // > $500
     );
-    
+
     if (largePurchases.length > 10) {
       riskFactors.push('Multiple large purchases detected');
     }
@@ -520,7 +519,7 @@ class PersonalAI {
   private async processWithPersonalizedContext(session: PersonalAISession, input: string, agent: Agent) {
     const context = session.currentContext;
     const questionNumber = context.questionsAnswered + 1;
-    
+
     // Predefined onboarding questions with personalized context
     const questions = [
       "What would you like me to call you?",
@@ -540,23 +539,23 @@ class PersonalAI {
     if (questionNumber <= questions.length) {
       const insights = session.transactionInsights;
       let personalizedQuestion = questions[questionNumber - 1];
-      
+
       // Add context based on their transaction data
       if (questionNumber === 4 && insights?.topCategories?.length > 0) {
         const topCategory = insights.topCategories[0].category;
         personalizedQuestion += ` I notice you spend quite a bit on ${topCategory} - is managing that spending part of what you'd like help with?`;
       }
-      
+
       return personalizedQuestion;
     }
-    
+
     return "Thank you for sharing that with me. Let me prepare your personalized budget recommendations based on everything you've told me and your spending patterns.";
   }
 
   private async generateFinalBudgetRecommendations(session: PersonalAISession) {
     const analysis = session.currentContext.comprehensiveAnalysis;
     const conversationInsights = this.extractInsightsFromConversation(session.conversationHistory);
-    
+
     return {
       personalizedMessage: "Based on our conversation and your spending patterns, here are my recommendations for your envelope budget.",
       recommendedEnvelopes: await this.generatePersonalizedEnvelopes(session),
@@ -591,7 +590,7 @@ class PersonalAI {
   private async generatePersonalizedEnvelopes(session: PersonalAISession) {
     // This would integrate with the onboarding agent's envelope recommendations
     const { onboardingAgent } = await import('./OnboardingAgent.js');
-    
+
     // Mock profile based on session data
     const mockProfile = {
       userId: session.userId,
@@ -600,25 +599,25 @@ class PersonalAI {
       needsTitheEnvelope: false,
       monthlyIncome: session.transactionInsights?.averageMonthlySpending * 1.2
     };
-    
+
     return onboardingAgent.generateEnvelopeRecommendations(mockProfile, [], session.currentContext.comprehensiveAnalysis?.billAnalysis);
   }
 
   private generatePersonalizedTips(analysis: any, insights: any) {
     const tips = [];
-    
+
     if (insights.expressedStress) {
       tips.push("Start with just 3-4 envelopes to keep things simple and reduce financial stress");
     }
-    
+
     if (analysis?.transactionInsights?.topCategories?.length > 0) {
       const topCategory = analysis.transactionInsights.topCategories[0];
       tips.push(`Your highest spending category is ${topCategory.category} - consider setting a specific envelope for this`);
     }
-    
+
     tips.push("Review your envelopes weekly rather than daily to avoid overthinking");
     tips.push("Celebrate small wins - every dollar saved is progress toward your goals");
-    
+
     return tips;
   }
 
@@ -647,7 +646,7 @@ class PersonalAI {
   async getSessionStatus(sessionId: string, userId: string): Promise<PersonalAISession | null> {
     try {
       const session = this.activeSessions.get(sessionId);
-      
+
       if (!session || session.userId !== userId) {
         return null;
       }
