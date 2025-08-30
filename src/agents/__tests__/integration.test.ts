@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import request from 'supertest';
-import { app as testApp } from '../../server.ts'; // Renamed to testApp to avoid conflict with the original app
+import testApp from '../../server.ts';
 import { db } from '../../lib/db.ts';
 import jwt from 'jsonwebtoken';
 import { env } from '../../config/env.ts';

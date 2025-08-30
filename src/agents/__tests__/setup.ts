@@ -116,15 +116,23 @@ vi.mock('../../lib/openai.ts', () => ({
 }));
 
 // Mock server to prevent startup during tests
-vi.mock('../../server.ts', () => ({
-  default: {
+vi.mock('../../server.ts', () => {
+  const mockApp = {
     listen: vi.fn().mockReturnValue({ address: () => ({ port: 5000 }) }),
     use: vi.fn(),
     get: vi.fn(),
     post: vi.fn(),
+    put: vi.fn(),
+    delete: vi.fn(),
+    patch: vi.fn(),
     address: vi.fn().mockReturnValue({ port: 5000 }),
-  },
-}));
+  };
+  
+  return {
+    default: mockApp,
+    app: mockApp, // Export both default and named export
+  };
+});
 
 // Prevent process.exit during tests
 const originalExit = process.exit;
