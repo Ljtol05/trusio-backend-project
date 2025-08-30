@@ -1,0 +1,51 @@
+~/workspace$ npm run test:agents --verbose 2>&1 | tail -50
+⎯⎯⎯⎯ Unhandled Rejection ⎯⎯⎯⎯⎯
+Error: Failed to route message to appropriate agent
+ ❯ AgentManager.routeToAgent src/agents/core/AgentManager.ts:80:13
+     78|     } catch (error: any) {
+     79|       logger.error({ error: error.message, message }, 'Agent routing f…
+     80|       throw new Error('Failed to route message to appropriate agent');
+       |             ^
+     81|     }
+     82|   }
+
+This error originated in "src/agents/__tests__/agentRegistry.test.ts" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.
+The latest test that might've caused the error is "should handle agent execution errors gracefully". It might mean one of the following:
+- The error was thrown, while Vitest was running this test.
+- If the error occurred after the test had been completed, this was the last documented test before it was thrown.
+
+⎯⎯⎯⎯ Unhandled Rejection ⎯⎯⎯⎯⎯
+Error: process.exit unexpectedly called with "1"
+ ❯ process.exit node_modules/vitest/dist/vendor/execute.fL3szUAI.js:401:11
+ ❯ startServer src/server.ts:153:13
+    151|   } catch (error) {
+    152|     logger.error({ error }, 'Failed to start server');
+    153|     process.exit(1);
+       |             ^
+    154|   }
+    155| }
+ ❯ src/server.ts:157:1
+ ❯ VitestExecutor.runModule node_modules/vite-node/dist/client.mjs:362:5
+ ❯ VitestExecutor.directRequest node_modules/vite-node/dist/client.mjs:346:5
+ ❯ VitestExecutor.cachedRequest node_modules/vite-node/dist/client.mjs:189:14
+ ❯ VitestExecutor.dependencyRequest node_modules/vite-node/dist/client.mjs:233:12
+ ❯ src/agents/__tests__/integration.test.ts:3:31
+ ❯ VitestExecutor.runModule node_modules/vite-node/dist/client.mjs:362:5
+ ❯ VitestExecutor.directRequest node_modules/vite-node/dist/client.mjs:346:5
+
+This error originated in "src/agents/__tests__/integration.test.ts" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+
+ Test Files  4 failed | 1 passed (5)
+      Tests  47 failed | 27 passed (74)
+     Errors  1005 errors
+   Start at  18:33:36
+   Duration  2.57s (transform 1.03s, setup 530ms, collect 2.63s, tests 1.03s, environment 1ms, prepare 1.11s)
+
+JUNIT report written to /home/runner/workspace/src/agents/test-results/agents-junit.xml
+npm verbose cwd /home/runner/workspace
+npm verbose os Linux 6.2.16
+npm verbose node v22.17.0
+npm verbose npm  v10.9.2
+npm verbose exit 1
+npm verbose code 1
