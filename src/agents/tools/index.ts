@@ -1,4 +1,3 @@
-
 // Export all tool types and interfaces
 export type {
   FinancialContext,
@@ -12,22 +11,32 @@ export type {
 // Import and export all tool implementations
 export { budgetAnalysisTool, createEnvelopeTool, budgetCreationTool } from './budget.ts';
 export { envelopeTransferTool, getEnvelopeBalanceTool } from './envelope.ts';
-export { 
-  categorizeTransactionTool, 
+export {
+  categorizeTransactionTool,
   automaticAllocationTool,
   patternDetectionTool,
-  detectAnomaliesTool 
+  detectAnomaliesTool
 } from './transaction-tools.ts';
 export { agentHandoffTool } from './handoff.ts';
 export { memoryStoreTool, memoryRetrieveTool } from './memory.ts';
-export { 
+export {
   spendingPatternsTool,
   varianceAnalysisTool,
-  riskAssessmentTool 
+  riskAssessmentTool
 } from './analysis.ts';
 
-// Export the main registry
-export { toolRegistry } from './registry.ts';
+// Import all tool modules to ensure registration
+import './budget.js';
+import './envelope.js';
+import './transaction-tools.js';
+import './analysis.js';
+import './insight.js';
+import './handoff.js';
+import './transfer_funds.js';
+import './identify_opportunities.js';
+import './track_achievements.js';
+import './memory.js';
 
-// Re-export everything from registry for convenience
-export * from './registry.ts';
+// Re-export registry and types
+export * from './registry.js';
+export * from './types.js';

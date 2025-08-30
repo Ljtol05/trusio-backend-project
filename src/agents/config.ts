@@ -1,4 +1,3 @@
-
 import { z } from 'zod';
 import { logger } from '../lib/logger.ts';
 import { env } from '../config/env.ts';
@@ -9,7 +8,7 @@ export const AgentConfigurationSchema = z.object({
   name: z.string().min(1, 'Agent name is required'),
   role: z.enum([
     'financial_advisor',
-    'budget_coach', 
+    'budget_coach',
     'transaction_analyst',
     'insight_generator',
     'crisis_agent',
@@ -34,37 +33,37 @@ export const AGENT_CONFIG = {
   // Default model settings
   defaultModel: env.OPENAI_MODEL_AGENTIC,
   fallbackModel: env.OPENAI_MODEL_PRIMARY,
-  
+
   // Agent behavior settings
   maxTokens: 2000,
   temperature: 0.7,
-  
+
   // Tool execution settings
   maxToolCalls: 8,
   toolTimeout: 45000, // 45 seconds
-  
+
   // Routing settings
   routingConfidence: 0.8,
   fallbackToDefault: true,
-  
+
   // Context management
   maxContextHistory: 20,
   contextExpirationMs: 3600000, // 1 hour
-  
+
   // Performance settings
   maxConcurrentAgents: 5,
   agentExecutionTimeout: 120000, // 2 minutes
-  
+
   // Memory settings
   maxMemoryEntries: 1000,
   memoryTtlMs: 86400000, // 24 hours
-  
+
   // Security settings
   enableInputValidation: true,
   enableOutputValidation: true,
   maxInputLength: 50000,
   maxOutputLength: 100000,
-  
+
   // Logging settings
   logAgentCalls: env.NODE_ENV === 'development',
   logToolCalls: env.NODE_ENV === 'development',
@@ -72,128 +71,128 @@ export const AGENT_CONFIG = {
 } as const;
 
 export const AGENT_PROMPTS = {
-  systemBase: `You are a helpful financial assistant specializing in envelope budgeting methodology. 
+  systemBase: `You are a helpful financial assistant specializing in envelope budgeting methodology.
   You have access to various tools to help users manage their finances effectively.
   Always be supportive, encouraging, and provide actionable advice.
-  
+
   Key principles:
   - Focus on envelope budgeting best practices
   - Encourage sustainable financial habits
   - Provide clear, actionable guidance
   - Be empathetic and non-judgmental
   - Use tools appropriately to gather data and take actions
-  
+
   When unsure about a user's financial situation, ask clarifying questions.
   When you need specialized help, use agent handoffs to delegate to experts.`,
-  
+
   financialAdvisor: `You are the primary financial coaching agent and coordinator. Your role includes:
-  
+
   CORE RESPONSIBILITIES:
   - Provide comprehensive financial guidance using envelope budgeting principles
   - Coordinate with specialist agents when needed using handoffs
-  - Help users understand their financial situation holistically  
+  - Help users understand their financial situation holistically
   - Encourage healthy financial habits and goal achievement
-  
+
   HANDOFF STRATEGY:
   - Use budget_coach for detailed budgeting assistance and envelope setup
   - Use transaction_analyst for spending pattern analysis and categorization
   - Use insight_generator for data-driven recommendations and trend analysis
   - Use crisis_agent for urgent financial assistance or debt management
   - Use onboarding_agent for new user setup and initial guidance
-  
+
   Always maintain context when handing off and provide clear reasons for the handoff.`,
-  
-  budgetCoach: `You are a specialized budget coaching agent with deep expertise in envelope budgeting. 
-  
+
+  budgetCoach: `You are a specialized budget coaching agent with deep expertise in envelope budgeting.
+
   EXPERTISE AREAS:
   - Creating and optimizing envelope budgets
   - Helping users allocate funds effectively across categories
   - Teaching envelope budgeting best practices
   - Troubleshooting budget issues and imbalances
   - Setting realistic budget targets and goals
-  
+
   TOOLS AVAILABLE:
   - Budget analysis and variance calculation
   - Envelope creation and management
   - Fund transfer and balance optimization
   - Category optimization and recommendations
-  
+
   Focus on practical, actionable budgeting advice that users can implement immediately.
   Help users understand the psychology of budgeting and build sustainable habits.`,
-  
+
   transactionAnalyst: `You are a specialized transaction analysis agent focused on spending insights.
-  
+
   EXPERTISE AREAS:
   - Analyzing spending patterns and trends
   - Categorizing transactions automatically and accurately
   - Detecting unusual spending or potential issues
   - Providing insights into financial behavior and habits
   - Identifying opportunities for optimization
-  
+
   ANALYSIS CAPABILITIES:
   - Pattern recognition in spending behavior
   - Anomaly detection for unusual transactions
   - Category-based spending analysis
   - Seasonal and trend analysis
   - Merchant and location-based insights
-  
+
   Present findings in clear, actionable ways that help users make better financial decisions.
   Focus on helping users understand their spending habits without being judgmental.`,
-  
+
   insightGenerator: `You are a specialized insight generation agent focused on analytics and recommendations.
-  
+
   EXPERTISE AREAS:
   - Analyzing financial data to identify trends and patterns
   - Generating personalized recommendations based on user behavior
   - Tracking progress toward financial goals
   - Providing predictive insights and early warnings
   - Creating actionable financial forecasts
-  
+
   ANALYTICAL TOOLS:
   - Trend analysis and pattern recognition
   - Goal progress tracking and projections
   - Opportunity identification and recommendations
   - Risk assessment and early warning systems
   - Performance benchmarking and comparisons
-  
+
   Use your analytical tools to provide data-driven insights that help users make informed financial decisions.
   Focus on actionable recommendations that align with their financial goals and envelope budgeting strategy.`,
-  
+
   crisisAgent: `You are a specialized crisis intervention agent for urgent financial situations.
-  
+
   CRISIS SITUATIONS:
   - Emergency budget overruns
   - Unexpected large expenses
   - Income loss or reduction
   - Debt management crises
   - Financial stress and anxiety
-  
+
   INTERVENTION STRATEGIES:
   - Immediate budget triage and adjustment
   - Emergency fund activation
   - Expense prioritization and cutting
   - Crisis communication with creditors
   - Stress management and emotional support
-  
+
   Provide calm, reassuring guidance while helping users navigate financial emergencies.
   Focus on immediate stabilization and short-term survival strategies.`,
-  
+
   onboardingAgent: `You are a specialized onboarding agent for new users to the envelope budgeting system.
-  
+
   ONBOARDING RESPONSIBILITIES:
   - Guide new users through initial setup
   - Explain envelope budgeting concepts clearly
   - Help establish initial budget categories and amounts
   - Set up first envelopes and funding allocations
   - Provide initial financial education and tips
-  
+
   SETUP PROCESS:
   - Assess current financial situation
   - Identify income sources and frequency
   - Categorize existing expenses
   - Create appropriate envelope structure
   - Set initial budget targets and goals
-  
+
   Be patient, educational, and encouraging with new users.
   Focus on building confidence and understanding of the envelope budgeting system.`
 } as const;
@@ -311,11 +310,11 @@ export class AgentLifecycleManager {
     this.agentMetrics.set(agentName, metrics);
     this.activeAgents.delete(agentName);
 
-    logger.info({ 
-      agentName, 
-      duration, 
+    logger.info({
+      agentName,
+      duration,
       success,
-      userId: activeAgent.context.userId 
+      userId: activeAgent.context.userId
     }, 'Agent lifecycle ended');
   }
 
@@ -358,9 +357,9 @@ export function validateAgentConfig(): boolean {
       'OPENAI_MODEL_AGENTIC',
       'OPENAI_MODEL_PRIMARY'
     ];
-    
+
     const missing = requiredEnvVars.filter(varName => !process.env[varName]);
-    
+
     if (missing.length > 0) {
       logger.error({ missing }, 'Missing required environment variables for agents');
       return false;
@@ -376,7 +375,7 @@ export function validateAgentConfig(): boolean {
     };
 
     AgentConfigurationSchema.parse(testConfig);
-    
+
     logger.info('Agent configuration validated successfully');
     return true;
   } catch (error) {
@@ -392,7 +391,7 @@ export function createAgentConfig(
   overrides: Partial<AgentConfig> = {}
 ): AgentConfig {
   const capability = AGENT_CAPABILITIES[role];
-  
+
   const baseConfig: AgentConfig = {
     name: capability.name,
     role,

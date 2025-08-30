@@ -26,6 +26,10 @@ import voiceOnboardingRoutes from './routes/voice-onboarding.js';
 import serviceAccountRoutes from './routes/service-accounts.js';
 import testVoiceKYCRoutes from './routes/test-voice-kyc.js';
 
+// Import routingRoutes and webhookRoutes as they are used in the changes snippet
+import routingRoutes from './routes/routing.js'; // Assuming this route exists
+import webhookRoutes from './routes/webhooks.js'; // Assuming this route exists
+
 // Initialize agent registry
 import { agentRegistry } from './agents/agentRegistry.js';
 
@@ -77,6 +81,10 @@ app.use('/api/creator', creatorRoutes);
 app.use('/api/voice-onboarding', voiceOnboardingRoutes);
 app.use('/api/service-accounts', serviceAccountRoutes);
 app.use('/api/test-voice-kyc', testVoiceKYCRoutes);
+// Assuming these routes were intended to be added based on the changes snippet:
+app.use('/api/routing', routingRoutes);
+app.use('/webhooks', webhookRoutes);
+
 
 // Error handling middleware
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
