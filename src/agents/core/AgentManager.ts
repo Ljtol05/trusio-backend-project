@@ -1,18 +1,18 @@
 
-import { logger } from '../../lib/logger.js';
-import { agentLifecycleManager } from '../config.js';
-import { agentValidator } from './AgentValidator.js';
-import { agentContextManager } from './AgentContextManager.js';
-import { memoryManager } from './MemoryManager.js';
-import { goalTracker } from './GoalTracker.js';
-import { handoffManager } from './HandoffManager.js';
+import { logger } from '../../lib/logger.ts';
+import { agentLifecycleManager } from '../config.ts';
+import { agentValidator } from './AgentValidator.ts';
+import { agentContextManager } from './AgentContextManager.ts';
+import { memoryManager } from './MemoryManager.ts';
+import { goalTracker } from './GoalTracker.ts';
+import { handoffManager } from './HandoffManager.ts';
 import {
   FinancialAdvisorAgent,
   BudgetCoachAgent,
   TransactionAnalystAgent,
   InsightGeneratorAgent,
-} from '../agents/index.js';
-import type { FinancialContext, AgentExecutionResult } from '../types.js';
+} from '../multi_agents/index.ts';
+import type { FinancialContext, AgentExecutionResult } from '../types.ts';
 
 export class AgentManager {
   private agents: Map<string, any> = new Map();
