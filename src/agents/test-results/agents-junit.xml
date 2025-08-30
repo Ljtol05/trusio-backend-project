@@ -1,764 +1,331 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<testsuites name="vitest tests" tests="74" failures="47" errors="0" time="3.258">
-    <testsuite name="src/agents/__tests__/agentRegistry.test.ts" timestamp="2025-08-30T18:33:39.507Z" hostname="39c96b6516b9" tests="12" failures="10" errors="0" skipped="0" time="0.047">
-        <testcase classname="src/agents/__tests__/agentRegistry.test.ts" name="AgentRegistry &gt; Agent Initialization &gt; should initialize all required agents" time="0.01">
-            <failure message="expected {} to have property &apos;length&apos;" type="AssertionError">
-AssertionError: expected {} to have property &apos;length&apos;
- ❯ src/agents/__tests__/agentRegistry.test.ts:85:44
-            </failure>
-        </testcase>
-        <testcase classname="src/agents/__tests__/agentRegistry.test.ts" name="AgentRegistry &gt; Agent Initialization &gt; should properly assign tools to agents" time="0.001">
-            <failure message="expected undefined not to be undefined" type="AssertionError">
-AssertionError: expected undefined not to be undefined
- ❯ src/agents/__tests__/agentRegistry.test.ts:91:34
-            </failure>
-        </testcase>
-        <testcase classname="src/agents/__tests__/agentRegistry.test.ts" name="AgentRegistry &gt; Agent Routing &gt; should route budget-related messages to budget coach" time="0.007">
-            <failure message="expected Promise{…} to be BudgetCoachAgent{ …(2) } // Object.is equality" type="AssertionError">
-AssertionError: expected Promise{…} to be BudgetCoachAgent{ …(2) } // Object.is equality
-
-- Expected
-+ Received
-
-- BudgetCoachAgent {
--   &quot;agent&quot;: Object {
--     &quot;instructions&quot;: &quot;You are a specialized budget coaching agent with deep expertise in envelope budgeting. 
--   
--   EXPERTISE AREAS:
--   - Creating and optimizing envelope budgets
--   - Helping users allocate funds effectively across categories
--   - Teaching envelope budgeting best practices
--   - Troubleshooting budget issues and imbalances
--   - Setting realistic budget targets and goals
--   
--   TOOLS AVAILABLE:
--   - Budget analysis and variance calculation
--   - Envelope creation and management
--   - Fund transfer and balance optimization
--   - Category optimization and recommendations
--   
--   Focus on practical, actionable budgeting advice that users can implement immediately.
--   Help users understand the psychology of budgeting and build sustainable habits.&quot;,
--     &quot;model&quot;: &quot;gpt-4o&quot;,
--     &quot;name&quot;: &quot;Budget Coach&quot;,
--     &quot;tools&quot;: Array [
--       &quot;budget_analysis&quot;,
--       &quot;spending_patterns&quot;,
--       &quot;variance_calculation&quot;,
--       &quot;create_envelope&quot;,
--       &quot;transfer_funds&quot;,
--       &quot;manage_balance&quot;,
--       &quot;optimize_categories&quot;,
--       &quot;agent_handoff&quot;,
--     ],
--   },
--   &quot;isInitialized&quot;: true,
-- }
-+ Promise {}
-
- ❯ src/agents/__tests__/agentRegistry.test.ts:98:21
-            </failure>
-        </testcase>
-        <testcase classname="src/agents/__tests__/agentRegistry.test.ts" name="AgentRegistry &gt; Agent Routing &gt; should route transaction-related messages to transaction analyst" time="0.009">
-            <failure message="expected Promise{…} to be TransactionAnalystAgent{ …(2) } // Object.is equality" type="AssertionError">
-AssertionError: expected Promise{…} to be TransactionAnalystAgent{ …(2) } // Object.is equality
-
-- Expected
-+ Received
-
-- TransactionAnalystAgent {
--   &quot;agent&quot;: Object {
--     &quot;instructions&quot;: &quot;You are a specialized transaction analysis agent focused on spending insights.
--   
--   EXPERTISE AREAS:
--   - Analyzing spending patterns and trends
--   - Categorizing transactions automatically and accurately
--   - Detecting unusual spending or potential issues
--   - Providing insights into financial behavior and habits
--   - Identifying opportunities for optimization
--   
--   ANALYSIS CAPABILITIES:
--   - Pattern recognition in spending behavior
--   - Anomaly detection for unusual transactions
--   - Category-based spending analysis
--   - Seasonal and trend analysis
--   - Merchant and location-based insights
--   
--   Present findings in clear, actionable ways that help users make better financial decisions.
--   Focus on helping users understand their spending habits without being judgmental.&quot;,
--     &quot;model&quot;: &quot;gpt-4o&quot;,
--     &quot;name&quot;: &quot;Transaction Analyst&quot;,
--     &quot;tools&quot;: Array [
--       &quot;categorize_transaction&quot;,
--       &quot;auto_allocate&quot;,
--       &quot;recognize_patterns&quot;,
--       &quot;detect_anomalies&quot;,
--       &quot;analyze_spending_patterns&quot;,
--       &quot;analyze_budget_variance&quot;,
--       &quot;agent_handoff&quot;,
--     ],
--   },
--   &quot;isInitialized&quot;: true,
-- }
-+ Promise {}
-
- ❯ src/agents/__tests__/agentRegistry.test.ts:103:21
-            </failure>
-        </testcase>
-        <testcase classname="src/agents/__tests__/agentRegistry.test.ts" name="AgentRegistry &gt; Agent Routing &gt; should route insight-related messages to insight generator" time="0.004">
-            <failure message="expected Promise{…} to be InsightGeneratorAgent{ …(2) } // Object.is equality" type="AssertionError">
-AssertionError: expected Promise{…} to be InsightGeneratorAgent{ …(2) } // Object.is equality
-
-- Expected
-+ Received
-
-- InsightGeneratorAgent {
--   &quot;agent&quot;: Object {
--     &quot;instructions&quot;: &quot;You are a specialized insight generation agent focused on analytics and recommendations.
--   
--   EXPERTISE AREAS:
--   - Analyzing financial data to identify trends and patterns
--   - Generating personalized recommendations based on user behavior
--   - Tracking progress toward financial goals
--   - Providing predictive insights and early warnings
--   - Creating actionable financial forecasts
--   
--   ANALYTICAL TOOLS:
--   - Trend analysis and pattern recognition
--   - Goal progress tracking and projections
--   - Opportunity identification and recommendations
--   - Risk assessment and early warning systems
--   - Performance benchmarking and comparisons
--   
--   Use your analytical tools to provide data-driven insights that help users make informed financial decisions.
--   Focus on actionable recommendations that align with their financial goals and envelope budgeting strategy.&quot;,
--     &quot;model&quot;: &quot;gpt-4o&quot;,
--     &quot;name&quot;: &quot;Insight Generator&quot;,
--     &quot;tools&quot;: Array [
--       &quot;analyze_trends&quot;,
--       &quot;analyze_goal_progress&quot;,
--       &quot;generate_recommendations&quot;,
--       &quot;identify_opportunities&quot;,
--       &quot;detect_warnings&quot;,
--       &quot;track_achievements&quot;,
--       &quot;agent_handoff&quot;,
--     ],
--   },
--   &quot;isInitialized&quot;: true,
-- }
-+ Promise {}
-
- ❯ src/agents/__tests__/agentRegistry.test.ts:108:21
-            </failure>
-        </testcase>
-        <testcase classname="src/agents/__tests__/agentRegistry.test.ts" name="AgentRegistry &gt; Agent Routing &gt; should default to financial advisor for general messages" time="0.002">
-            <failure message="expected Promise{…} to be FinancialAdvisorAgent{ …(2) } // Object.is equality" type="AssertionError">
-AssertionError: expected Promise{…} to be FinancialAdvisorAgent{ …(2) } // Object.is equality
-
-- Expected
-+ Received
-
-- FinancialAdvisorAgent {
--   &quot;agent&quot;: Object {
--     &quot;instructions&quot;: &quot;You are the primary financial coaching agent and coordinator. Your role includes:
--   
--   CORE RESPONSIBILITIES:
--   - Provide comprehensive financial guidance using envelope budgeting principles
--   - Coordinate with specialist agents when needed using handoffs
--   - Help users understand their financial situation holistically  
--   - Encourage healthy financial habits and goal achievement
--   
--   HANDOFF STRATEGY:
--   - Use budget_coach for detailed budgeting assistance and envelope setup
--   - Use transaction_analyst for spending pattern analysis and categorization
--   - Use insight_generator for data-driven recommendations and trend analysis
--   - Use crisis_agent for urgent financial assistance or debt management
--   - Use onboarding_agent for new user setup and initial guidance
--   
--   Always maintain context when handing off and provide clear reasons for the handoff.&quot;,
--     &quot;model&quot;: &quot;gpt-4o&quot;,
--     &quot;name&quot;: &quot;Financial Advisor&quot;,
--     &quot;tools&quot;: Array [
--       &quot;generate_recommendations&quot;,
--       &quot;identify_opportunities&quot;,
--       &quot;track_achievements&quot;,
--       &quot;agent_handoff&quot;,
--     ],
--   },
--   &quot;isInitialized&quot;: true,
-- }
-+ Promise {}
-
- ❯ src/agents/__tests__/agentRegistry.test.ts:113:21
-            </failure>
-        </testcase>
-        <testcase classname="src/agents/__tests__/agentRegistry.test.ts" name="AgentRegistry &gt; Agent Execution &gt; should successfully run an agent with context" time="0.005">
-            <failure message="[vitest] No &quot;createAgentResponse&quot; export is defined on the &quot;../../lib/openai.ts&quot; mock. Did you forget to return it from &quot;vi.mock&quot;?
-If you need to partially mock a module, you can use &quot;importOriginal&quot; helper inside:
-" type="Error">
-Error: [vitest] No &quot;createAgentResponse&quot; export is defined on the &quot;../../lib/openai.ts&quot; mock. Did you forget to return it from &quot;vi.mock&quot;?
-If you need to partially mock a module, you can use &quot;importOriginal&quot; helper inside:
-
- ❯ AgentManager.runAgent src/agents/core/AgentManager.ts:139:15
- ❯ src/agents/__tests__/agentRegistry.test.ts:119:24
-            </failure>
-        </testcase>
-        <testcase classname="src/agents/__tests__/agentRegistry.test.ts" name="AgentRegistry &gt; Agent Execution &gt; should handle agent execution errors gracefully" time="0.004">
-            <failure message="expected [Function] to throw error including &apos;Failed to process request with financ…&apos; but got &apos;[vitest] No &quot;createAgentResponse&quot; exp…&apos;" type="AssertionError">
-AssertionError: expected [Function] to throw error including &apos;Failed to process request with financ…&apos; but got &apos;[vitest] No &quot;createAgentResponse&quot; exp…&apos;
-
-- Expected
-+ Received
-
-- Failed to process request with financial agent
-+ [vitest] No &quot;createAgentResponse&quot; export is defined on the &quot;../../lib/openai.ts&quot; mock. Did you forget to return it from &quot;vi.mock&quot;?
-+ If you need to partially mock a module, you can use &quot;importOriginal&quot; helper inside:
-+
-
- ❯ src/agents/__tests__/agentRegistry.test.ts:133:7
-            </failure>
-        </testcase>
-        <testcase classname="src/agents/__tests__/agentRegistry.test.ts" name="AgentRegistry &gt; Agent Execution &gt; should throw error for non-existent agent" time="0">
-        </testcase>
-        <testcase classname="src/agents/__tests__/agentRegistry.test.ts" name="AgentRegistry &gt; Agent Capabilities &gt; should return correct capabilities for each agent" time="0">
-            <failure message="expected [ &apos;budget_analysis&apos;, …(4) ] to include &apos;envelope_budgeting&apos;" type="AssertionError">
-AssertionError: expected [ &apos;budget_analysis&apos;, …(4) ] to include &apos;envelope_budgeting&apos;
- ❯ src/agents/__tests__/agentRegistry.test.ts:152:34
-            </failure>
-        </testcase>
-        <testcase classname="src/agents/__tests__/agentRegistry.test.ts" name="AgentRegistry &gt; Agent Capabilities &gt; should return empty array for non-existent agent capabilities" time="0.001">
-        </testcase>
-        <testcase classname="src/agents/__tests__/agentRegistry.test.ts" name="AgentRegistry &gt; Agent Metrics &gt; should return comprehensive metrics for all agents" time="0.001">
-            <failure message="expected { isAvailable: true, …(4) } to have property &quot;name&quot;" type="AssertionError">
-AssertionError: expected { isAvailable: true, …(4) } to have property &quot;name&quot;
- ❯ src/agents/__tests__/agentRegistry.test.ts:172:24
- ❯ src/agents/__tests__/agentRegistry.test.ts:171:30
+<testsuites name="vitest tests" tests="33" failures="33" errors="0" time="1.347">
+    <testsuite name="src/agents/__tests__/agentRegistry.test.ts" timestamp="2025-08-30T18:39:04.903Z" hostname="39c96b6516b9" tests="1" failures="1" errors="0" skipped="0" time="0">
+        <testcase classname="src/agents/__tests__/agentRegistry.test.ts" name="src/agents/__tests__/agentRegistry.test.ts" time="0">
+            <failure message="Cannot read properties of undefined (reading &apos;map&apos;)" type="TypeError">
+TypeError: Cannot read properties of undefined (reading &apos;map&apos;)
+ ❯ AgentRegistry.initializeAgents src/agents/agentRegistry.ts:22:41
+ ❯ new AgentRegistry src/agents/agentRegistry.ts:13:10
+ ❯ src/agents/agentRegistry.ts:133:30
+ ❯ src/agents/__tests__/agentRegistry.test.ts:25:25
             </failure>
         </testcase>
     </testsuite>
-    <testsuite name="src/agents/__tests__/integration.test.ts" timestamp="2025-08-30T18:33:39.517Z" hostname="39c96b6516b9" tests="16" failures="16" errors="0" skipped="0" time="0.244">
-        <testcase classname="src/agents/__tests__/integration.test.ts" name="Agent API Integration Tests &gt; POST /api/ai/chat &gt; should handle basic chat request successfully" time="0.053">
-            <failure message="expected 404 to be 200 // Object.is equality" type="AssertionError">
-AssertionError: expected 404 to be 200 // Object.is equality
-
-- Expected
-+ Received
-
-- 200
-+ 404
-
- ❯ src/agents/__tests__/integration.test.ts:78:31
+    <testsuite name="src/agents/__tests__/integration.test.ts" timestamp="2025-08-30T18:39:04.907Z" hostname="39c96b6516b9" tests="16" failures="16" errors="0" skipped="0" time="0.023">
+        <testcase classname="src/agents/__tests__/integration.test.ts" name="Agent API Integration Tests &gt; POST /api/ai/chat &gt; should handle basic chat request successfully" time="0.005">
+            <failure message="app.address is not a function" type="TypeError">
+TypeError: app.address is not a function
+ ❯ Test.serverAddress node_modules/supertest/lib/test.js:46:22
+ ❯ new Test node_modules/supertest/lib/test.js:34:14
+ ❯ Object.obj.&lt;computed&gt; [as post] node_modules/supertest/index.js:43:18
+ ❯ src/agents/__tests__/integration.test.ts:71:10
+            </failure>
+            <failure message="vi.clearTimers is not a function" type="TypeError">
+TypeError: vi.clearTimers is not a function
+ ❯ src/agents/__tests__/setup.ts:165:6
             </failure>
         </testcase>
-        <testcase classname="src/agents/__tests__/integration.test.ts" name="Agent API Integration Tests &gt; POST /api/ai/chat &gt; should route to appropriate agent based on message" time="0.009">
-            <failure message="expected 404 to be 200 // Object.is equality" type="AssertionError">
-AssertionError: expected 404 to be 200 // Object.is equality
-
-- Expected
-+ Received
-
-- 200
-+ 404
-
- ❯ src/agents/__tests__/integration.test.ts:94:31
+        <testcase classname="src/agents/__tests__/integration.test.ts" name="Agent API Integration Tests &gt; POST /api/ai/chat &gt; should route to appropriate agent based on message" time="0.001">
+            <failure message="app.address is not a function" type="TypeError">
+TypeError: app.address is not a function
+ ❯ Test.serverAddress node_modules/supertest/lib/test.js:46:22
+ ❯ new Test node_modules/supertest/lib/test.js:34:14
+ ❯ Object.obj.&lt;computed&gt; [as post] node_modules/supertest/index.js:43:18
+ ❯ src/agents/__tests__/integration.test.ts:87:10
+            </failure>
+            <failure message="vi.clearTimers is not a function" type="TypeError">
+TypeError: vi.clearTimers is not a function
+ ❯ src/agents/__tests__/setup.ts:165:6
             </failure>
         </testcase>
-        <testcase classname="src/agents/__tests__/integration.test.ts" name="Agent API Integration Tests &gt; POST /api/ai/chat &gt; should include conversation history when requested" time="0.005">
-            <failure message="expected 404 to be 200 // Object.is equality" type="AssertionError">
-AssertionError: expected 404 to be 200 // Object.is equality
-
-- Expected
-+ Received
-
-- 200
-+ 404
-
- ❯ src/agents/__tests__/integration.test.ts:124:31
+        <testcase classname="src/agents/__tests__/integration.test.ts" name="Agent API Integration Tests &gt; POST /api/ai/chat &gt; should include conversation history when requested" time="0.001">
+            <failure message="app.address is not a function" type="TypeError">
+TypeError: app.address is not a function
+ ❯ Test.serverAddress node_modules/supertest/lib/test.js:46:22
+ ❯ new Test node_modules/supertest/lib/test.js:34:14
+ ❯ Object.obj.&lt;computed&gt; [as post] node_modules/supertest/index.js:43:18
+ ❯ src/agents/__tests__/integration.test.ts:113:10
+            </failure>
+            <failure message="vi.clearTimers is not a function" type="TypeError">
+TypeError: vi.clearTimers is not a function
+ ❯ src/agents/__tests__/setup.ts:165:6
             </failure>
         </testcase>
-        <testcase classname="src/agents/__tests__/integration.test.ts" name="Agent API Integration Tests &gt; POST /api/ai/chat &gt; should handle validation errors" time="0.006">
-            <failure message="expected 404 to be 400 // Object.is equality" type="AssertionError">
-AssertionError: expected 404 to be 400 // Object.is equality
-
-- Expected
-+ Received
-
-- 400
-+ 404
-
- ❯ src/agents/__tests__/integration.test.ts:136:31
+        <testcase classname="src/agents/__tests__/integration.test.ts" name="Agent API Integration Tests &gt; POST /api/ai/chat &gt; should handle validation errors" time="0.001">
+            <failure message="app.address is not a function" type="TypeError">
+TypeError: app.address is not a function
+ ❯ Test.serverAddress node_modules/supertest/lib/test.js:46:22
+ ❯ new Test node_modules/supertest/lib/test.js:34:14
+ ❯ Object.obj.&lt;computed&gt; [as post] node_modules/supertest/index.js:43:18
+ ❯ src/agents/__tests__/integration.test.ts:130:10
+            </failure>
+            <failure message="vi.clearTimers is not a function" type="TypeError">
+TypeError: vi.clearTimers is not a function
+ ❯ src/agents/__tests__/setup.ts:165:6
             </failure>
         </testcase>
-        <testcase classname="src/agents/__tests__/integration.test.ts" name="Agent API Integration Tests &gt; POST /api/ai/chat &gt; should require authentication" time="0.007">
-            <failure message="expected 404 to be 401 // Object.is equality" type="AssertionError">
-AssertionError: expected 404 to be 401 // Object.is equality
-
-- Expected
-+ Received
-
-- 401
-+ 404
-
- ❯ src/agents/__tests__/integration.test.ts:148:31
+        <testcase classname="src/agents/__tests__/integration.test.ts" name="Agent API Integration Tests &gt; POST /api/ai/chat &gt; should require authentication" time="0.001">
+            <failure message="app.address is not a function" type="TypeError">
+TypeError: app.address is not a function
+ ❯ Test.serverAddress node_modules/supertest/lib/test.js:46:22
+ ❯ new Test node_modules/supertest/lib/test.js:34:14
+ ❯ Object.obj.&lt;computed&gt; [as post] node_modules/supertest/index.js:43:18
+ ❯ src/agents/__tests__/integration.test.ts:143:10
+            </failure>
+            <failure message="vi.clearTimers is not a function" type="TypeError">
+TypeError: vi.clearTimers is not a function
+ ❯ src/agents/__tests__/setup.ts:165:6
             </failure>
         </testcase>
-        <testcase classname="src/agents/__tests__/integration.test.ts" name="Agent API Integration Tests &gt; POST /api/ai/tools/execute &gt; should execute tool directly" time="0.005">
-            <failure message="expected 404 to be 200 // Object.is equality" type="AssertionError">
-AssertionError: expected 404 to be 200 // Object.is equality
-
-- Expected
-+ Received
-
-- 200
-+ 404
-
- ❯ src/agents/__tests__/integration.test.ts:166:31
+        <testcase classname="src/agents/__tests__/integration.test.ts" name="Agent API Integration Tests &gt; POST /api/ai/tools/execute &gt; should execute tool directly" time="0.001">
+            <failure message="app.address is not a function" type="TypeError">
+TypeError: app.address is not a function
+ ❯ Test.serverAddress node_modules/supertest/lib/test.js:46:22
+ ❯ new Test node_modules/supertest/lib/test.js:34:14
+ ❯ Object.obj.&lt;computed&gt; [as post] node_modules/supertest/index.js:43:18
+ ❯ src/agents/__tests__/integration.test.ts:155:10
+            </failure>
+            <failure message="vi.clearTimers is not a function" type="TypeError">
+TypeError: vi.clearTimers is not a function
+ ❯ src/agents/__tests__/setup.ts:165:6
             </failure>
         </testcase>
-        <testcase classname="src/agents/__tests__/integration.test.ts" name="Agent API Integration Tests &gt; POST /api/ai/tools/execute &gt; should handle tool execution errors" time="0.005">
-            <failure message="expected 404 to be 200 // Object.is equality" type="AssertionError">
-AssertionError: expected 404 to be 200 // Object.is equality
-
-- Expected
-+ Received
-
-- 200
-+ 404
-
- ❯ src/agents/__tests__/integration.test.ts:181:31
+        <testcase classname="src/agents/__tests__/integration.test.ts" name="Agent API Integration Tests &gt; POST /api/ai/tools/execute &gt; should handle tool execution errors" time="0.001">
+            <failure message="app.address is not a function" type="TypeError">
+TypeError: app.address is not a function
+ ❯ Test.serverAddress node_modules/supertest/lib/test.js:46:22
+ ❯ new Test node_modules/supertest/lib/test.js:34:14
+ ❯ Object.obj.&lt;computed&gt; [as post] node_modules/supertest/index.js:43:18
+ ❯ src/agents/__tests__/integration.test.ts:174:10
+            </failure>
+            <failure message="vi.clearTimers is not a function" type="TypeError">
+TypeError: vi.clearTimers is not a function
+ ❯ src/agents/__tests__/setup.ts:165:6
             </failure>
         </testcase>
-        <testcase classname="src/agents/__tests__/integration.test.ts" name="Agent API Integration Tests &gt; POST /api/ai/handoff &gt; should handle agent handoff successfully" time="0.005">
-            <failure message="expected 404 to be 200 // Object.is equality" type="AssertionError">
-AssertionError: expected 404 to be 200 // Object.is equality
-
-- Expected
-+ Received
-
-- 200
-+ 404
-
- ❯ src/agents/__tests__/integration.test.ts:200:31
+        <testcase classname="src/agents/__tests__/integration.test.ts" name="Agent API Integration Tests &gt; POST /api/ai/handoff &gt; should handle agent handoff successfully" time="0.001">
+            <failure message="app.address is not a function" type="TypeError">
+TypeError: app.address is not a function
+ ❯ Test.serverAddress node_modules/supertest/lib/test.js:46:22
+ ❯ new Test node_modules/supertest/lib/test.js:34:14
+ ❯ Object.obj.&lt;computed&gt; [as post] node_modules/supertest/index.js:43:18
+ ❯ src/agents/__tests__/integration.test.ts:190:10
+            </failure>
+            <failure message="vi.clearTimers is not a function" type="TypeError">
+TypeError: vi.clearTimers is not a function
+ ❯ src/agents/__tests__/setup.ts:165:6
             </failure>
         </testcase>
-        <testcase classname="src/agents/__tests__/integration.test.ts" name="Agent API Integration Tests &gt; POST /api/ai/handoff &gt; should validate agent names in handoff" time="0.012">
-            <failure message="expected 404 to be 400 // Object.is equality" type="AssertionError">
-AssertionError: expected 404 to be 400 // Object.is equality
-
-- Expected
-+ Received
-
-- 400
-+ 404
-
- ❯ src/agents/__tests__/integration.test.ts:218:31
+        <testcase classname="src/agents/__tests__/integration.test.ts" name="Agent API Integration Tests &gt; POST /api/ai/handoff &gt; should validate agent names in handoff" time="0.001">
+            <failure message="app.address is not a function" type="TypeError">
+TypeError: app.address is not a function
+ ❯ Test.serverAddress node_modules/supertest/lib/test.js:46:22
+ ❯ new Test node_modules/supertest/lib/test.js:34:14
+ ❯ Object.obj.&lt;computed&gt; [as post] node_modules/supertest/index.js:43:18
+ ❯ src/agents/__tests__/integration.test.ts:209:10
+            </failure>
+            <failure message="vi.clearTimers is not a function" type="TypeError">
+TypeError: vi.clearTimers is not a function
+ ❯ src/agents/__tests__/setup.ts:165:6
             </failure>
         </testcase>
-        <testcase classname="src/agents/__tests__/integration.test.ts" name="Agent API Integration Tests &gt; GET /api/ai/agents &gt; should return list of available agents" time="0.027">
-            <failure message="expected 404 to be 200 // Object.is equality" type="AssertionError">
-AssertionError: expected 404 to be 200 // Object.is equality
-
-- Expected
-+ Received
-
-- 200
-+ 404
-
- ❯ src/agents/__tests__/integration.test.ts:229:31
+        <testcase classname="src/agents/__tests__/integration.test.ts" name="Agent API Integration Tests &gt; GET /api/ai/agents &gt; should return list of available agents" time="0.001">
+            <failure message="app.address is not a function" type="TypeError">
+TypeError: app.address is not a function
+ ❯ Test.serverAddress node_modules/supertest/lib/test.js:46:22
+ ❯ new Test node_modules/supertest/lib/test.js:34:14
+ ❯ Object.obj.&lt;computed&gt; [as get] node_modules/supertest/index.js:43:18
+ ❯ src/agents/__tests__/integration.test.ts:226:10
+            </failure>
+            <failure message="vi.clearTimers is not a function" type="TypeError">
+TypeError: vi.clearTimers is not a function
+ ❯ src/agents/__tests__/setup.ts:165:6
             </failure>
         </testcase>
-        <testcase classname="src/agents/__tests__/integration.test.ts" name="Agent API Integration Tests &gt; GET /api/ai/tools &gt; should return list of available tools" time="0.015">
-            <failure message="expected 404 to be 200 // Object.is equality" type="AssertionError">
-AssertionError: expected 404 to be 200 // Object.is equality
-
-- Expected
-+ Received
-
-- 200
-+ 404
-
- ❯ src/agents/__tests__/integration.test.ts:250:31
+        <testcase classname="src/agents/__tests__/integration.test.ts" name="Agent API Integration Tests &gt; GET /api/ai/tools &gt; should return list of available tools" time="0.001">
+            <failure message="app.address is not a function" type="TypeError">
+TypeError: app.address is not a function
+ ❯ Test.serverAddress node_modules/supertest/lib/test.js:46:22
+ ❯ new Test node_modules/supertest/lib/test.js:34:14
+ ❯ Object.obj.&lt;computed&gt; [as get] node_modules/supertest/index.js:43:18
+ ❯ src/agents/__tests__/integration.test.ts:247:10
+            </failure>
+            <failure message="vi.clearTimers is not a function" type="TypeError">
+TypeError: vi.clearTimers is not a function
+ ❯ src/agents/__tests__/setup.ts:165:6
             </failure>
         </testcase>
-        <testcase classname="src/agents/__tests__/integration.test.ts" name="Agent API Integration Tests &gt; GET /api/ai/tools &gt; should filter tools by category" time="0.02">
-            <failure message="expected 404 to be 200 // Object.is equality" type="AssertionError">
-AssertionError: expected 404 to be 200 // Object.is equality
-
-- Expected
-+ Received
-
-- 200
-+ 404
-
- ❯ src/agents/__tests__/integration.test.ts:262:31
+        <testcase classname="src/agents/__tests__/integration.test.ts" name="Agent API Integration Tests &gt; GET /api/ai/tools &gt; should filter tools by category" time="0.001">
+            <failure message="app.address is not a function" type="TypeError">
+TypeError: app.address is not a function
+ ❯ Test.serverAddress node_modules/supertest/lib/test.js:46:22
+ ❯ new Test node_modules/supertest/lib/test.js:34:14
+ ❯ Object.obj.&lt;computed&gt; [as get] node_modules/supertest/index.js:43:18
+ ❯ src/agents/__tests__/integration.test.ts:259:10
+            </failure>
+            <failure message="vi.clearTimers is not a function" type="TypeError">
+TypeError: vi.clearTimers is not a function
+ ❯ src/agents/__tests__/setup.ts:165:6
             </failure>
         </testcase>
-        <testcase classname="src/agents/__tests__/integration.test.ts" name="Agent API Integration Tests &gt; GET /api/ai/sessions/:sessionId/history &gt; should return conversation history" time="0.035">
-            <failure message="expected 404 to be 200 // Object.is equality" type="AssertionError">
-AssertionError: expected 404 to be 200 // Object.is equality
-
-- Expected
-+ Received
-
-- 200
-+ 404
-
- ❯ src/agents/__tests__/integration.test.ts:287:31
+        <testcase classname="src/agents/__tests__/integration.test.ts" name="Agent API Integration Tests &gt; GET /api/ai/sessions/:sessionId/history &gt; should return conversation history" time="0.001">
+            <failure message="app.address is not a function" type="TypeError">
+TypeError: app.address is not a function
+ ❯ Test.serverAddress node_modules/supertest/lib/test.js:46:22
+ ❯ new Test node_modules/supertest/lib/test.js:34:14
+ ❯ Object.obj.&lt;computed&gt; [as get] node_modules/supertest/index.js:43:18
+ ❯ src/agents/__tests__/integration.test.ts:284:10
+            </failure>
+            <failure message="vi.clearTimers is not a function" type="TypeError">
+TypeError: vi.clearTimers is not a function
+ ❯ src/agents/__tests__/setup.ts:165:6
             </failure>
         </testcase>
-        <testcase classname="src/agents/__tests__/integration.test.ts" name="Agent API Integration Tests &gt; GET /api/ai/status &gt; should return system status" time="0.029">
-            <failure message="expected 404 to be 200 // Object.is equality" type="AssertionError">
-AssertionError: expected 404 to be 200 // Object.is equality
-
-- Expected
-+ Received
-
-- 200
-+ 404
-
- ❯ src/agents/__tests__/integration.test.ts:300:31
+        <testcase classname="src/agents/__tests__/integration.test.ts" name="Agent API Integration Tests &gt; GET /api/ai/status &gt; should return system status" time="0.001">
+            <failure message="app.address is not a function" type="TypeError">
+TypeError: app.address is not a function
+ ❯ Test.serverAddress node_modules/supertest/lib/test.js:46:22
+ ❯ new Test node_modules/supertest/lib/test.js:34:14
+ ❯ Object.obj.&lt;computed&gt; [as get] node_modules/supertest/index.js:43:18
+ ❯ src/agents/__tests__/integration.test.ts:297:10
+            </failure>
+            <failure message="vi.clearTimers is not a function" type="TypeError">
+TypeError: vi.clearTimers is not a function
+ ❯ src/agents/__tests__/setup.ts:165:6
             </failure>
         </testcase>
-        <testcase classname="src/agents/__tests__/integration.test.ts" name="Agent API Integration Tests &gt; Error Handling &gt; should handle database connection errors gracefully" time="0.004">
-            <failure message="expected 404 to be 500 // Object.is equality" type="AssertionError">
-AssertionError: expected 404 to be 500 // Object.is equality
-
-- Expected
-+ Received
-
-- 500
-+ 404
-
- ❯ src/agents/__tests__/integration.test.ts:320:31
+        <testcase classname="src/agents/__tests__/integration.test.ts" name="Agent API Integration Tests &gt; Error Handling &gt; should handle database connection errors gracefully" time="0.001">
+            <failure message="app.address is not a function" type="TypeError">
+TypeError: app.address is not a function
+ ❯ Test.serverAddress node_modules/supertest/lib/test.js:46:22
+ ❯ new Test node_modules/supertest/lib/test.js:34:14
+ ❯ Object.obj.&lt;computed&gt; [as post] node_modules/supertest/index.js:43:18
+ ❯ src/agents/__tests__/integration.test.ts:314:10
+            </failure>
+            <failure message="vi.clearTimers is not a function" type="TypeError">
+TypeError: vi.clearTimers is not a function
+ ❯ src/agents/__tests__/setup.ts:165:6
             </failure>
         </testcase>
-        <testcase classname="src/agents/__tests__/integration.test.ts" name="Agent API Integration Tests &gt; Error Handling &gt; should handle agent unavailability" time="0.004">
-            <failure message="expected 404 to be 500 // Object.is equality" type="AssertionError">
-AssertionError: expected 404 to be 500 // Object.is equality
-
-- Expected
-+ Received
-
-- 500
-+ 404
-
- ❯ src/agents/__tests__/integration.test.ts:334:31
+        <testcase classname="src/agents/__tests__/integration.test.ts" name="Agent API Integration Tests &gt; Error Handling &gt; should handle agent unavailability" time="0">
+            <failure message="app.address is not a function" type="TypeError">
+TypeError: app.address is not a function
+ ❯ Test.serverAddress node_modules/supertest/lib/test.js:46:22
+ ❯ new Test node_modules/supertest/lib/test.js:34:14
+ ❯ Object.obj.&lt;computed&gt; [as post] node_modules/supertest/index.js:43:18
+ ❯ src/agents/__tests__/integration.test.ts:328:10
             </failure>
-        </testcase>
-    </testsuite>
-    <testsuite name="src/agents/__tests__/performance.test.ts" timestamp="2025-08-30T18:33:39.527Z" hostname="39c96b6516b9" tests="12" failures="10" errors="0" skipped="0" time="0.574">
-        <testcase classname="src/agents/__tests__/performance.test.ts" name="Agent Performance Tests &gt; Agent Response Times &gt; should respond within acceptable time limits" time="0.019">
-            <failure message="[vitest] No &quot;createAgentResponse&quot; export is defined on the &quot;../../lib/openai.ts&quot; mock. Did you forget to return it from &quot;vi.mock&quot;?
-If you need to partially mock a module, you can use &quot;importOriginal&quot; helper inside:
-" type="Error">
-Error: [vitest] No &quot;createAgentResponse&quot; export is defined on the &quot;../../lib/openai.ts&quot; mock. Did you forget to return it from &quot;vi.mock&quot;?
-If you need to partially mock a module, you can use &quot;importOriginal&quot; helper inside:
-
- ❯ AgentManager.runAgent src/agents/core/AgentManager.ts:139:15
- ❯ measureExecutionTime src/agents/__tests__/performance.test.ts:10:18
- ❯ src/agents/__tests__/performance.test.ts:88:28
-            </failure>
-        </testcase>
-        <testcase classname="src/agents/__tests__/performance.test.ts" name="Agent Performance Tests &gt; Agent Response Times &gt; should handle multiple concurrent agent requests" time="0.008">
-            <failure message="[vitest] No &quot;createAgentResponse&quot; export is defined on the &quot;../../lib/openai.ts&quot; mock. Did you forget to return it from &quot;vi.mock&quot;?
-If you need to partially mock a module, you can use &quot;importOriginal&quot; helper inside:
-" type="Error">
-Error: [vitest] No &quot;createAgentResponse&quot; export is defined on the &quot;../../lib/openai.ts&quot; mock. Did you forget to return it from &quot;vi.mock&quot;?
-If you need to partially mock a module, you can use &quot;importOriginal&quot; helper inside:
-
- ❯ AgentManager.runAgent src/agents/core/AgentManager.ts:139:15
- ❯ runConcurrentOperations src/agents/__tests__/performance.test.ts:19:26
- ❯ measureExecutionTime src/agents/__tests__/performance.test.ts:10:18
- ❯ src/agents/__tests__/performance.test.ts:103:28
-            </failure>
-        </testcase>
-        <testcase classname="src/agents/__tests__/performance.test.ts" name="Agent Performance Tests &gt; Agent Response Times &gt; should maintain performance with large financial context" time="0.228">
-            <failure message="[vitest] No &quot;createAgentResponse&quot; export is defined on the &quot;../../lib/openai.ts&quot; mock. Did you forget to return it from &quot;vi.mock&quot;?
-If you need to partially mock a module, you can use &quot;importOriginal&quot; helper inside:
-" type="Error">
-Error: [vitest] No &quot;createAgentResponse&quot; export is defined on the &quot;../../lib/openai.ts&quot; mock. Did you forget to return it from &quot;vi.mock&quot;?
-If you need to partially mock a module, you can use &quot;importOriginal&quot; helper inside:
-
- ❯ AgentManager.runAgent src/agents/core/AgentManager.ts:139:15
- ❯ measureExecutionTime src/agents/__tests__/performance.test.ts:10:18
- ❯ src/agents/__tests__/performance.test.ts:131:28
-            </failure>
-        </testcase>
-        <testcase classname="src/agents/__tests__/performance.test.ts" name="Agent Performance Tests &gt; Tool Performance &gt; should execute tools within acceptable time limits" time="0.001">
-        </testcase>
-        <testcase classname="src/agents/__tests__/performance.test.ts" name="Agent Performance Tests &gt; Tool Performance &gt; should handle concurrent tool executions" time="0.009">
-            <failure message="expected false to be true // Object.is equality" type="AssertionError">
-AssertionError: expected false to be true // Object.is equality
-
-- Expected
-+ Received
-
-- true
-+ false
-
- ❯ src/agents/__tests__/performance.test.ts:171:36
- ❯ src/agents/__tests__/performance.test.ts:170:14
-            </failure>
-        </testcase>
-        <testcase classname="src/agents/__tests__/performance.test.ts" name="Agent Performance Tests &gt; Memory and Resource Usage &gt; should not leak memory during repeated operations" time="0.002">
-            <failure message="[vitest] No &quot;createAgentResponse&quot; export is defined on the &quot;../../lib/openai.ts&quot; mock. Did you forget to return it from &quot;vi.mock&quot;?
-If you need to partially mock a module, you can use &quot;importOriginal&quot; helper inside:
-" type="Error">
-Error: [vitest] No &quot;createAgentResponse&quot; export is defined on the &quot;../../lib/openai.ts&quot; mock. Did you forget to return it from &quot;vi.mock&quot;?
-If you need to partially mock a module, you can use &quot;importOriginal&quot; helper inside:
-
- ❯ AgentManager.runAgent src/agents/core/AgentManager.ts:139:15
- ❯ src/agents/__tests__/performance.test.ts:188:9
-            </failure>
-        </testcase>
-        <testcase classname="src/agents/__tests__/performance.test.ts" name="Agent Performance Tests &gt; Memory and Resource Usage &gt; should handle agent registry operations efficiently" time="0.094">
-        </testcase>
-        <testcase classname="src/agents/__tests__/performance.test.ts" name="Agent Performance Tests &gt; Stress Testing &gt; should handle high-frequency agent requests" time="0.009">
-            <failure message="[vitest] No &quot;createAgentResponse&quot; export is defined on the &quot;../../lib/openai.ts&quot; mock. Did you forget to return it from &quot;vi.mock&quot;?
-If you need to partially mock a module, you can use &quot;importOriginal&quot; helper inside:
-" type="Error">
-Error: [vitest] No &quot;createAgentResponse&quot; export is defined on the &quot;../../lib/openai.ts&quot; mock. Did you forget to return it from &quot;vi.mock&quot;?
-If you need to partially mock a module, you can use &quot;importOriginal&quot; helper inside:
-
- ❯ AgentManager.runAgent src/agents/core/AgentManager.ts:139:15
- ❯ runConcurrentOperations src/agents/__tests__/performance.test.ts:19:26
- ❯ src/agents/__tests__/performance.test.ts:234:23
-            </failure>
-        </testcase>
-        <testcase classname="src/agents/__tests__/performance.test.ts" name="Agent Performance Tests &gt; Stress Testing &gt; should gracefully degrade under extreme load" time="0.008">
-            <failure message="[vitest] No &quot;createAgentResponse&quot; export is defined on the &quot;../../lib/openai.ts&quot; mock. Did you forget to return it from &quot;vi.mock&quot;?
-If you need to partially mock a module, you can use &quot;importOriginal&quot; helper inside:
-" type="Error">
-Error: [vitest] No &quot;createAgentResponse&quot; export is defined on the &quot;../../lib/openai.ts&quot; mock. Did you forget to return it from &quot;vi.mock&quot;?
-If you need to partially mock a module, you can use &quot;importOriginal&quot; helper inside:
-
- ❯ AgentManager.runAgent src/agents/core/AgentManager.ts:139:15
- ❯ runConcurrentOperations src/agents/__tests__/performance.test.ts:19:26
- ❯ src/agents/__tests__/performance.test.ts:254:23
-            </failure>
-        </testcase>
-        <testcase classname="src/agents/__tests__/performance.test.ts" name="Agent Performance Tests &gt; Edge Cases and Resilience &gt; should handle malformed context gracefully" time="0.002">
-            <failure message="[vitest] No &quot;createAgentResponse&quot; export is defined on the &quot;../../lib/openai.ts&quot; mock. Did you forget to return it from &quot;vi.mock&quot;?
-If you need to partially mock a module, you can use &quot;importOriginal&quot; helper inside:
-" type="Error">
-Error: [vitest] No &quot;createAgentResponse&quot; export is defined on the &quot;../../lib/openai.ts&quot; mock. Did you forget to return it from &quot;vi.mock&quot;?
-If you need to partially mock a module, you can use &quot;importOriginal&quot; helper inside:
-
- ❯ AgentManager.runAgent src/agents/core/AgentManager.ts:139:15
- ❯ measureExecutionTime src/agents/__tests__/performance.test.ts:10:18
- ❯ src/agents/__tests__/performance.test.ts:273:28
-            </failure>
-        </testcase>
-        <testcase classname="src/agents/__tests__/performance.test.ts" name="Agent Performance Tests &gt; Edge Cases and Resilience &gt; should handle very long messages efficiently" time="0.002">
-            <failure message="[vitest] No &quot;createAgentResponse&quot; export is defined on the &quot;../../lib/openai.ts&quot; mock. Did you forget to return it from &quot;vi.mock&quot;?
-If you need to partially mock a module, you can use &quot;importOriginal&quot; helper inside:
-" type="Error">
-Error: [vitest] No &quot;createAgentResponse&quot; export is defined on the &quot;../../lib/openai.ts&quot; mock. Did you forget to return it from &quot;vi.mock&quot;?
-If you need to partially mock a module, you can use &quot;importOriginal&quot; helper inside:
-
- ❯ AgentManager.runAgent src/agents/core/AgentManager.ts:139:15
- ❯ measureExecutionTime src/agents/__tests__/performance.test.ts:10:18
- ❯ src/agents/__tests__/performance.test.ts:284:28
-            </failure>
-        </testcase>
-        <testcase classname="src/agents/__tests__/performance.test.ts" name="Agent Performance Tests &gt; Edge Cases and Resilience &gt; should maintain performance with frequent agent switching" time="0.016">
-            <failure message="[vitest] No &quot;createAgentResponse&quot; export is defined on the &quot;../../lib/openai.ts&quot; mock. Did you forget to return it from &quot;vi.mock&quot;?
-If you need to partially mock a module, you can use &quot;importOriginal&quot; helper inside:
-" type="Error">
-Error: [vitest] No &quot;createAgentResponse&quot; export is defined on the &quot;../../lib/openai.ts&quot; mock. Did you forget to return it from &quot;vi.mock&quot;?
-If you need to partially mock a module, you can use &quot;importOriginal&quot; helper inside:
-
- ❯ AgentManager.runAgent src/agents/core/AgentManager.ts:139:15
- ❯ src/agents/__tests__/performance.test.ts:299:11
- ❯ measureExecutionTime src/agents/__tests__/performance.test.ts:10:18
- ❯ src/agents/__tests__/performance.test.ts:296:28
+            <failure message="vi.clearTimers is not a function" type="TypeError">
+TypeError: vi.clearTimers is not a function
+ ❯ src/agents/__tests__/setup.ts:165:6
             </failure>
         </testcase>
     </testsuite>
-    <testsuite name="src/agents/__tests__/tools.test.ts" timestamp="2025-08-30T18:33:39.534Z" hostname="39c96b6516b9" tests="14" failures="0" errors="0" skipped="0" time="0.132">
-        <testcase classname="src/agents/__tests__/tools.test.ts" name="Financial Tools &gt; Tool Registry &gt; should have all required transaction tools registered" time="0.004">
+    <testsuite name="src/agents/__tests__/performance.test.ts" timestamp="2025-08-30T18:39:04.943Z" hostname="39c96b6516b9" tests="1" failures="1" errors="0" skipped="0" time="0">
+        <testcase classname="src/agents/__tests__/performance.test.ts" name="src/agents/__tests__/performance.test.ts" time="0">
+            <failure message="Cannot read properties of undefined (reading &apos;map&apos;)" type="TypeError">
+TypeError: Cannot read properties of undefined (reading &apos;map&apos;)
+ ❯ AgentRegistry.initializeAgents src/agents/agentRegistry.ts:22:41
+ ❯ new AgentRegistry src/agents/agentRegistry.ts:13:10
+ ❯ src/agents/agentRegistry.ts:133:30
+ ❯ src/agents/__tests__/performance.test.ts:22:25
+            </failure>
+        </testcase>
+    </testsuite>
+    <testsuite name="src/agents/__tests__/tools.test.ts" timestamp="2025-08-30T18:39:04.945Z" hostname="39c96b6516b9" tests="14" failures="14" errors="0" skipped="0" time="0.114">
+        <testcase classname="src/agents/__tests__/tools.test.ts" name="Financial Tools &gt; Tool Registry &gt; should have all required transaction tools registered" time="0.003">
+            <failure message="vi.clearTimers is not a function" type="TypeError">
+TypeError: vi.clearTimers is not a function
+ ❯ src/agents/__tests__/setup.ts:165:6
+            </failure>
         </testcase>
         <testcase classname="src/agents/__tests__/tools.test.ts" name="Financial Tools &gt; Tool Registry &gt; should return correct tool count" time="0.002">
+            <failure message="vi.clearTimers is not a function" type="TypeError">
+TypeError: vi.clearTimers is not a function
+ ❯ src/agents/__tests__/setup.ts:165:6
+            </failure>
         </testcase>
-        <testcase classname="src/agents/__tests__/tools.test.ts" name="Financial Tools &gt; Budget Tools &gt; should execute budget analysis tool successfully" time="0">
+        <testcase classname="src/agents/__tests__/tools.test.ts" name="Financial Tools &gt; Budget Tools &gt; should execute budget analysis tool successfully" time="0.001">
+            <failure message="vi.clearTimers is not a function" type="TypeError">
+TypeError: vi.clearTimers is not a function
+ ❯ src/agents/__tests__/setup.ts:165:6
+            </failure>
         </testcase>
-        <testcase classname="src/agents/__tests__/tools.test.ts" name="Financial Tools &gt; Budget Tools &gt; should handle budget analysis errors gracefully" time="0.001">
+        <testcase classname="src/agents/__tests__/tools.test.ts" name="Financial Tools &gt; Budget Tools &gt; should handle budget analysis errors gracefully" time="0">
+            <failure message="vi.clearTimers is not a function" type="TypeError">
+TypeError: vi.clearTimers is not a function
+ ❯ src/agents/__tests__/setup.ts:165:6
+            </failure>
         </testcase>
-        <testcase classname="src/agents/__tests__/tools.test.ts" name="Financial Tools &gt; Envelope Tools &gt; should create envelope successfully" time="0">
+        <testcase classname="src/agents/__tests__/tools.test.ts" name="Financial Tools &gt; Envelope Tools &gt; should create envelope successfully" time="0.001">
+            <failure message="vi.clearTimers is not a function" type="TypeError">
+TypeError: vi.clearTimers is not a function
+ ❯ src/agents/__tests__/setup.ts:165:6
+            </failure>
         </testcase>
         <testcase classname="src/agents/__tests__/tools.test.ts" name="Financial Tools &gt; Envelope Tools &gt; should transfer funds between envelopes" time="0">
+            <failure message="vi.clearTimers is not a function" type="TypeError">
+TypeError: vi.clearTimers is not a function
+ ❯ src/agents/__tests__/setup.ts:165:6
+            </failure>
         </testcase>
-        <testcase classname="src/agents/__tests__/tools.test.ts" name="Financial Tools &gt; Transaction Tools &gt; should categorize transactions correctly" time="0.003">
+        <testcase classname="src/agents/__tests__/tools.test.ts" name="Financial Tools &gt; Transaction Tools &gt; should categorize transactions correctly" time="0.001">
+            <failure message="vi.clearTimers is not a function" type="TypeError">
+TypeError: vi.clearTimers is not a function
+ ❯ src/agents/__tests__/setup.ts:165:6
+            </failure>
         </testcase>
-        <testcase classname="src/agents/__tests__/tools.test.ts" name="Financial Tools &gt; Transaction Tools &gt; should analyze spending patterns" time="0.001">
+        <testcase classname="src/agents/__tests__/tools.test.ts" name="Financial Tools &gt; Transaction Tools &gt; should analyze spending patterns" time="0.002">
+            <failure message="vi.clearTimers is not a function" type="TypeError">
+TypeError: vi.clearTimers is not a function
+ ❯ src/agents/__tests__/setup.ts:165:6
+            </failure>
         </testcase>
-        <testcase classname="src/agents/__tests__/tools.test.ts" name="Financial Tools &gt; Analysis Tools &gt; should analyze budget variance" time="0.001">
+        <testcase classname="src/agents/__tests__/tools.test.ts" name="Financial Tools &gt; Analysis Tools &gt; should analyze budget variance" time="0">
+            <failure message="vi.clearTimers is not a function" type="TypeError">
+TypeError: vi.clearTimers is not a function
+ ❯ src/agents/__tests__/setup.ts:165:6
+            </failure>
         </testcase>
-        <testcase classname="src/agents/__tests__/tools.test.ts" name="Financial Tools &gt; Insight Tools &gt; should generate personalized recommendations" time="0.004">
+        <testcase classname="src/agents/__tests__/tools.test.ts" name="Financial Tools &gt; Insight Tools &gt; should generate personalized recommendations" time="0.001">
+            <failure message="vi.clearTimers is not a function" type="TypeError">
+TypeError: vi.clearTimers is not a function
+ ❯ src/agents/__tests__/setup.ts:165:6
+            </failure>
         </testcase>
         <testcase classname="src/agents/__tests__/tools.test.ts" name="Financial Tools &gt; Insight Tools &gt; should identify financial opportunities" time="0">
+            <failure message="vi.clearTimers is not a function" type="TypeError">
+TypeError: vi.clearTimers is not a function
+ ❯ src/agents/__tests__/setup.ts:165:6
+            </failure>
         </testcase>
-        <testcase classname="src/agents/__tests__/tools.test.ts" name="Financial Tools &gt; Agent Handoff Tool &gt; should execute agent handoff successfully" time="0">
+        <testcase classname="src/agents/__tests__/tools.test.ts" name="Financial Tools &gt; Agent Handoff Tool &gt; should execute agent handoff successfully" time="0.001">
+            <failure message="vi.clearTimers is not a function" type="TypeError">
+TypeError: vi.clearTimers is not a function
+ ❯ src/agents/__tests__/setup.ts:165:6
+            </failure>
         </testcase>
-        <testcase classname="src/agents/__tests__/tools.test.ts" name="Financial Tools &gt; Tool Error Handling &gt; should handle non-existent tool gracefully" time="0.001">
+        <testcase classname="src/agents/__tests__/tools.test.ts" name="Financial Tools &gt; Tool Error Handling &gt; should handle non-existent tool gracefully" time="0">
+            <failure message="vi.clearTimers is not a function" type="TypeError">
+TypeError: vi.clearTimers is not a function
+ ❯ src/agents/__tests__/setup.ts:165:6
+            </failure>
         </testcase>
-        <testcase classname="src/agents/__tests__/tools.test.ts" name="Financial Tools &gt; Tool Error Handling &gt; should handle tool execution timeout" time="0.101">
+        <testcase classname="src/agents/__tests__/tools.test.ts" name="Financial Tools &gt; Tool Error Handling &gt; should handle tool execution timeout" time="0.102">
+            <failure message="vi.clearTimers is not a function" type="TypeError">
+TypeError: vi.clearTimers is not a function
+ ❯ src/agents/__tests__/setup.ts:165:6
+            </failure>
         </testcase>
     </testsuite>
-    <testsuite name="src/agents/__tests__/validation.test.ts" timestamp="2025-08-30T18:33:39.538Z" hostname="39c96b6516b9" tests="20" failures="11" errors="0" skipped="0" time="0.037">
-        <testcase classname="src/agents/__tests__/validation.test.ts" name="Data Validation Tests &gt; Schema Validation &gt; AgentConfigSchema &gt; should validate correct agent configuration" time="0.013">
-            <failure message="expected false to be true // Object.is equality" type="AssertionError">
-AssertionError: expected false to be true // Object.is equality
-
-- Expected
-+ Received
-
-- true
-+ false
-
- ❯ src/agents/__tests__/validation.test.ts:57:32
-            </failure>
-        </testcase>
-        <testcase classname="src/agents/__tests__/validation.test.ts" name="Data Validation Tests &gt; Schema Validation &gt; AgentConfigSchema &gt; should reject invalid agent configuration" time="0.001">
-        </testcase>
-        <testcase classname="src/agents/__tests__/validation.test.ts" name="Data Validation Tests &gt; Schema Validation &gt; FinancialContextSchema &gt; should validate correct financial context" time="0.001">
-        </testcase>
-        <testcase classname="src/agents/__tests__/validation.test.ts" name="Data Validation Tests &gt; Schema Validation &gt; FinancialContextSchema &gt; should accept minimal financial context" time="0.001">
-        </testcase>
-        <testcase classname="src/agents/__tests__/validation.test.ts" name="Data Validation Tests &gt; Schema Validation &gt; FinancialContextSchema &gt; should reject invalid financial context" time="0.001">
-        </testcase>
-        <testcase classname="src/agents/__tests__/validation.test.ts" name="Data Validation Tests &gt; Schema Validation &gt; AgentResponseSchema &gt; should validate correct agent response" time="0.001">
-        </testcase>
-        <testcase classname="src/agents/__tests__/validation.test.ts" name="Data Validation Tests &gt; Schema Validation &gt; AgentResponseSchema &gt; should reject invalid agent response" time="0">
-        </testcase>
-        <testcase classname="src/agents/__tests__/validation.test.ts" name="Data Validation Tests &gt; Tool Parameter Validation &gt; should validate budget analysis parameters" time="0.001">
-        </testcase>
-        <testcase classname="src/agents/__tests__/validation.test.ts" name="Data Validation Tests &gt; Tool Parameter Validation &gt; should reject invalid tool parameters" time="0.002">
-            <failure message="expected &apos;Tool not found: create_envelope&apos; to contain &apos;validation&apos;" type="AssertionError">
-AssertionError: expected &apos;Tool not found: create_envelope&apos; to contain &apos;validation&apos;
-
-- Expected
-+ Received
-
-- validation
-+ Tool not found: create_envelope
-
- ❯ src/agents/__tests__/validation.test.ts:217:28
-            </failure>
-        </testcase>
-        <testcase classname="src/agents/__tests__/validation.test.ts" name="Data Validation Tests &gt; Error Handling Validation &gt; should handle database validation errors gracefully" time="0.001">
-            <failure message="expected &apos;Tool not found: budget_analysis&apos; to contain &apos;Validation failed&apos;" type="AssertionError">
-AssertionError: expected &apos;Tool not found: budget_analysis&apos; to contain &apos;Validation failed&apos;
-
-- Expected
-+ Received
-
-- Validation failed
-+ Tool not found: budget_analysis
-
- ❯ src/agents/__tests__/validation.test.ts:242:28
-            </failure>
-        </testcase>
-        <testcase classname="src/agents/__tests__/validation.test.ts" name="Data Validation Tests &gt; Error Handling Validation &gt; should validate agent handoff parameters" time="0.001">
-            <failure message="expected false to be true // Object.is equality" type="AssertionError">
-AssertionError: expected false to be true // Object.is equality
-
-- Expected
-+ Received
-
-- true
-+ false
-
- ❯ src/agents/__tests__/validation.test.ts:260:30
-            </failure>
-        </testcase>
-        <testcase classname="src/agents/__tests__/validation.test.ts" name="Data Validation Tests &gt; Error Handling Validation &gt; should reject invalid handoff parameters" time="0.001">
-            <failure message="expected &apos;Tool not found: agent_handoff&apos; to contain &apos;validation&apos;" type="AssertionError">
-AssertionError: expected &apos;Tool not found: agent_handoff&apos; to contain &apos;validation&apos;
-
-- Expected
-+ Received
-
-- validation
-+ Tool not found: agent_handoff
-
- ❯ src/agents/__tests__/validation.test.ts:278:28
-            </failure>
-        </testcase>
-        <testcase classname="src/agents/__tests__/validation.test.ts" name="Data Validation Tests &gt; Input Sanitization &gt; should sanitize user input messages" time="0.004">
-            <failure message="Input validation failed: Potentially malicious content detected" type="Error">
-Error: Input validation failed: Potentially malicious content detected
- ❯ AgentManager.runAgent src/agents/core/AgentManager.ts:139:15
- ❯ src/agents/__tests__/validation.test.ts:286:22
-            </failure>
-        </testcase>
-        <testcase classname="src/agents/__tests__/validation.test.ts" name="Data Validation Tests &gt; Input Sanitization &gt; should handle SQL injection attempts in parameters" time="0.001">
-            <failure message="expected &apos;Tool not found: categorize_transaction&apos; to contain &apos;validation&apos;" type="AssertionError">
-AssertionError: expected &apos;Tool not found: categorize_transaction&apos; to contain &apos;validation&apos;
-
-- Expected
-+ Received
-
-- validation
-+ Tool not found: categorize_transaction
-
- ❯ src/agents/__tests__/validation.test.ts:311:28
-            </failure>
-        </testcase>
-        <testcase classname="src/agents/__tests__/validation.test.ts" name="Data Validation Tests &gt; Input Sanitization &gt; should validate envelope creation with proper limits" time="0.001">
-            <failure message="expected &apos;Tool not found: create_envelope&apos; to contain &apos;validation&apos;" type="AssertionError">
-AssertionError: expected &apos;Tool not found: create_envelope&apos; to contain &apos;validation&apos;
-
-- Expected
-+ Received
-
-- validation
-+ Tool not found: create_envelope
-
- ❯ src/agents/__tests__/validation.test.ts:329:28
-            </failure>
-        </testcase>
-        <testcase classname="src/agents/__tests__/validation.test.ts" name="Data Validation Tests &gt; Type Safety Validation &gt; should enforce type safety in agent responses" time="0.001">
-        </testcase>
-        <testcase classname="src/agents/__tests__/validation.test.ts" name="Data Validation Tests &gt; Type Safety Validation &gt; should enforce type safety in financial context" time="0">
-        </testcase>
-        <testcase classname="src/agents/__tests__/validation.test.ts" name="Data Validation Tests &gt; Business Logic Validation &gt; should validate financial constraints" time="0.001">
-            <failure message="expected &apos;Tool not found: transfer_funds&apos; to contain &apos;positive amount&apos;" type="AssertionError">
-AssertionError: expected &apos;Tool not found: transfer_funds&apos; to contain &apos;positive amount&apos;
-
-- Expected
-+ Received
-
-- positive amount
-+ Tool not found: transfer_funds
-
- ❯ src/agents/__tests__/validation.test.ts:373:28
-            </failure>
-        </testcase>
-        <testcase classname="src/agents/__tests__/validation.test.ts" name="Data Validation Tests &gt; Business Logic Validation &gt; should validate budget constraints" time="0.001">
-            <failure message="expected &apos;Tool not found: create_envelope&apos; to contain &apos;validation&apos;" type="AssertionError">
-AssertionError: expected &apos;Tool not found: create_envelope&apos; to contain &apos;validation&apos;
-
-- Expected
-+ Received
-
-- validation
-+ Tool not found: create_envelope
-
- ❯ src/agents/__tests__/validation.test.ts:391:28
-            </failure>
-        </testcase>
-        <testcase classname="src/agents/__tests__/validation.test.ts" name="Data Validation Tests &gt; Business Logic Validation &gt; should validate date constraints" time="0.001">
-            <failure message="expected false to be true // Object.is equality" type="AssertionError">
-AssertionError: expected false to be true // Object.is equality
-
-- Expected
-+ Received
-
-- true
-+ false
-
- ❯ src/agents/__tests__/validation.test.ts:409:30
+    <testsuite name="src/agents/__tests__/validation.test.ts" timestamp="2025-08-30T18:39:04.979Z" hostname="39c96b6516b9" tests="1" failures="1" errors="0" skipped="0" time="0">
+        <testcase classname="src/agents/__tests__/validation.test.ts" name="src/agents/__tests__/validation.test.ts" time="0">
+            <failure message="Cannot read properties of undefined (reading &apos;map&apos;)" type="TypeError">
+TypeError: Cannot read properties of undefined (reading &apos;map&apos;)
+ ❯ AgentRegistry.initializeAgents src/agents/agentRegistry.ts:22:41
+ ❯ new AgentRegistry src/agents/agentRegistry.ts:13:10
+ ❯ src/agents/agentRegistry.ts:133:30
+ ❯ src/agents/__tests__/validation.test.ts:23:25
             </failure>
         </testcase>
     </testsuite>

@@ -1,0 +1,101 @@
+~/workspace$ npm run test:agents 2>&1 | head -100
+
+> envelope-app-backend@1.0.0 test:agents
+> vitest run --config vitest.config.agents.ts
+
+
+ RUN  v1.6.1 /home/runner/workspace
+
+stdout | src/config/env.ts:65:11
+[env] ✅ OpenAI client initialized
+
+stdout | src/config/env.ts:65:11
+[env] ✅ OpenAI client initialized
+
+ × src/agents/__tests__/integration.test.ts > Agent API Integration Tests > POST /api/ai/chat > should handle basic chat request successfully
+   → app.address is not a function
+   → vi.clearTimers is not a function
+ × src/agents/__tests__/integration.test.ts > Agent API Integration Tests > POST /api/ai/chat > should route to appropriate agent based on message
+   → app.address is not a function
+   → vi.clearTimers is not a function
+ × src/agents/__tests__/integration.test.ts > Agent API Integration Tests > POST /api/ai/chat > should include conversation history when requested
+   → app.address is not a function
+   → vi.clearTimers is not a function
+ × src/agents/__tests__/integration.test.ts > Agent API Integration Tests > POST /api/ai/chat > should handle validation errors
+   → app.address is not a function
+   → vi.clearTimers is not a function
+ × src/agents/__tests__/integration.test.ts > Agent API Integration Tests > POST /api/ai/chat > should require authentication
+   → app.address is not a function
+   → vi.clearTimers is not a function
+ × src/agents/__tests__/integration.test.ts > Agent API Integration Tests > POST /api/ai/tools/execute > should execute tool directly
+   → app.address is not a function
+   → vi.clearTimers is not a function
+ × src/agents/__tests__/integration.test.ts > Agent API Integration Tests > POST /api/ai/tools/execute > should handle tool execution errors
+   → app.address is not a function
+   → vi.clearTimers is not a function
+ × src/agents/__tests__/integration.test.ts > Agent API Integration Tests > POST /api/ai/handoff > should handle agent handoff successfully
+   → app.address is not a function
+   → vi.clearTimers is not a function
+ × src/agents/__tests__/integration.test.ts > Agent API Integration Tests > POST /api/ai/handoff > should validate agent names in handoff
+   → app.address is not a function
+   → vi.clearTimers is not a function
+ × src/agents/__tests__/integration.test.ts > Agent API Integration Tests > GET /api/ai/agents > should return list of available agents
+   → app.address is not a function
+   → vi.clearTimers is not a function
+ × src/agents/__tests__/integration.test.ts > Agent API Integration Tests > GET /api/ai/tools > should return list of available tools
+   → app.address is not a function
+   → vi.clearTimers is not a function
+ × src/agents/__tests__/integration.test.ts > Agent API Integration Tests > GET /api/ai/tools > should filter tools by category
+   → app.address is not a function
+   → vi.clearTimers is not a function
+ × src/agents/__tests__/integration.test.ts > Agent API Integration Tests > GET /api/ai/sessions/:sessionId/history > should return conversation history
+   → app.address is not a function
+   → vi.clearTimers is not a function
+ × src/agents/__tests__/integration.test.ts > Agent API Integration Tests > GET /api/ai/status > should return system status
+   → app.address is not a function
+   → vi.clearTimers is not a function
+ × src/agents/__tests__/integration.test.ts > Agent API Integration Tests > Error Handling > should handle database connection errors gracefully
+   → app.address is not a function
+   → vi.clearTimers is not a function
+ × src/agents/__tests__/integration.test.ts > Agent API Integration Tests > Error Handling > should handle agent unavailability
+   → app.address is not a function
+   → vi.clearTimers is not a function
+stdout | src/config/env.ts:65:11
+[env] ✅ OpenAI client initialized
+
+ × src/agents/__tests__/tools.test.ts > Financial Tools > Tool Registry > should have all required transaction tools registered
+   → vi.clearTimers is not a function
+ × src/agents/__tests__/tools.test.ts > Financial Tools > Tool Registry > should return correct tool count
+   → vi.clearTimers is not a function
+ × src/agents/__tests__/tools.test.ts > Financial Tools > Budget Tools > should execute budget analysis tool successfully
+   → vi.clearTimers is not a function
+ × src/agents/__tests__/tools.test.ts > Financial Tools > Budget Tools > should handle budget analysis errors gracefully
+   → vi.clearTimers is not a function
+ × src/agents/__tests__/tools.test.ts > Financial Tools > Envelope Tools > should create envelope successfully
+   → vi.clearTimers is not a function
+ × src/agents/__tests__/tools.test.ts > Financial Tools > Envelope Tools > should transfer funds between envelopes
+   → vi.clearTimers is not a function
+ × src/agents/__tests__/tools.test.ts > Financial Tools > Transaction Tools > should categorize transactions correctly
+   → vi.clearTimers is not a function
+ × src/agents/__tests__/tools.test.ts > Financial Tools > Transaction Tools > should analyze spending patterns
+   → vi.clearTimers is not a function
+ × src/agents/__tests__/tools.test.ts > Financial Tools > Analysis Tools > should analyze budget variance
+   → vi.clearTimers is not a function
+ × src/agents/__tests__/tools.test.ts > Financial Tools > Insight Tools > should generate personalized recommendations
+   → vi.clearTimers is not a function
+ × src/agents/__tests__/tools.test.ts > Financial Tools > Insight Tools > should identify financial opportunities
+   → vi.clearTimers is not a function
+ × src/agents/__tests__/tools.test.ts > Financial Tools > Agent Handoff Tool > should execute agent handoff successfully
+   → vi.clearTimers is not a function
+ × src/agents/__tests__/tools.test.ts > Financial Tools > Tool Error Handling > should handle non-existent tool gracefully
+   → vi.clearTimers is not a function
+ × src/agents/__tests__/tools.test.ts > Financial Tools > Tool Error Handling > should handle tool execution timeout
+   → vi.clearTimers is not a function
+stdout | src/config/env.ts:65:11
+[env] ✅ OpenAI client initialized
+
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |agents| src/agents/__tests__/agentRegistry.test.ts [ src/agents/__tests__/agentRegistry.test.ts ]
+TypeError: Cannot read properties of undefined (reading 'map')
