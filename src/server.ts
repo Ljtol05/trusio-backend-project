@@ -25,10 +25,8 @@ import creatorRoutes from './routes/creator.js';
 import voiceOnboardingRoutes from './routes/voice-onboarding.js';
 import serviceAccountRoutes from './routes/service-accounts.js';
 import testVoiceKYCRoutes from './routes/test-voice-kyc.js';
-
-// Import routingRoutes and webhookRoutes as they are used in the changes snippet
-import routingRoutes from './routes/routing.js'; // Assuming this route exists
-import webhookRoutes from './routes/webhooks.js'; // Assuming this route exists
+import routingRoutes from './routes/routing.js';
+import webhookRoutes from './routes/webhooks.js';
 
 // Initialize agent registry
 import { agentRegistry } from './agents/agentRegistry.js';
@@ -65,7 +63,7 @@ app.get('/healthz', (req, res) => {
 // API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/onboarding', onboardingRoutes);
-app.use('/api/ai', aiRoutes); // Enhanced with financial coaching
+app.use('/api/ai', aiRoutes); // Enhanced with financial coaching and agent system
 app.use('/api/envelopes', envelopeRoutes);
 app.use('/api/transactions', transactionRoutes);
 app.use('/api/transfers', transferRoutes);
@@ -81,9 +79,8 @@ app.use('/api/creator', creatorRoutes);
 app.use('/api/voice-onboarding', voiceOnboardingRoutes);
 app.use('/api/service-accounts', serviceAccountRoutes);
 app.use('/api/test-voice-kyc', testVoiceKYCRoutes);
-// Assuming these routes were intended to be added based on the changes snippet:
 app.use('/api/routing', routingRoutes);
-app.use('/webhooks', webhookRoutes);
+app.use('/api/webhooks', webhookRoutes);
 
 
 // Error handling middleware

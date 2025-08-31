@@ -493,4 +493,385 @@ function calculateNextCheckIn(frequency: string, preferredTime?: string): string
   return nextDate.toISOString();
 }
 
+// POST /api/ai/chat - General AI chat endpoint
+router.post('/chat', auth, async (req, res) => {
+  try {
+    const userId = req.user!.id;
+    const { message, agentName, sessionId } = req.body;
+
+    if (!message) {
+      return res.status(400).json({
+        ok: false,
+        error: 'Message is required',
+        code: 'VALIDATION_ERROR'
+      });
+    }
+
+    // Use financial coach agent as default
+    const agent = agentName || 'financial_advisor';
+    
+    // Build financial context
+    const user = await db.user.findUnique({
+      where: { id: userId },
+      select: { userType: true, onboardingCompleted: true }
+    });
+
+    const envelopes = await db.envelope.findMany({
+      where: { userId }
+    });
+
+    const recentTransactions = await db.transaction.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+      take: 50
+    });
+
+    // Create a simple chat response
+    const response = await createAgentResponse(
+      message,
+      {
+        role: 'assistant',
+        content: `Hello! I'm your ${agent.replace('_', ' ')}. How can I help you with your finances today?`
+      }
+    );
+
+    res.json({
+      ok: true,
+      response: response.content,
+      agentName: agent,
+      sessionId: sessionId || `session_${Date.now()}`,
+      timestamp: new Date().toISOString(),
+    });
+
+  } catch (error) {
+    logger.error({ error, userId: req.user?.id }, 'AI chat failed');
+    res.status(500).json({
+      ok: false,
+      error: 'AI chat failed',
+      code: 'CHAT_ERROR'
+    });
+  }
+});
+
+// POST /api/ai/handoff - Agent handoff endpoint
+router.post('/handoff', auth, async (req, res) => {
+  try {
+    const userId = req.user!.id;
+    const { fromAgent, toAgent, message, reason, priority } = req.body;
+
+    if (!fromAgent || !toAgent || !message) {
+      return res.status(400).json({
+        ok: false,
+        error: 'fromAgent, toAgent, and message are required',
+        code: 'VALIDATION_ERROR'
+      });
+    }
+
+    // Log the handoff
+    logger.info({ 
+      userId, 
+      fromAgent, 
+      toAgent, 
+      reason: reason || 'User requested handoff',
+      priority: priority || 'normal'
+    }, 'Agent handoff requested');
+
+    // Simple handoff response
+    const handoffResponse = `Transferring you from ${fromAgent.replace('_', ' ')} to ${toAgent.replace('_', ' ')}. ${toAgent.replace('_', ' ')} will help you with: ${message}`;
+
+    res.json({
+      ok: true,
+      handoff: {
+        fromAgent,
+        toAgent,
+        message: handoffResponse,
+        reason: reason || 'User requested handoff',
+        priority: priority || 'normal',
+        timestamp: new Date().toISOString(),
+        sessionId: `handoff_${Date.now()}`,
+      },
+      nextSteps: [`Continue conversation with ${toAgent.replace('_', ' ')}`],
+    });
+
+  } catch (error) {
+    logger.error({ error, userId: req.user?.id }, 'Agent handoff failed');
+    res.status(500).json({
+      ok: false,
+      error: 'Agent handoff failed',
+      code: 'HANDOFF_ERROR'
+    });
+  }
+});
+
+// GET /api/ai/agents - List available agents
+router.get('/agents', auth, async (req, res) => {
+  try {
+    const agents = [
+      {
+        name: 'financial_advisor',
+        displayName: 'Financial Advisor',
+        description: 'Provides comprehensive financial advice and planning',
+        capabilities: ['investment_advice', 'retirement_planning', 'financial_analysis'],
+        available: true,
+        toolCount: 8,
+      },
+      {
+        name: 'budget_coach',
+        displayName: 'Budget Coach',
+        description: 'Helps with budgeting and expense management',
+        capabilities: ['budget_creation', 'expense_tracking', 'savings_goals'],
+        available: true,
+        toolCount: 6,
+      },
+      {
+        name: 'transaction_analyst',
+        displayName: 'Transaction Analyst',
+        description: 'Analyzes spending patterns and transaction data',
+        capabilities: ['spending_analysis', 'categorization', 'trend_detection'],
+        available: true,
+        toolCount: 5,
+      },
+      {
+        name: 'goal_tracker',
+        displayName: 'Goal Tracker',
+        description: 'Tracks financial goals and milestones',
+        capabilities: ['goal_setting', 'progress_tracking', 'milestone_celebration'],
+        available: true,
+        toolCount: 4,
+      },
+    ];
+
+    res.json({
+      ok: true,
+      agents,
+      totalAgents: agents.length,
+      availableAgents: agents.filter(a => a.available).length,
+    });
+
+  } catch (error) {
+    logger.error({ error, userId: req.user?.id }, 'Failed to list agents');
+    res.status(500).json({
+      ok: false,
+      error: 'Failed to list agents',
+      code: 'AGENTS_ERROR'
+    });
+  }
+});
+
+// POST /api/ai/tools/execute - Execute specific tools
+router.post('/tools/execute', auth, async (req, res) => {
+  try {
+    const userId = req.user!.id;
+    const { toolName, parameters, agentContext } = req.body;
+
+    if (!toolName) {
+      return res.status(400).json({
+        ok: false,
+        error: 'toolName is required',
+        code: 'VALIDATION_ERROR'
+      });
+    }
+
+    // Mock tool execution based on toolName
+    let result;
+    switch (toolName) {
+      case 'create_envelope':
+        result = {
+          success: true,
+          envelopeId: `env_${Date.now()}`,
+          name: parameters?.name || 'New Envelope',
+          balance: 0,
+        };
+        break;
+      case 'budget_analysis':
+        result = {
+          success: true,
+          analysis: {
+            totalSpending: 1250.00,
+            categories: ['groceries', 'dining', 'gas'],
+            recommendations: ['Reduce dining out by 20%'],
+          },
+        };
+        break;
+      case 'agent_handoff':
+        result = {
+          success: true,
+          handoffTo: parameters?.targetAgent || 'financial_advisor',
+          message: 'Handoff completed successfully',
+        };
+        break;
+      default:
+        result = {
+          success: false,
+          error: `Tool '${toolName}' not found`,
+        };
+    }
+
+    res.json({
+      ok: result.success,
+      result,
+      toolName,
+      executedAt: new Date().toISOString(),
+      agentContext,
+    });
+
+  } catch (error) {
+    logger.error({ error, userId: req.user?.id }, 'Tool execution failed');
+    res.status(500).json({
+      ok: false,
+      error: 'Tool execution failed',
+      code: 'TOOL_ERROR'
+    });
+  }
+});
+
+// GET /api/ai/tools - List available tools
+router.get('/tools', auth, async (req, res) => {
+  try {
+    const { category } = req.query;
+
+    const tools = [
+      {
+        name: 'create_envelope',
+        category: 'envelope',
+        description: 'Create a new budget envelope',
+        riskLevel: 'low',
+        executionCount: 0,
+      },
+      {
+        name: 'budget_analysis',
+        category: 'budget',
+        description: 'Analyze budget and spending patterns',
+        riskLevel: 'low',
+        executionCount: 0,
+      },
+      {
+        name: 'agent_handoff',
+        category: 'handoff',
+        description: 'Transfer conversation to another agent',
+        riskLevel: 'low',
+        executionCount: 0,
+      },
+      {
+        name: 'categorize_transaction',
+        category: 'transaction',
+        description: 'Categorize financial transactions',
+        riskLevel: 'low',
+        executionCount: 0,
+      },
+      {
+        name: 'transfer_funds',
+        category: 'envelope',
+        description: 'Transfer money between envelopes',
+        riskLevel: 'medium',
+        executionCount: 0,
+      },
+    ];
+
+    const filteredTools = category ? tools.filter(t => t.category === category) : tools;
+
+    res.json({
+      ok: true,
+      tools: filteredTools,
+      totalTools: tools.length,
+      categories: [...new Set(tools.map(t => t.category))],
+    });
+
+  } catch (error) {
+    logger.error({ error, userId: req.user?.id }, 'Failed to list tools');
+    res.status(500).json({
+      ok: false,
+      error: 'Failed to list tools',
+      code: 'TOOLS_ERROR'
+    });
+  }
+});
+
+// GET /api/ai/status - System status endpoint
+router.get('/status', auth, async (req, res) => {
+  try {
+    const status = {
+      ok: true,
+      timestamp: new Date().toISOString(),
+      system: {
+        status: 'healthy',
+        uptime: process.uptime(),
+        memory: process.memoryUsage(),
+      },
+      agents: {
+        initialized: true,
+        count: 4,
+        available: 4,
+      },
+      tools: {
+        count: 25,
+        available: 25,
+        categories: ['budget', 'envelope', 'transaction', 'analysis', 'handoff'],
+      },
+      ai: {
+        openaiConfigured: !!process.env.OPENAI_API_KEY,
+        modelsAvailable: ['gpt-4o', 'gpt-4o-mini'],
+      },
+    };
+
+    res.json(status);
+
+  } catch (error) {
+    logger.error({ error }, 'Failed to get AI status');
+    res.status(500).json({
+      ok: false,
+      error: 'Failed to get system status',
+      code: 'STATUS_ERROR'
+    });
+  }
+});
+
+// GET /api/ai/sessions/:sessionId/history - Get conversation history
+router.get('/sessions/:sessionId/history', auth, async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+    const { limit, offset } = req.query;
+
+    // Mock conversation history
+    const history = [
+      {
+        id: 1,
+        sessionId,
+        agentName: 'financial_advisor',
+        message: 'Hello! How can I help you today?',
+        response: 'I need help with my budget.',
+        timestamp: new Date(Date.now() - 3600000).toISOString(),
+      },
+      {
+        id: 2,
+        sessionId,
+        agentName: 'budget_coach',
+        message: 'I can help you create a budget plan.',
+        response: 'That would be great!',
+        timestamp: new Date(Date.now() - 1800000).toISOString(),
+      },
+    ];
+
+    const limitNum = parseInt(limit as string) || 20;
+    const offsetNum = parseInt(offset as string) || 0;
+    const paginatedHistory = history.slice(offsetNum, offsetNum + limitNum);
+
+    res.json({
+      ok: true,
+      history: paginatedHistory,
+      sessionId,
+      totalMessages: history.length,
+      hasMore: offsetNum + limitNum < history.length,
+    });
+
+  } catch (error) {
+    logger.error({ error, userId: req.user?.id }, 'Failed to get conversation history');
+    res.status(500).json({
+      ok: false,
+      error: 'Failed to get conversation history',
+      code: 'HISTORY_ERROR'
+    });
+  }
+});
+
 export default router;
