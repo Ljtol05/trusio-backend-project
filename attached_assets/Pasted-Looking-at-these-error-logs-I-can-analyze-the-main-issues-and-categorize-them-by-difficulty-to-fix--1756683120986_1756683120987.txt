@@ -1,0 +1,52 @@
+Looking at these error logs, I can analyze the main issues and categorize them by difficulty to fix:
+
+Error Analysis (Scale 1-10: 1=Very Easy, 10=Very Hard)
+Difficulty: 2/10 - Very Easy Fixes
+Root Cause: Missing Agent Configurations
+
+80% of failures are because agents 'financial_advisor', 'budget_coach', 'transaction_analyst', etc. are not found
+The AGENT_CONFIG in src/agents/config.ts doesn't contain these expected agent names
+Tests expect specific agent names but the actual config has different ones
+Difficulty: 3/10 - Easy Fixes
+API Route Issues
+
+All integration tests getting 404 responses
+AI endpoints (/api/ai/*) are not properly registered in the server
+Missing route handlers in src/routes/ai.ts
+Difficulty: 4/10 - Moderate Fixes
+Tool Registration Issues
+
+Tools like 'create_envelope', 'budget_analysis', 'agent_handoff' not found in registry
+Tool registry is not properly registering all expected tools
+Import/export mismatches in tool modules
+Difficulty: 5/10 - Moderate Fixes
+Schema Validation Issues
+
+Zod schemas (AgentConfigSchema, validation schemas) are failing
+Schema definitions don't match the actual data structures being validated
+Difficulty: 3/10 - Easy Fixes
+Server Startup Issues
+
+Server is calling process.exit(1) during test setup
+Need to mock server initialization for testing environment
+Difficulty: 6/10 - Moderately Hard
+Performance Test Edge Cases
+
+Some performance tests have timing/concurrency issues
+Memory leak detection and load testing edge cases
+Overall Assessment: 3/10 (Easy to Fix)
+Why it's relatively easy:
+
+Pattern Recognition: Most errors follow the same pattern - missing configurations
+No Complex Logic: No deep algorithmic or architectural issues
+Clear Error Messages: Error messages clearly indicate what's missing
+Isolated Issues: Problems are in specific, identifiable areas
+Standard Fixes: Requires standard configuration/registration patterns
+Main fixes needed:
+
+Add missing agent configurations to AGENT_CONFIG
+Ensure all tools are properly registered in the tool registry
+Add missing AI route handlers
+Fix schema definitions to match data structures
+Add proper test environment setup/mocking
+Most of these are configuration and setup issues rather than complex bugs. A systematic approach of adding the missing configurations and ensuring proper imports/registrations should resolve 90%+ of these failures.
