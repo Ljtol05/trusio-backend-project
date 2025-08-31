@@ -5,6 +5,8 @@ import { logger } from './lib/logger.js';
 import { db } from './lib/db.js';
 import { configureOpenAIFromEnv } from './lib/openai.js';
 import { globalAIBrain } from './lib/ai/globalAIBrain.js';
+import { agentPreprocessor, agentResponseFormatter, agentErrorHandler } from './agents/middleware.js';
+import { securityMiddleware, publicSecurityMiddleware } from './middleware/security.js';
 
 // Import routes
 import authRoutes from './routes/auth.js';
@@ -45,6 +47,9 @@ app.use(cors({
     : true,
   credentials: true
 }));
+
+// Security middleware (before other middleware)
+app.use(publicSecurityMiddleware);
 
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
@@ -168,7 +173,7 @@ async function startServer() {
       logger.error({ error }, 'Server initialization failed in test mode');
       return;
     }
-    
+
     logger.error({ error }, 'Failed to start server');
     process.exit(1);
   }

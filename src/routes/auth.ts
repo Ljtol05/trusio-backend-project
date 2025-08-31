@@ -1,13 +1,19 @@
-import { Router } from 'express';
+import express from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { z } from 'zod';
 import { db } from '../lib/db.js';
 import { env } from '../config/env.js';
-import { sendVerificationEmail } from '../lib/email.js';
 import { logger } from '../lib/logger.js';
+import { sendVerificationEmail } from '../lib/email.js';
+import { authenticateToken } from '../services/auth.js';
+import { authSecurityMiddleware } from '../middleware/security.js';
+import { validateAuth, validateParams } from '../middleware/validation.js';
 
-const router = Router();
+const router = express.Router();
+
+// Apply security middleware to all auth routes
+router.use(authSecurityMiddleware);
 
 // Validation schemas
 const registerSchema = z.object({
@@ -165,9 +171,9 @@ async function verifyPhoneCode(phone: string, code: string): Promise<boolean> {
 }
 
 // POST /api/auth/register
-router.post('/register', async (req, res) => {
+router.post('/register', validateAuth(registerSchema), async (req: any, res: any) => {
   try {
-    const { name, firstName, lastName, email, password } = registerSchema.parse(req.body);
+    const { name, firstName, lastName, email, password } = req.body;
 
     // Combine firstName and lastName if provided, otherwise use name
     const fullName = name || `${firstName} ${lastName}`.trim();
@@ -247,7 +253,7 @@ router.post('/register', async (req, res) => {
 });
 
 // POST /api/auth/verify-email
-router.post('/verify-email', async (req, res) => {
+router.post('/verify-email', validateAuth(verifyEmailSchema), async (req: any, res: any) => {
   try {
     // Clean up expired verification codes periodically
     await db.verificationCode.deleteMany({
@@ -259,7 +265,7 @@ router.post('/verify-email', async (req, res) => {
     });
 
     logger.debug({ body: req.body }, 'Verify email request received');
-    const { email, code } = verifyEmailSchema.parse(req.body);
+    const { email, code } = req.body;
 
     // Find user
     const user = await db.user.findUnique({ where: { email } });
@@ -328,9 +334,9 @@ router.post('/verify-email', async (req, res) => {
 });
 
 // POST /api/auth/resend-verification
-router.post('/resend-verification', async (req, res) => {
+router.post('/resend-verification', validateAuth(resendVerificationSchema), async (req: any, res: any) => {
   try {
-    const { email } = resendVerificationSchema.parse(req.body);
+    const { email } = req.body;
 
     // Find user
     const user = await db.user.findUnique({ where: { email } });
@@ -373,9 +379,9 @@ router.post('/resend-verification', async (req, res) => {
 });
 
 // POST /api/auth/login
-router.post('/login', async (req, res) => {
+router.post('/login', validateAuth(loginSchema), async (req: any, res: any) => {
   try {
-    const { email, password } = loginSchema.parse(req.body);
+    const { email, password } = req.body;
 
     // Find user
     const user = await db.user.findUnique({ where: { email } });
@@ -540,11 +546,11 @@ router.get('/me', authenticateToken, async (req: any, res) => {
 });
 
 // POST /api/auth/start-phone-verification
-router.post('/start-phone-verification', authenticateToken, async (req: any, res) => {
+router.post('/start-phone-verification', authenticateToken, validateAuth(startPhoneVerificationSchema), async (req: any, res: any) => {
   try {
     logger.debug({ body: req.body, userId: req.user?.id }, 'Start phone verification request received');
 
-    const { phone } = startPhoneVerificationSchema.parse(req.body);
+    const { phone } = req.body;
 
     // Normalize phone number for consistency - ensure it starts with +
     let normalizedPhone = phone.replace(/\D/g, '');
@@ -608,9 +614,9 @@ router.post('/start-phone-verification', authenticateToken, async (req: any, res
 });
 
 // POST /api/auth/verify-phone
-router.post('/verify-phone', authenticateToken, async (req: any, res) => {
+router.post('/verify-phone', authenticateToken, validateAuth(verifyPhoneSchema), async (req: any, res: any) => {
   try {
-    const { phone, code } = verifyPhoneSchema.parse(req.body);
+    const { phone, code } = req.body;
 
     // Find user
     const user = await db.user.findUnique({ where: { id: req.user.id } });
@@ -685,9 +691,9 @@ router.post('/verify-phone', authenticateToken, async (req: any, res) => {
 });
 
 // POST /api/auth/resend-phone-code
-router.post('/resend-phone-code', authenticateToken, async (req: any, res) => {
+router.post('/resend-phone-code', authenticateToken, validateAuth(resendPhoneCodeSchema), async (req: any, res: any) => {
   try {
-    const { phone } = resendPhoneCodeSchema.parse(req.body);
+    const { phone } = req.body;
 
     // Find user
     const user = await db.user.findUnique({ where: { id: req.user.id } });
@@ -726,9 +732,9 @@ router.post('/resend-phone-code', authenticateToken, async (req: any, res) => {
 });
 
 // POST /api/auth/forgot-password
-router.post('/forgot-password', async (req, res) => {
+router.post('/forgot-password', validateAuth(forgotPasswordSchema), async (req: any, res: any) => {
   try {
-    const { email } = forgotPasswordSchema.parse(req.body);
+    const { email } = req.body;
 
     // Find user
     const user = await db.user.findUnique({ where: { email } });
@@ -767,9 +773,9 @@ router.post('/forgot-password', async (req, res) => {
 });
 
 // POST /api/auth/reset-password
-router.post('/reset-password', async (req, res) => {
+router.post('/reset-password', validateAuth(resetPasswordSchema), async (req: any, res: any) => {
   try {
-    const { email, code, newPassword } = resetPasswordSchema.parse(req.body);
+    const { email, code, newPassword } = req.body;
 
     // Find user
     const user = await db.user.findUnique({ where: { email } });

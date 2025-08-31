@@ -7,8 +7,13 @@ import { db } from '../lib/db.js';
 import { financialCoachAgent } from '../agents/core/FinancialCoachAgent.js';
 import { contentCreatorAgent } from '../agents/core/ContentCreatorAgent.js';
 import type { FinancialContext } from '../agents/tools/types.js';
+import { apiSecurityMiddleware } from '../middleware/security.js';
+import { validateAI } from '../middleware/validation.js';
 
 const router = Router();
+
+// Apply security middleware to all AI routes
+router.use(apiSecurityMiddleware);
 
 // Validation schemas
 const CoachingSessionSchema = z.object({
@@ -167,7 +172,7 @@ router.get('/coach/insights', auth, async (req, res) => {
 });
 
 // POST /api/ai/coach/session - Start a coaching session
-router.post('/coach/session', auth, async (req, res) => {
+router.post('/coach/session', auth, validateAI.coach, async (req, res) => {
   try {
     const userId = req.user!.id;
     const { message, sessionType, context: sessionContext } = CoachingSessionSchema.parse(req.body);
@@ -494,7 +499,7 @@ function calculateNextCheckIn(frequency: string, preferredTime?: string): string
 }
 
 // POST /api/ai/chat - General AI chat endpoint
-router.post('/chat', auth, async (req, res) => {
+router.post('/chat', auth, validateAI.chat, async (req, res) => {
   try {
     const userId = req.user!.id;
     const { message, agentName, sessionId } = req.body;
@@ -509,7 +514,7 @@ router.post('/chat', auth, async (req, res) => {
 
     // Use financial coach agent as default
     const agent = agentName || 'financial_advisor';
-    
+
     // Build financial context
     const user = await db.user.findUnique({
       where: { id: userId },
@@ -554,7 +559,7 @@ router.post('/chat', auth, async (req, res) => {
 });
 
 // POST /api/ai/handoff - Agent handoff endpoint
-router.post('/handoff', auth, async (req, res) => {
+router.post('/handoff', auth, validateAI.handoff, async (req, res) => {
   try {
     const userId = req.user!.id;
     const { fromAgent, toAgent, message, reason, priority } = req.body;
@@ -659,7 +664,7 @@ router.get('/agents', auth, async (req, res) => {
 });
 
 // POST /api/ai/tools/execute - Execute specific tools
-router.post('/tools/execute', auth, async (req, res) => {
+router.post('/tools/execute', auth, validateAI.executeAction, async (req, res) => {
   try {
     const userId = req.user!.id;
     const { toolName, parameters, agentContext } = req.body;

@@ -220,14 +220,9 @@ export class AgentValidator {
    * Sanitize user input
    */
   sanitizeInput(input: string): string {
-    // Remove potentially dangerous characters and patterns
-    return input
-      .replace(/<script.*?<\/script>/gi, '')
-      .replace(/<.*?>/g, '') // Remove HTML tags
-      .replace(/javascript:/gi, '')
-      .replace(/vbscript:/gi, '')
-      .replace(/data:text\/html/gi, '')
-      .trim();
+    // Use centralized sanitization from security middleware
+    const { sanitizeString } = require('../../middleware/security.js');
+    return sanitizeString(input);
   }
 
   /**

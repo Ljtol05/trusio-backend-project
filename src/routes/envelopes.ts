@@ -1,4 +1,3 @@
-
 import { Router } from 'express';
 import { z } from 'zod';
 import { logger } from '../lib/logger.js';
@@ -6,8 +5,13 @@ import { auth } from '../services/auth.js';
 import { db } from '../lib/db.js';
 import { envelopeSystem } from '../lib/envelopeSystem.js';
 import { envelopeAutoRouter } from '../lib/envelopeAutoRouter.js';
+import { apiSecurityMiddleware } from '../middleware/security.js';
+import { validateEnvelope, validateParams } from '../middleware/validation.js';
 
 const router = Router();
+
+// Apply security middleware to all envelope routes
+router.use(apiSecurityMiddleware);
 
 // Validation schemas
 const CreateEnvelopeSchema = z.object({
@@ -82,7 +86,7 @@ router.get('/', auth, async (req, res) => {
 });
 
 // POST /api/envelopes - Create new envelope
-router.post('/', auth, async (req, res) => {
+router.post('/', auth, validateEnvelope.create, async (req, res) => {
   try {
     const userId = req.user!.id;
     const data = CreateEnvelopeSchema.parse(req.body);
@@ -338,7 +342,7 @@ router.post('/create-from-template', auth, async (req, res) => {
 });
 
 // PUT /api/envelopes/:id - Update envelope
-router.put('/:id', auth, async (req, res) => {
+router.put('/:id', auth, validateParams.id, validateEnvelope.update, async (req, res) => {
   try {
     const userId = req.user!.id;
     const envelopeId = parseInt(req.params.id);
