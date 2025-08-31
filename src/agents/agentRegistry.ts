@@ -2,7 +2,7 @@ import { Agent } from '@openai/agents';
 import { logger } from '../lib/logger.ts';
 import { toolRegistry } from './tools/registry.ts';
 import type { FinancialContext } from './tools/types.ts';
-import { AGENT_CONFIG } from './config.ts';
+import { AGENT_CONFIG, AGENT_BASE_CONFIG } from './config.ts';
 
 class AgentRegistry {
   private agents = new Map<string, Agent>();
@@ -36,8 +36,8 @@ class AgentRegistry {
 
         const agent = new Agent({
           name: agentName,
-          instructions: `You are a ${config.name}. ${config.description}`,
-          model: 'gpt-4o',
+          instructions: config.instructions,
+          model: config.model || 'gpt-4o',
           tools: agentTools,
         });
 
