@@ -1,4 +1,3 @@
-
 import { z } from 'zod';
 import { logger } from '../../lib/logger.js';
 import { AGENT_CONFIG } from '../config.js';
@@ -35,7 +34,7 @@ const SECURITY_PATTERNS = {
     /\{SYSTEM\}/i,
     /<system>/i,
   ],
-  
+
   // Patterns that might indicate attempts to extract sensitive information
   informationExtraction: [
     /api\s+key/i,
@@ -47,7 +46,7 @@ const SECURITY_PATTERNS = {
     /sql/i,
     /admin/i,
   ],
-  
+
   // Patterns that might indicate malicious content
   maliciousContent: [
     /<script/i,
@@ -66,7 +65,7 @@ export class AgentValidator {
     try {
       // Schema validation
       const validatedInput = AgentInputSchema.parse(input);
-      
+
       // Security validation
       const securityErrors = this.checkInputSecurity(validatedInput.message);
       if (securityErrors.length > 0) {
@@ -74,19 +73,19 @@ export class AgentValidator {
           securityErrors,
           messageLength: validatedInput.message.length 
         }, 'Input failed security validation');
-        
+
         return {
           isValid: false,
           errors: securityErrors
         };
       }
-      
+
       logger.debug('Input validation passed');
       return {
         isValid: true,
         data: validatedInput
       };
-      
+
     } catch (error) {
       if (error instanceof z.ZodError) {
         const errors = error.errors.map(e => `${e.path.join('.')}: ${e.message}`);
@@ -96,7 +95,7 @@ export class AgentValidator {
           errors
         };
       }
-      
+
       logger.error({ error }, 'Unexpected error during input validation');
       return {
         isValid: false,
@@ -112,7 +111,7 @@ export class AgentValidator {
     try {
       // Schema validation
       const validatedOutput = AgentOutputSchema.parse(output);
-      
+
       // Security validation  
       const securityErrors = this.checkOutputSecurity(validatedOutput.response);
       if (securityErrors.length > 0) {
@@ -121,19 +120,19 @@ export class AgentValidator {
           agentName: validatedOutput.agentName,
           responseLength: validatedOutput.response.length 
         }, 'Output failed security validation');
-        
+
         return {
           isValid: false,
           errors: securityErrors
         };
       }
-      
+
       logger.debug({ agentName: validatedOutput.agentName }, 'Output validation passed');
       return {
         isValid: true,
         data: validatedOutput
       };
-      
+
     } catch (error) {
       if (error instanceof z.ZodError) {
         const errors = error.errors.map(e => `${e.path.join('.')}: ${e.message}`);
@@ -143,7 +142,7 @@ export class AgentValidator {
           errors
         };
       }
-      
+
       logger.error({ error }, 'Unexpected error during output validation');
       return {
         isValid: false,
@@ -157,7 +156,7 @@ export class AgentValidator {
    */
   private checkInputSecurity(message: string): string[] {
     const errors: string[] = [];
-    
+
     // Check for prompt injection attempts
     for (const pattern of SECURITY_PATTERNS.promptInjection) {
       if (pattern.test(message)) {
@@ -165,7 +164,7 @@ export class AgentValidator {
         break;
       }
     }
-    
+
     // Check for information extraction attempts
     for (const pattern of SECURITY_PATTERNS.informationExtraction) {
       if (pattern.test(message)) {
@@ -173,7 +172,7 @@ export class AgentValidator {
         break;
       }
     }
-    
+
     // Check for malicious content
     for (const pattern of SECURITY_PATTERNS.maliciousContent) {
       if (pattern.test(message)) {
@@ -181,7 +180,7 @@ export class AgentValidator {
         break;
       }
     }
-    
+
     return errors;
   }
 
@@ -190,7 +189,7 @@ export class AgentValidator {
    */
   private checkOutputSecurity(response: string): string[] {
     const errors: string[] = [];
-    
+
     // Check for malicious content in output
     for (const pattern of SECURITY_PATTERNS.maliciousContent) {
       if (pattern.test(response)) {
@@ -198,7 +197,7 @@ export class AgentValidator {
         break;
       }
     }
-    
+
     // Check for potential information leakage
     const sensitivePatterns = [
       /sk-[a-zA-Z0-9]{20,}/,  // OpenAI API key pattern
@@ -206,14 +205,14 @@ export class AgentValidator {
       /\b\d{3}-\d{2}-\d{4}\b/, // SSN pattern
       /\b\d{4}\s?\d{4}\s?\d{4}\s?\d{4}\b/, // Credit card pattern
     ];
-    
+
     for (const pattern of sensitivePatterns) {
       if (pattern.test(response)) {
         errors.push('Potential sensitive information in response');
         break;
       }
     }
-    
+
     return errors;
   }
 
