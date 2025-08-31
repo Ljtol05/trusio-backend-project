@@ -33,6 +33,15 @@ export default defineConfig({
         '**/*.test.ts',
       ],
     },
+    env: {
+      NODE_ENV: 'test',
+      TEST_MODE: 'true',
+      DATABASE_URL: 'file:./test.db',
+      JWT_SECRET: 'test-jwt-secret',
+      OPENAI_API_KEY: 'test-key',
+      OPENAI_PROJECT_ID: 'test-project',
+      OPENAI_ORG_ID: 'test-org',
+    },
   },
   resolve: {
     alias: {

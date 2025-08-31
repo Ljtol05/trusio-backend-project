@@ -107,11 +107,43 @@ vi.mock('../../lib/openai.ts', () => ({
     },
   },
   createAgentResponse: vi.fn().mockResolvedValue('Mocked agent response'),
+  configureOpenAIFromEnv: vi.fn().mockReturnValue(true),
   MODELS: {
     agentic: 'gpt-4o',
     primary: 'gpt-4o-mini',
     analysis: 'gpt-4o-mini',
     budget: 'gpt-4o-mini',
+  },
+}));
+
+// Mock external email service
+vi.mock('../../lib/email.ts', () => ({
+  sendVerificationEmail: vi.fn().mockResolvedValue({ success: true }),
+  sendPasswordResetEmail: vi.fn().mockResolvedValue({ success: true }),
+}));
+
+// Mock Plaid service
+vi.mock('../../lib/plaid.ts', () => ({
+  plaidClient: {
+    linkTokenCreate: vi.fn().mockResolvedValue({ link_token: 'mock_link_token' }),
+    itemPublicTokenExchange: vi.fn().mockResolvedValue({ access_token: 'mock_access_token' }),
+    transactionsGet: vi.fn().mockResolvedValue({ transactions: [] }),
+  },
+}));
+
+// Mock Twilio service
+vi.mock('../../lib/twilio.ts', () => ({
+  twilioClient: {
+    verify: {
+      services: vi.fn().mockReturnValue({
+        verifications: {
+          create: vi.fn().mockResolvedValue({ status: 'pending' }),
+        },
+        verificationChecks: {
+          create: vi.fn().mockResolvedValue({ status: 'approved' }),
+        },
+      }),
+    },
   },
 }));
 
@@ -123,11 +155,44 @@ vi.mock('../../server.ts', async (importOriginal) => {
   return actual;
 });
 
+// Mock environment configuration
+vi.mock('../../config/env.ts', () => ({
+  env: {
+    NODE_ENV: 'test',
+    PORT: 5000,
+    DATABASE_URL: 'file:./test.db',
+    JWT_SECRET: 'test-jwt-secret',
+    OPENAI_API_KEY: 'test-key',
+    OPENAI_PROJECT_ID: 'test-project',
+    OPENAI_ORG_ID: 'test-org',
+    OPENAI_MODEL_PRIMARY: 'gpt-4o-mini',
+    OPENAI_MODEL_AGENTIC: 'gpt-4o',
+    OPENAI_MODEL_ANALYSIS: 'gpt-4o-mini',
+    OPENAI_MODEL_BUDGET: 'gpt-4o-mini',
+    OPENAI_TIMEOUT_MS: 60000,
+    OPENAI_MAX_RETRIES: 3,
+    OPENAI_AGENTS_TRACING_ENABLED: false,
+    OPENAI_AGENTS_API_TYPE: 'chat_completions',
+  },
+  openai: null,
+  isAIEnabled: vi.fn().mockReturnValue(false),
+}));
+
+// Mock global AI brain to prevent initialization during tests
+vi.mock('../../lib/ai/globalAIBrain.ts', () => ({
+  globalAIBrain: {
+    initialize: vi.fn().mockResolvedValue(undefined),
+    isInitialized: vi.fn().mockReturnValue(true),
+    query: vi.fn().mockResolvedValue('Mock AI response'),
+  },
+}));
+
 // Prevent process.exit during tests
 const originalExit = process.exit;
 beforeAll(() => {
   // Initialize test environment
   process.env.NODE_ENV = 'test';
+  process.env.TEST_MODE = 'true';
   process.env.OPENAI_API_KEY = 'test-key';
   process.env.OPENAI_PROJECT_ID = 'test-project';
   process.env.OPENAI_ORG_ID = 'test-org';
@@ -139,8 +204,12 @@ beforeAll(() => {
   vi.spyOn(console, 'log').mockImplementation(() => {});
   vi.spyOn(console, 'info').mockImplementation(() => {});
   vi.spyOn(console, 'warn').mockImplementation(() => {});
+  vi.spyOn(console, 'error').mockImplementation(() => {});
 
-  process.exit = vi.fn() as any;
+  // Mock process.exit to prevent test termination
+  process.exit = vi.fn().mockImplementation((code) => {
+    throw new Error(`Process exit called with code: ${code}`);
+  }) as any;
 });
 
 afterAll(() => {
@@ -151,16 +220,27 @@ afterAll(() => {
 beforeEach(() => {
   // Reset all mocks before each test
   vi.clearAllMocks();
+  vi.clearAllTimers();
 
   // Reset agent system state
   mockDbResponses.conversation.findMany.mockResolvedValue([]);
   mockDbResponses.conversation.createMany.mockResolvedValue({ count: 2 });
   mockDbResponses.conversation.count.mockResolvedValue(0);
+
+  // Reset database mocks to default state
+  mockDbResponses.user.findUnique.mockResolvedValue(createMockUser());
+  mockDbResponses.envelope.findMany.mockResolvedValue([createMockEnvelope()]);
+  mockDbResponses.transaction.findMany.mockResolvedValue([createMockTransaction()]);
+  mockDbResponses.goal.findMany.mockResolvedValue([createMockGoal()]);
 });
 
 afterEach(() => {
   // Cleanup after each test
   vi.clearAllTimers();
+  vi.unstubAllEnvs();
+  
+  // Ensure no pending promises or async operations
+  return new Promise(resolve => setImmediate(resolve));
 });
 
 // Test utilities

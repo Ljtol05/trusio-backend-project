@@ -111,56 +111,71 @@ app.use((req, res) => {
 
 async function startServer() {
   try {
-    // Test database connection
-    await db.$connect();
-    logger.info('Database connected successfully');
-
-    // Initialize Global AI Brain
-    try {
-      await globalAIBrain.initialize();
-      logger.info('Global AI Brain initialized successfully');
-    } catch (aiError) {
-      logger.warn({ error: aiError }, 'Global AI Brain initialization failed, continuing without AI features');
+    // Test database connection (skip in test mode)
+    if (process.env.NODE_ENV !== 'test') {
+      await db.$connect();
+      logger.info('Database connected successfully');
     }
 
-    // Configure OpenAI
-    const openaiConfigured = configureOpenAIFromEnv();
-    if (openaiConfigured) {
-      logger.info('OpenAI configured successfully');
-    } else {
-      logger.warn('OpenAI configuration failed - AI features may not work');
+    // Initialize Global AI Brain (skip in test mode)
+    if (process.env.NODE_ENV !== 'test') {
+      try {
+        await globalAIBrain.initialize();
+        logger.info('Global AI Brain initialized successfully');
+      } catch (aiError) {
+        logger.warn({ error: aiError }, 'Global AI Brain initialization failed, continuing without AI features');
+      }
     }
 
-    // Start server
-    const server = app.listen(env.PORT, '0.0.0.0', () => {
-      logger.info({
-        port: env.PORT,
-        environment: env.NODE_ENV,
-        features: {
-          ai: openaiConfigured,
-          coaching: openaiConfigured,
-          database: true,
-        }
-      }, 'Server started successfully');
-    });
+    // Configure OpenAI (skip in test mode)
+    let openaiConfigured = false;
+    if (process.env.NODE_ENV !== 'test') {
+      openaiConfigured = configureOpenAIFromEnv();
+      if (openaiConfigured) {
+        logger.info('OpenAI configured successfully');
+      } else {
+        logger.warn('OpenAI configuration failed - AI features may not work');
+      }
+    }
 
-    // Graceful shutdown
-    process.on('SIGINT', async () => {
-      logger.info('Shutting down server...');
-      server.close(() => {
-        db.$disconnect();
-        process.exit(0);
+    // Start server (skip in test mode)
+    if (process.env.NODE_ENV !== 'test' && process.env.TEST_MODE !== 'true') {
+      const server = app.listen(env.PORT, '0.0.0.0', () => {
+        logger.info({
+          port: env.PORT,
+          environment: env.NODE_ENV,
+          features: {
+            ai: openaiConfigured,
+            coaching: openaiConfigured,
+            database: true,
+          }
+        }, 'Server started successfully');
       });
-    });
+
+      // Graceful shutdown
+      process.on('SIGINT', async () => {
+        logger.info('Shutting down server...');
+        server.close(() => {
+          db.$disconnect();
+          process.exit(0);
+        });
+      });
+    }
 
   } catch (error) {
+    // In test mode, don't exit the process
+    if (process.env.NODE_ENV === 'test' || process.env.TEST_MODE === 'true') {
+      logger.error({ error }, 'Server initialization failed in test mode');
+      return;
+    }
+    
     logger.error({ error }, 'Failed to start server');
     process.exit(1);
   }
 }
 
 // Only start server if not in test mode
-if (process.env.TEST_MODE !== 'true') {
+if (process.env.TEST_MODE !== 'true' && process.env.NODE_ENV !== 'test') {
   startServer();
 }
 
