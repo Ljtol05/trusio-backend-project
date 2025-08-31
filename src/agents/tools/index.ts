@@ -9,21 +9,27 @@ export type {
 } from './types.ts';
 
 // Import and export all tool implementations
-export { budgetAnalysisTool, createEnvelopeTool, budgetCreationTool } from './budget.ts';
-export { envelopeTransferTool, getEnvelopeBalanceTool } from './envelope.ts';
+export { budgetAnalysisTool, createEnvelopeTool, updateEnvelopeTool } from './budget.js';
+export { envelopeTransferTool, getEnvelopeBalanceTool } from './envelope.js';
 export {
   categorizeTransactionTool,
   automaticAllocationTool,
   patternDetectionTool,
-  detectAnomaliesTool
-} from './transaction-tools.ts';
-export { agentHandoffTool } from './handoff.ts';
-export { memoryStoreTool, memoryRetrieveTool } from './memory.ts';
+  detectAnomaliesTool,
+  spendingPatternsTool
+} from './transaction-tools.js';
+export { agentHandoffTool, agentCapabilityCheckTool } from './handoff.js';
+export { memoryStoreTool, memoryRetrieveTool } from './memory.js';
 export {
-  spendingPatternsTool,
+  analyzeSpendingTool,
+  generateReportTool,
   varianceAnalysisTool,
   riskAssessmentTool
-} from './analysis.ts';
+} from './analysis.js';
+export { transferFundsTool } from './transfer_funds.js';
+export { trackAchievementsTool } from './track_achievements.js';
+export { identifyOpportunitiesTool } from './identify_opportunities.js';
+export { generateInsightTool } from './insight.js';
 
 // Import all tool modules to ensure registration
 import './budget.js';

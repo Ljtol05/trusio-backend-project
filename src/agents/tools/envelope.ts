@@ -28,40 +28,40 @@ const transferFundsSchema = z.object({
   reason: z.string().optional().describe('Reason for transfer')
 });
 
-const createEnvelopeTool = tool({
+export const create_envelope = {
   name: 'create_envelope',
-  description: 'Create a new envelope for budget allocation, savings tracking, and financial goal management',
-  parameters: createEnvelopeSchema,
-  async execute({ userId, name, targetAmount, category, description, priority }) {
-    try {
-      logger.info({ userId, name, targetAmount, category, priority }, 'Creating envelope');
+  description: 'Create a new envelope for budget allocation',
+  parameters: {
+    type: 'object',
+    properties: {
+      userId: { type: 'string', description: 'User ID' },
+      name: { type: 'string', description: 'Envelope name' },
+      initialBalance: { type: 'number', description: 'Initial balance in cents' },
+      icon: { type: 'string', description: 'Icon name for envelope' },
+      color: { type: 'string', description: 'Color theme for envelope' }
+    },
+    required: ['userId', 'name']
+  },
+  async execute(parameters: any, context: any) {
+    const { userId, name, initialBalance = 0, icon = 'folder', color = 'blue' } = parameters;
 
-      // TODO: Implement actual envelope creation with Prisma
-      const envelope = {
-        id: `env_${Date.now()}`,
-        name,
-        targetAmount,
-        currentAmount: 0,
-        category: category || 'general',
-        description,
-        priority,
+    // Mock implementation for now
+    return {
+      success: true,
+      envelope: {
+        id: `envelope_${Date.now()}`,
         userId,
-        createdAt: new Date().toISOString(),
-        progressPercentage: 0,
-        isActive: true
-      };
-
-      return {
-        status: 'success',
-        envelope,
-        message: `Envelope "${name}" created successfully with target of $${targetAmount}`
-      };
-    } catch (error) {
-      logger.error({ error, userId, name }, 'Envelope creation failed');
-      throw new Error(`Envelope creation failed: ${error.message}`);
-    }
+        name,
+        balanceCents: initialBalance,
+        icon,
+        color,
+        createdAt: new Date()
+      }
+    };
   }
-});
+};
+
+export const createEnvelopeTool = create_envelope;
 
 const manageBalanceTool = tool({
   name: 'manage_balance',

@@ -17,7 +17,7 @@ const agentCapabilityCheckSchema = z.object({
   requiredCapabilities: z.array(z.string()).describe('List of required capabilities')
 });
 
-const agentHandoffTool = tool({
+const agent_handoff = {
   name: 'agent_handoff',
   description: 'Hand off the conversation to another specialized financial agent with full context preservation and capability matching',
   parameters: agentHandoffSchema,
@@ -110,44 +110,39 @@ const agentHandoffTool = tool({
       };
     }
   },
-});
+};
 
-const agentCapabilityCheckTool = tool({
+export const agentHandoffTool = agent_handoff;
+
+const check_agent_capabilities = {
   name: 'check_agent_capabilities',
-  description: 'Check if an agent has specific capabilities before handoff',
-  parameters: agentCapabilityCheckSchema,
-  async execute({ agentName, requiredCapabilities }) {
-    try {
-      logger.info({ agentName, requiredCapabilities }, 'Checking agent capabilities');
-
-      const agentCapabilities = {
-        'financial_advisor': ['comprehensive_financial_guidance', 'goal_setting', 'financial_education', 'agent_coordination', 'holistic_planning'],
-        'budget_coach': ['envelope_budgeting', 'budget_creation', 'fund_allocation', 'category_optimization', 'budget_troubleshooting'],
-        'transaction_analyst': ['spending_analysis', 'transaction_categorization', 'pattern_recognition', 'anomaly_detection', 'spending_insights'],
-        'insight_generator': ['trend_analysis', 'goal_tracking', 'personalized_recommendations', 'predictive_insights', 'financial_forecasting']
-      };
-
-      const hasCapabilities = agentCapabilities[agentName] || [];
-      const missingCapabilities = requiredCapabilities.filter(cap => !hasCapabilities.includes(cap));
-      const hasAllCapabilities = missingCapabilities.length === 0;
-
-      return {
-        status: 'success',
-        agentName,
-        hasAllCapabilities,
-        availableCapabilities: hasCapabilities,
-        requiredCapabilities,
-        missingCapabilities,
-        recommendation: hasAllCapabilities
-          ? `${agentName} can handle all required capabilities`
-          : `Consider alternative agent or split request across multiple agents`
-      };
-    } catch (error) {
-      logger.error({ error, agentName }, 'Capability check failed');
-      throw new Error(`Capability check failed: ${error.message}`);
+  description: 'Check capabilities and availability of other agents',
+  parameters: {
+    type: 'object',
+    properties: {
+      agentName: { type: 'string', description: 'Agent name to check capabilities for' }
     }
+  },
+  async execute(parameters: any, context: any) {
+    const { agentName } = parameters;
+
+    // Mock implementation for now
+    const agentCapabilities = {
+      financial_advisor: ['investment_advice', 'retirement_planning', 'tax_optimization'],
+      budget_coach: ['budget_creation', 'expense_tracking', 'saving_goals'],
+      transaction_analyst: ['categorization', 'pattern_analysis', 'fraud_detection']
+    };
+
+    return {
+      success: true,
+      agent: agentName,
+      capabilities: agentCapabilities[agentName] || [],
+      available: Object.keys(agentCapabilities).includes(agentName)
+    };
   }
-});
+};
+
+export const agentCapabilityCheckTool = check_agent_capabilities;
 
 export function registerHandoffTools(registry: ToolRegistry): void {
   try {

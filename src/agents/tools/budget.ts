@@ -18,53 +18,41 @@ const budgetOptimizationSchema = z.object({
   aggressiveness: z.enum(['conservative', 'moderate', 'aggressive']).default('moderate').describe('Optimization aggressiveness level')
 });
 
-const budgetAnalysisTool = tool({
+export const budget_analysis = {
   name: 'budget_analysis',
-  description: 'Analyze user budget performance, spending patterns, adherence rates, and provide actionable insights and recommendations',
-  parameters: budgetAnalysisSchema,
-  async execute({ userId, period, categories, includeProjections, compareToGoals }) {
-    try {
-      logger.info({ userId, period, categories, includeProjections, compareToGoals }, 'Executing budget analysis');
+  description: 'Analyze budget allocations and spending patterns across envelopes',
+  parameters: {
+    type: 'object',
+    properties: {
+      userId: { type: 'string', description: 'User ID for budget analysis' },
+      timeframe: { type: 'string', description: 'Time period for analysis (week, month, year)' },
+      includeProjections: { type: 'boolean', description: 'Include spending projections' }
+    },
+    required: ['userId']
+  },
+  async execute(parameters: any, context: any) {
+    const { userId, timeframe = 'month', includeProjections = false } = parameters;
 
-      // TODO: Implement actual budget analysis logic with Prisma
-      const analysis = {
+    // Mock implementation for now
+    return {
+      success: true,
+      analysis: {
         totalBudget: 5000,
-        totalSpent: 4200,
-        adherenceRate: 84,
-        categories: categories || ['food', 'transportation', 'entertainment'],
-        variance: {
-          overBudget: ['entertainment'],
-          underBudget: ['food', 'transportation'],
-          onTrack: ['utilities']
-        },
-        recommendations: [
-          'Consider reducing entertainment spending by 10%',
-          'You\'re doing well with your food budget',
-          'Transportation costs are under control'
-        ],
-        projections: includeProjections ? {
-          endOfPeriodSpending: 4800,
-          remainingBudget: 200,
-          daysRemaining: 15
-        } : undefined,
-        goalComparison: compareToGoals ? {
-          savingsGoalProgress: 75,
-          emergencyFundProgress: 60,
-          debtPayoffProgress: 90
-        } : undefined
-      };
-
-      return {
-        status: 'success',
-        period,
-        analysis
-      };
-    } catch (error) {
-      logger.error({ error, userId }, 'Budget analysis failed');
-      throw new Error(`Budget analysis failed: ${error.message}`);
-    }
+        totalSpent: 3200,
+        remainingBudget: 1800,
+        timeframe,
+        topCategories: [
+          { name: 'Groceries', spent: 800, budget: 1000 },
+          { name: 'Bills', spent: 1200, budget: 1200 },
+          { name: 'Gas', spent: 400, budget: 500 }
+        ]
+      }
+    };
   }
-});
+};
+
+export const budgetAnalysisTool = budget_analysis;
+
 
 const budgetOptimizationTool = tool({
   name: 'optimize_categories',
@@ -130,14 +118,14 @@ export function registerBudgetTools(registry: ToolRegistry): void {
     registry.registerTool({
       name: 'budget_performance',
       ...budgetAnalysisTool,
-      category: 'budget', 
+      category: 'budget',
       riskLevel: 'low',
       requiresAuth: true
     });
 
     logger.info({ toolCount: 4 }, 'Budget tools registered successfully');
   } catch (error) {
-    logger.error({ error }, 'Failed to register budget tools');
+    logger.error({ error }, 'Failed to budget tools');
     throw error;
   }
 }

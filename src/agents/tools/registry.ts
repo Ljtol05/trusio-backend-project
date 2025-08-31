@@ -2,16 +2,16 @@ import { logger } from '../../lib/logger.ts';
 import type { ToolDefinition, ToolExecutionContext, ToolExecutionResult, FinancialContext } from './types.ts';
 
 // Import all tool implementations
-import { budgetAnalysisTool } from './budget.ts';
-import { createEnvelopeTool, updateEnvelopeTool } from './envelope.ts';
-import { categorizeTransactionTool, spendingPatternsTool } from './transaction-tools.ts';
-import { transferFundsTool } from './transfer_funds.ts';
-import { trackAchievementsTool } from './track_achievements.ts';
-import { identifyOpportunitiesTool } from './identify_opportunities.ts';
-import { generateInsightTool } from './insight.ts';
-import { memoryStoreTool, memoryRetrieveTool } from './memory.ts';
-import { agentHandoffTool, agentCapabilityCheckTool } from './handoff.ts';
-import { analyzeSpendingTool, generateReportTool } from './analysis.ts';
+import { budgetAnalysisTool } from './budget.js';
+import { createEnvelopeTool, updateEnvelopeTool } from './envelope.js';
+import { categorizeTransactionTool, spendingPatternsTool } from './transaction-tools.js';
+import { transferFundsTool } from './transfer_funds.js';
+import { trackAchievementsTool } from './track_achievements.js';
+import { identifyOpportunitiesTool } from './identify_opportunities.js';
+import { generateInsightTool } from './insight.js';
+import { memoryStoreTool, memoryRetrieveTool } from './memory.js';
+import { agentHandoffTool, agentCapabilityCheckTool } from './handoff.js';
+import { analyzeSpendingTool, generateReportTool } from './analysis.js';
 
 class ToolRegistry {
   private tools = new Map<string, any>();
@@ -23,52 +23,67 @@ class ToolRegistry {
   }
 
   private registerAllTools(): void {
-    // Budget tools
-    this.registerTool('budget_analysis', budgetAnalysisTool, 'budget');
-    this.registerTool('create_envelope', createEnvelopeTool, 'budget');
-    this.registerTool('update_envelope', updateEnvelopeTool, 'budget');
+    try {
+      // Budget tools
+      this.registerTool('budget_analysis', budgetAnalysisTool, 'budget');
+      this.registerTool('create_envelope', createEnvelopeTool, 'budget');
+      this.registerTool('update_envelope', updateEnvelopeTool, 'budget');
 
-    // Transaction tools
-    this.registerTool('categorize_transaction', categorizeTransactionTool, 'transaction');
-    this.registerTool('spending_patterns', spendingPatternsTool, 'transaction');
+      // Transaction tools
+      this.registerTool('categorize_transaction', categorizeTransactionTool, 'transaction');
+      this.registerTool('spending_patterns', spendingPatternsTool, 'transaction');
 
-    // Transfer tools
-    this.registerTool('transfer_funds', transferFundsTool, 'transfer');
+      // Transfer tools
+      this.registerTool('transfer_funds', transferFundsTool, 'transfer');
 
-    // Achievement tools
-    this.registerTool('track_achievements', trackAchievementsTool, 'goal');
+      // Achievement tools
+      this.registerTool('track_achievements', trackAchievementsTool, 'goal');
 
-    // Opportunity tools
-    this.registerTool('identify_opportunities', identifyOpportunitiesTool, 'insight');
+      // Opportunity tools
+      this.registerTool('identify_opportunities', identifyOpportunitiesTool, 'insight');
 
-    // Insight tools
-    this.registerTool('generate_insight', generateInsightTool, 'insight');
+      // Insight tools
+      this.registerTool('generate_insight', generateInsightTool, 'insight');
 
-    // Memory tools
-    this.registerTool('memory_store', memoryStoreTool, 'memory');
-    this.registerTool('memory_retrieve', memoryRetrieveTool, 'memory');
+      // Memory tools
+      this.registerTool('memory_store', memoryStoreTool, 'memory');
+      this.registerTool('memory_retrieve', memoryRetrieveTool, 'memory');
 
-    // Handoff tools
-    this.registerTool('agent_handoff', agentHandoffTool, 'handoff');
-    this.registerTool('check_agent_capabilities', agentCapabilityCheckTool, 'handoff');
+      // Handoff tools
+      this.registerTool('agent_handoff', agentHandoffTool, 'handoff');
+      this.registerTool('check_agent_capabilities', agentCapabilityCheckTool, 'handoff');
 
-    // Analysis tools
-    this.registerTool('analyze_spending', analyzeSpendingTool, 'analysis');
-    this.registerTool('generate_report', generateReportTool, 'analysis');
+      // Analysis tools
+      this.registerTool('analyze_spending', analyzeSpendingTool, 'analysis');
+      this.registerTool('generate_report', generateReportTool, 'analysis');
 
-    logger.info({ totalTools: this.tools.size }, 'All tools registered successfully');
+      logger.info({ totalTools: this.tools.size }, 'All tools registered successfully');
+    } catch (error) {
+      logger.error({ error }, 'Failed to register tools');
+      throw error;
+    }
   }
 
   private registerTool(name: string, toolDefinition: any, category: string): void {
     try {
+      if (!toolDefinition) {
+        logger.warn({ toolName: name }, 'Tool definition is undefined, skipping registration');
+        return;
+      }
+
+      if (typeof toolDefinition.execute !== 'function') {
+        logger.warn({ toolName: name }, 'Tool definition missing execute function, skipping registration');
+        return;
+      }
+
       this.tools.set(name, toolDefinition);
       this.toolCategories.set(name, category);
       this.toolMetrics.set(name, { calls: 0, errors: 0, totalDuration: 0 });
 
-      logger.debug({ toolName: name, category }, 'Tool registered');
+      logger.debug({ toolName: name, category }, 'Tool registered successfully');
     } catch (error) {
       logger.error({ error, toolName: name }, 'Failed to register tool');
-      throw error;
+      // Don't throw here, just skip the tool and continue
     }
   }
 
