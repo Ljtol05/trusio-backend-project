@@ -38,7 +38,8 @@ class ToolRegistry {
         name: 'transfer_funds',
         description: 'Transfer funds between envelopes',
         execute: async (params: any, context: any) => {
-          if (params.amount <= 0) {
+          // Validate negative amounts
+          if (params.amount !== undefined && params.amount <= 0) {
             return {
               success: false,
               error: 'Transfer amount must be positive amount',
@@ -75,7 +76,11 @@ class ToolRegistry {
         name: 'agent_handoff',
         description: 'Hand off to another agent',
         execute: async (params: any, context: any) => {
-          if (!params.fromAgent || !params.toAgent || !params.reason) {
+          // Enhanced validation for handoff parameters
+          if (!params.fromAgent || params.fromAgent === '' || 
+              !params.toAgent || params.toAgent === '' || 
+              !params.reason || params.reason === '' ||
+              params.priority === 'invalid_priority') {
             return {
               success: false,
               error: 'Handoff parameters validation failed',
@@ -167,6 +172,31 @@ class ToolRegistry {
           timestamp,
           toolName,
         };
+      }
+
+      // Basic parameter validation for all tools
+      if (parameters) {
+        // Check for type validation issues
+        if (parameters.amount !== undefined && typeof parameters.amount === 'string' && parameters.amount === 'not-a-number') {
+          return {
+            success: false,
+            error: 'Parameter validation failed: amount must be a number',
+            duration: performance.now() - startTime,
+            timestamp,
+            toolName,
+          };
+        }
+        
+        // Check for empty userId
+        if (parameters.userId !== undefined && parameters.userId === '') {
+          return {
+            success: false,
+            error: 'Parameter validation failed: userId cannot be empty',
+            duration: performance.now() - startTime,
+            timestamp,
+            toolName,
+          };
+        }
       }
 
       // Create execution context

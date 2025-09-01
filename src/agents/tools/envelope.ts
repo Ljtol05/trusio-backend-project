@@ -78,10 +78,33 @@ export const create_envelope = {
       }
 
       // Check for negative target amount (business logic validation)
-      if (params.targetAmount < 0) {
+      if (params.targetAmount !== undefined && params.targetAmount < 0) {
         return {
           success: false,
           error: 'Budget constraint validation failed: target amount cannot be negative',
+          duration: Date.now() - startTime,
+          timestamp: new Date(),
+          toolName: 'create_envelope',
+        };
+      }
+
+      // Check for extremely large target amounts beyond safe integer
+      if (params.targetAmount !== undefined && params.targetAmount > Number.MAX_SAFE_INTEGER) {
+        return {
+          success: false,
+          error: 'Target amount validation failed: must be within valid range',
+          duration: Date.now() - startTime,
+          timestamp: new Date(),
+          toolName: 'create_envelope',
+        };
+      }
+
+      // Additional validation for business logic constraints
+      if (params.initialBalance !== undefined && params.targetAmount !== undefined && 
+          params.initialBalance > params.targetAmount && params.targetAmount > 0) {
+        return {
+          success: false,
+          error: 'Budget constraint validation failed: initial balance cannot exceed target',
           duration: Date.now() - startTime,
           timestamp: new Date(),
           toolName: 'create_envelope',
