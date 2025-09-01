@@ -1,0 +1,236 @@
+~/workspace$ npm run test:agents -- --run --reporter=verbose src/agents/__tests__/validation.test.ts
+
+> envelope-app-backend@1.0.0 test:agents
+> vitest run --config vitest.config.agents.ts --run --reporter=verbose src/agents/__tests__/validation.test.ts
+
+
+ RUN  v1.6.1 /home/runner/workspace
+
+ ❯ |agents| src/agents/__tests__/validation.test.ts (20)
+   ❯ Data Validation Tests (20)
+     ❯ Schema Validation (7)
+       ❯ AgentConfigSchema (2)
+         × should validate correct agent configuration
+         ✓ should reject invalid agent configuration
+       ✓ FinancialContextSchema (3)
+         ✓ should validate correct financial context
+         ✓ should accept minimal financial context
+         ✓ should reject invalid financial context
+       ✓ AgentResponseSchema (2)
+         ✓ should validate correct agent response
+         ✓ should reject invalid agent response
+     ❯ Tool Parameter Validation (2)
+       ✓ should validate budget analysis parameters
+       × should reject invalid tool parameters
+     ❯ Error Handling Validation (3)
+       × should handle database validation errors gracefully
+       ✓ should validate agent handoff parameters
+       × should reject invalid handoff parameters
+     ❯ Input Sanitization (3)
+       × should sanitize user input messages
+       × should handle SQL injection attempts in parameters
+       × should validate envelope creation with proper limits
+     ✓ Type Safety Validation (2)
+       ✓ should enforce type safety in agent responses
+       ✓ should enforce type safety in financial context
+     ❯ Business Logic Validation (3)
+       × should validate financial constraints
+       × should validate budget constraints
+       × should validate date constraints
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ Failed Tests 10 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |agents| src/agents/__tests__/validation.test.ts > Data Validation Tests > Schema Validation > AgentConfigSchema > should validate correct agent configuration
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/agents/__tests__/validation.test.ts:57:32
+     55| 
+     56|         const result = AgentConfigSchema.s…
+     57|         expect(result.success).toBe(true);
+       |                                ^
+     58|       });
+     59| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/10]⎯
+
+ FAIL  |agents| src/agents/__tests__/validation.test.ts > Data Validation Tests > Tool Parameter Validation > should reject invalid tool parameters
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ src/agents/__tests__/validation.test.ts:216:30
+    214| 
+    215|       const result = await toolRegistry.ex…
+    216|       expect(result.success).toBe(false);
+       |                              ^
+    217|       expect(result.error).toContain('vali…
+    218|     });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/10]⎯
+
+ FAIL  |agents| src/agents/__tests__/validation.test.ts > Data Validation Tests > Error Handling Validation > should handle database validation errors gracefully
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ src/agents/__tests__/validation.test.ts:241:30
+    239|       );
+    240| 
+    241|       expect(result.success).toBe(false);
+       |                              ^
+    242|       expect(result.error).toContain('Vali…
+    243|     });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/10]⎯
+
+ FAIL  |agents| src/agents/__tests__/validation.test.ts > Data Validation Tests > Error Handling Validation > should reject invalid handoff parameters
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ src/agents/__tests__/validation.test.ts:277:30
+    275|       );
+    276| 
+    277|       expect(result.success).toBe(false);
+       |                              ^
+    278|       expect(result.error).toContain('vali…
+    279|     });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/10]⎯
+
+ FAIL  |agents| src/agents/__tests__/validation.test.ts > Data Validation Tests > Input Sanitization > should sanitize user input messages
+AssertionError: expected 'Mocked response from financial_adviso…' not to contain '<script>'
+
+- Expected
++ Received
+
+- <script>
++ Mocked response from financial_advisor: <script>alert("xss")</script>Help me with budget
+
+ ❯ src/agents/__tests__/validation.test.ts:293:26
+    291| 
+    292|       // Should not contain script tags in…
+    293|       expect(result).not.toContain('<scrip…
+       |                          ^
+    294|       expect(result).not.toContain('alert(…
+    295|     });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/10]⎯
+
+ FAIL  |agents| src/agents/__tests__/validation.test.ts > Data Validation Tests > Input Sanitization > should handle SQL injection attempts in parameters
+AssertionError: expected 'Tool not found: categorize_transaction' to contain 'validation'
+
+- Expected
++ Received
+
+- validation
++ Tool not found: categorize_transaction
+
+ ❯ src/agents/__tests__/validation.test.ts:311:28
+    309|       // Should handle gracefully without …
+    310|       expect(result.success).toBe(false);
+    311|       expect(result.error).toContain('vali…
+       |                            ^
+    312|     });
+    313| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/10]⎯
+
+ FAIL  |agents| src/agents/__tests__/validation.test.ts > Data Validation Tests > Input Sanitization > should validate envelope creation with proper limits
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ src/agents/__tests__/validation.test.ts:328:30
+    326|       );
+    327| 
+    328|       expect(result.success).toBe(false);
+       |                              ^
+    329|       expect(result.error).toContain('vali…
+    330|     });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/10]⎯
+
+ FAIL  |agents| src/agents/__tests__/validation.test.ts > Data Validation Tests > Business Logic Validation > should validate financial constraints
+AssertionError: expected 'Tool not found: transfer_funds' to contain 'positive amount'
+
+- Expected
++ Received
+
+- positive amount
++ Tool not found: transfer_funds
+
+ ❯ src/agents/__tests__/validation.test.ts:373:28
+    371| 
+    372|       expect(result.success).toBe(false);
+    373|       expect(result.error).toContain('posi…
+       |                            ^
+    374|     });
+    375| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/10]⎯
+
+ FAIL  |agents| src/agents/__tests__/validation.test.ts > Data Validation Tests > Business Logic Validation > should validate budget constraints
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ src/agents/__tests__/validation.test.ts:390:30
+    388|       );
+    389| 
+    390|       expect(result.success).toBe(false);
+       |                              ^
+    391|       expect(result.error).toContain('vali…
+    392|     });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/10]⎯
+
+ FAIL  |agents| src/agents/__tests__/validation.test.ts > Data Validation Tests > Business Logic Validation > should validate date constraints
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/agents/__tests__/validation.test.ts:409:30
+    407| 
+    408|       // Should handle past dates graceful…
+    409|       expect(result.success).toBe(true);
+       |                              ^
+    410|       if (result.success && result.result.…
+    411|         expect(result.result.warnings).toC…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/10]⎯
+
+ Test Files  1 failed (1)
+      Tests  10 failed | 10 passed (20)
+   Start at  00:36:24
+   Duration  951ms (transform 409ms, setup 106ms, collect 278ms, tests 185ms, environment 1ms, prepare 144ms)
