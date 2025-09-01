@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<testsuites name="vitest tests" tests="89" failures="0" errors="0" time="1.367">
-    <testsuite name="src/agents/__tests__/agentRegistry.test.ts" timestamp="2025-09-01T01:39:00.188Z" hostname="c5326278d835" tests="12" failures="0" errors="0" skipped="0" time="0.008">
+<testsuites name="vitest tests" tests="89" failures="0" errors="0" time="1.448">
+    <testsuite name="src/agents/__tests__/agentRegistry.test.ts" timestamp="2025-09-01T01:46:18.706Z" hostname="c5326278d835" tests="12" failures="0" errors="0" skipped="0" time="0.007">
         <testcase classname="src/agents/__tests__/agentRegistry.test.ts" name="AgentRegistry &gt; Agent Initialization &gt; should initialize all required agents" time="0.001">
         </testcase>
         <testcase classname="src/agents/__tests__/agentRegistry.test.ts" name="AgentRegistry &gt; Agent Initialization &gt; should properly assign tools to agents" time="0">
         </testcase>
         <testcase classname="src/agents/__tests__/agentRegistry.test.ts" name="AgentRegistry &gt; Agent Routing &gt; should route budget-related messages to budget coach" time="0">
         </testcase>
-        <testcase classname="src/agents/__tests__/agentRegistry.test.ts" name="AgentRegistry &gt; Agent Routing &gt; should route transaction-related messages to transaction analyst" time="0">
+        <testcase classname="src/agents/__tests__/agentRegistry.test.ts" name="AgentRegistry &gt; Agent Routing &gt; should route transaction-related messages to transaction analyst" time="0.001">
         </testcase>
         <testcase classname="src/agents/__tests__/agentRegistry.test.ts" name="AgentRegistry &gt; Agent Routing &gt; should route insight-related messages to insight generator" time="0">
         </testcase>
@@ -26,16 +26,16 @@
         <testcase classname="src/agents/__tests__/agentRegistry.test.ts" name="AgentRegistry &gt; Agent Metrics &gt; should return comprehensive metrics for all agents" time="0.001">
         </testcase>
     </testsuite>
-    <testsuite name="src/agents/__tests__/integration.test.ts" timestamp="2025-09-01T01:39:00.193Z" hostname="c5326278d835" tests="16" failures="0" errors="0" skipped="0" time="0.031">
-        <testcase classname="src/agents/__tests__/integration.test.ts" name="Agent API Integration Tests &gt; POST /api/ai/chat &gt; should handle basic chat request successfully" time="0.006">
+    <testsuite name="src/agents/__tests__/integration.test.ts" timestamp="2025-09-01T01:46:18.715Z" hostname="c5326278d835" tests="16" failures="0" errors="0" skipped="0" time="0.029">
+        <testcase classname="src/agents/__tests__/integration.test.ts" name="Agent API Integration Tests &gt; POST /api/ai/chat &gt; should handle basic chat request successfully" time="0.009">
         </testcase>
-        <testcase classname="src/agents/__tests__/integration.test.ts" name="Agent API Integration Tests &gt; POST /api/ai/chat &gt; should route to appropriate agent based on message" time="0.001">
+        <testcase classname="src/agents/__tests__/integration.test.ts" name="Agent API Integration Tests &gt; POST /api/ai/chat &gt; should route to appropriate agent based on message" time="0.002">
         </testcase>
-        <testcase classname="src/agents/__tests__/integration.test.ts" name="Agent API Integration Tests &gt; POST /api/ai/chat &gt; should include conversation history when requested" time="0.002">
+        <testcase classname="src/agents/__tests__/integration.test.ts" name="Agent API Integration Tests &gt; POST /api/ai/chat &gt; should include conversation history when requested" time="0.001">
         </testcase>
-        <testcase classname="src/agents/__tests__/integration.test.ts" name="Agent API Integration Tests &gt; POST /api/ai/chat &gt; should handle validation errors" time="0">
+        <testcase classname="src/agents/__tests__/integration.test.ts" name="Agent API Integration Tests &gt; POST /api/ai/chat &gt; should handle validation errors" time="0.001">
         </testcase>
-        <testcase classname="src/agents/__tests__/integration.test.ts" name="Agent API Integration Tests &gt; POST /api/ai/chat &gt; should require authentication" time="0">
+        <testcase classname="src/agents/__tests__/integration.test.ts" name="Agent API Integration Tests &gt; POST /api/ai/chat &gt; should require authentication" time="0.001">
         </testcase>
         <testcase classname="src/agents/__tests__/integration.test.ts" name="Agent API Integration Tests &gt; POST /api/ai/tools/execute &gt; should execute tool directly" time="0.002">
         </testcase>
@@ -45,53 +45,53 @@
         </testcase>
         <testcase classname="src/agents/__tests__/integration.test.ts" name="Agent API Integration Tests &gt; POST /api/ai/handoff &gt; should validate agent names in handoff" time="0.001">
         </testcase>
-        <testcase classname="src/agents/__tests__/integration.test.ts" name="Agent API Integration Tests &gt; GET /api/ai/agents &gt; should return list of available agents" time="0.003">
+        <testcase classname="src/agents/__tests__/integration.test.ts" name="Agent API Integration Tests &gt; GET /api/ai/agents &gt; should return list of available agents" time="0.002">
         </testcase>
         <testcase classname="src/agents/__tests__/integration.test.ts" name="Agent API Integration Tests &gt; GET /api/ai/tools &gt; should return list of available tools" time="0.001">
         </testcase>
-        <testcase classname="src/agents/__tests__/integration.test.ts" name="Agent API Integration Tests &gt; GET /api/ai/tools &gt; should filter tools by category" time="0">
+        <testcase classname="src/agents/__tests__/integration.test.ts" name="Agent API Integration Tests &gt; GET /api/ai/tools &gt; should filter tools by category" time="0.001">
         </testcase>
         <testcase classname="src/agents/__tests__/integration.test.ts" name="Agent API Integration Tests &gt; GET /api/ai/sessions/:sessionId/history &gt; should return conversation history" time="0.001">
         </testcase>
-        <testcase classname="src/agents/__tests__/integration.test.ts" name="Agent API Integration Tests &gt; GET /api/ai/status &gt; should return system status" time="0">
+        <testcase classname="src/agents/__tests__/integration.test.ts" name="Agent API Integration Tests &gt; GET /api/ai/status &gt; should return system status" time="0.001">
         </testcase>
-        <testcase classname="src/agents/__tests__/integration.test.ts" name="Agent API Integration Tests &gt; Error Handling &gt; should handle database connection errors gracefully" time="0.003">
+        <testcase classname="src/agents/__tests__/integration.test.ts" name="Agent API Integration Tests &gt; Error Handling &gt; should handle database connection errors gracefully" time="0">
         </testcase>
-        <testcase classname="src/agents/__tests__/integration.test.ts" name="Agent API Integration Tests &gt; Error Handling &gt; should handle agent unavailability" time="0.003">
+        <testcase classname="src/agents/__tests__/integration.test.ts" name="Agent API Integration Tests &gt; Error Handling &gt; should handle agent unavailability" time="0.001">
         </testcase>
     </testsuite>
-    <testsuite name="src/agents/__tests__/performance.test.ts" timestamp="2025-09-01T01:39:00.198Z" hostname="c5326278d835" tests="12" failures="0" errors="0" skipped="0" time="0.017">
+    <testsuite name="src/agents/__tests__/performance.test.ts" timestamp="2025-09-01T01:46:18.719Z" hostname="c5326278d835" tests="12" failures="0" errors="0" skipped="0" time="0.016">
         <testcase classname="src/agents/__tests__/performance.test.ts" name="Agent Performance Tests &gt; Agent Response Times &gt; should respond within acceptable time limits" time="0.001">
         </testcase>
         <testcase classname="src/agents/__tests__/performance.test.ts" name="Agent Performance Tests &gt; Agent Response Times &gt; should handle multiple concurrent agent requests" time="0.001">
         </testcase>
-        <testcase classname="src/agents/__tests__/performance.test.ts" name="Agent Performance Tests &gt; Agent Response Times &gt; should maintain performance with large financial context" time="0.003">
+        <testcase classname="src/agents/__tests__/performance.test.ts" name="Agent Performance Tests &gt; Agent Response Times &gt; should maintain performance with large financial context" time="0.002">
         </testcase>
         <testcase classname="src/agents/__tests__/performance.test.ts" name="Agent Performance Tests &gt; Tool Performance &gt; should execute tools within acceptable time limits" time="0.001">
         </testcase>
         <testcase classname="src/agents/__tests__/performance.test.ts" name="Agent Performance Tests &gt; Tool Performance &gt; should handle concurrent tool executions" time="0.002">
         </testcase>
-        <testcase classname="src/agents/__tests__/performance.test.ts" name="Agent Performance Tests &gt; Memory and Resource Usage &gt; should not leak memory during repeated operations" time="0">
+        <testcase classname="src/agents/__tests__/performance.test.ts" name="Agent Performance Tests &gt; Memory and Resource Usage &gt; should not leak memory during repeated operations" time="0.001">
         </testcase>
-        <testcase classname="src/agents/__tests__/performance.test.ts" name="Agent Performance Tests &gt; Memory and Resource Usage &gt; should handle agent registry operations efficiently" time="0.002">
+        <testcase classname="src/agents/__tests__/performance.test.ts" name="Agent Performance Tests &gt; Memory and Resource Usage &gt; should handle agent registry operations efficiently" time="0.001">
         </testcase>
         <testcase classname="src/agents/__tests__/performance.test.ts" name="Agent Performance Tests &gt; Stress Testing &gt; should handle high-frequency agent requests" time="0.001">
         </testcase>
-        <testcase classname="src/agents/__tests__/performance.test.ts" name="Agent Performance Tests &gt; Stress Testing &gt; should gracefully degrade under extreme load" time="0.002">
+        <testcase classname="src/agents/__tests__/performance.test.ts" name="Agent Performance Tests &gt; Stress Testing &gt; should gracefully degrade under extreme load" time="0.001">
         </testcase>
-        <testcase classname="src/agents/__tests__/performance.test.ts" name="Agent Performance Tests &gt; Edge Cases and Resilience &gt; should handle malformed context gracefully" time="0.001">
+        <testcase classname="src/agents/__tests__/performance.test.ts" name="Agent Performance Tests &gt; Edge Cases and Resilience &gt; should handle malformed context gracefully" time="0.003">
         </testcase>
         <testcase classname="src/agents/__tests__/performance.test.ts" name="Agent Performance Tests &gt; Edge Cases and Resilience &gt; should handle very long messages efficiently" time="0.001">
         </testcase>
-        <testcase classname="src/agents/__tests__/performance.test.ts" name="Agent Performance Tests &gt; Edge Cases and Resilience &gt; should maintain performance with frequent agent switching" time="0">
+        <testcase classname="src/agents/__tests__/performance.test.ts" name="Agent Performance Tests &gt; Edge Cases and Resilience &gt; should maintain performance with frequent agent switching" time="0.001">
         </testcase>
     </testsuite>
-    <testsuite name="src/agents/__tests__/security.test.ts" timestamp="2025-09-01T01:39:00.202Z" hostname="c5326278d835" tests="15" failures="0" errors="0" skipped="0" time="0.089">
-        <testcase classname="src/agents/__tests__/security.test.ts" name="Security Middleware &gt; Input Sanitization &gt; should sanitize XSS attempts" time="0.002">
+    <testsuite name="src/agents/__tests__/security.test.ts" timestamp="2025-09-01T01:46:18.722Z" hostname="c5326278d835" tests="15" failures="0" errors="0" skipped="0" time="0.154">
+        <testcase classname="src/agents/__tests__/security.test.ts" name="Security Middleware &gt; Input Sanitization &gt; should sanitize XSS attempts" time="0.004">
         </testcase>
         <testcase classname="src/agents/__tests__/security.test.ts" name="Security Middleware &gt; Input Sanitization &gt; should sanitize email inputs" time="0">
         </testcase>
-        <testcase classname="src/agents/__tests__/security.test.ts" name="Security Middleware &gt; Input Sanitization &gt; should sanitize alphanumeric inputs" time="0">
+        <testcase classname="src/agents/__tests__/security.test.ts" name="Security Middleware &gt; Input Sanitization &gt; should sanitize alphanumeric inputs" time="0.001">
         </testcase>
         <testcase classname="src/agents/__tests__/security.test.ts" name="Security Middleware &gt; Threat Detection &gt; should detect XSS attempts" time="0.001">
         </testcase>
@@ -101,29 +101,29 @@
         </testcase>
         <testcase classname="src/agents/__tests__/security.test.ts" name="Security Middleware &gt; Threat Detection &gt; should detect command injection attempts" time="0.001">
         </testcase>
-        <testcase classname="src/agents/__tests__/security.test.ts" name="Security Middleware &gt; Input Validation &gt; should validate and sanitize simple strings" time="0">
+        <testcase classname="src/agents/__tests__/security.test.ts" name="Security Middleware &gt; Input Validation &gt; should validate and sanitize simple strings" time="0.001">
         </testcase>
         <testcase classname="src/agents/__tests__/security.test.ts" name="Security Middleware &gt; Input Validation &gt; should validate complex objects" time="0.001">
         </testcase>
-        <testcase classname="src/agents/__tests__/security.test.ts" name="Security Middleware &gt; Input Validation &gt; should pass safe inputs" time="0">
+        <testcase classname="src/agents/__tests__/security.test.ts" name="Security Middleware &gt; Input Validation &gt; should pass safe inputs" time="0.001">
         </testcase>
-        <testcase classname="src/agents/__tests__/security.test.ts" name="Security Middleware &gt; Security Middleware Integration &gt; should block malicious requests" time="0.038">
+        <testcase classname="src/agents/__tests__/security.test.ts" name="Security Middleware &gt; Security Middleware Integration &gt; should block malicious requests" time="0.036">
         </testcase>
-        <testcase classname="src/agents/__tests__/security.test.ts" name="Security Middleware &gt; Security Middleware Integration &gt; should allow safe requests" time="0.006">
+        <testcase classname="src/agents/__tests__/security.test.ts" name="Security Middleware &gt; Security Middleware Integration &gt; should allow safe requests" time="0.034">
         </testcase>
-        <testcase classname="src/agents/__tests__/security.test.ts" name="Security Middleware &gt; Security Middleware Integration &gt; should sanitize inputs when enabled" time="0.009">
+        <testcase classname="src/agents/__tests__/security.test.ts" name="Security Middleware &gt; Security Middleware Integration &gt; should sanitize inputs when enabled" time="0.023">
         </testcase>
-        <testcase classname="src/agents/__tests__/security.test.ts" name="Security Middleware &gt; Security Middleware Integration &gt; should enforce rate limiting" time="0.016">
+        <testcase classname="src/agents/__tests__/security.test.ts" name="Security Middleware &gt; Security Middleware Integration &gt; should enforce rate limiting" time="0.04">
         </testcase>
-        <testcase classname="src/agents/__tests__/security.test.ts" name="Security Middleware &gt; Security Middleware Integration &gt; should add security headers" time="0.012">
+        <testcase classname="src/agents/__tests__/security.test.ts" name="Security Middleware &gt; Security Middleware Integration &gt; should add security headers" time="0.009">
         </testcase>
     </testsuite>
-    <testsuite name="src/agents/__tests__/tools.test.ts" timestamp="2025-09-01T01:39:00.207Z" hostname="c5326278d835" tests="14" failures="0" errors="0" skipped="0" time="0.132">
-        <testcase classname="src/agents/__tests__/tools.test.ts" name="Financial Tools &gt; Tool Registry &gt; should have all required transaction tools registered" time="0.002">
+    <testsuite name="src/agents/__tests__/tools.test.ts" timestamp="2025-09-01T01:46:18.727Z" hostname="c5326278d835" tests="14" failures="0" errors="0" skipped="0" time="0.11">
+        <testcase classname="src/agents/__tests__/tools.test.ts" name="Financial Tools &gt; Tool Registry &gt; should have all required transaction tools registered" time="0.001">
         </testcase>
         <testcase classname="src/agents/__tests__/tools.test.ts" name="Financial Tools &gt; Tool Registry &gt; should return correct tool count" time="0.001">
         </testcase>
-        <testcase classname="src/agents/__tests__/tools.test.ts" name="Financial Tools &gt; Budget Tools &gt; should execute budget analysis tool successfully" time="0.001">
+        <testcase classname="src/agents/__tests__/tools.test.ts" name="Financial Tools &gt; Budget Tools &gt; should execute budget analysis tool successfully" time="0">
         </testcase>
         <testcase classname="src/agents/__tests__/tools.test.ts" name="Financial Tools &gt; Budget Tools &gt; should handle budget analysis errors gracefully" time="0.001">
         </testcase>
@@ -133,23 +133,23 @@
         </testcase>
         <testcase classname="src/agents/__tests__/tools.test.ts" name="Financial Tools &gt; Transaction Tools &gt; should categorize transactions correctly" time="0.001">
         </testcase>
-        <testcase classname="src/agents/__tests__/tools.test.ts" name="Financial Tools &gt; Transaction Tools &gt; should analyze spending patterns" time="0.001">
+        <testcase classname="src/agents/__tests__/tools.test.ts" name="Financial Tools &gt; Transaction Tools &gt; should analyze spending patterns" time="0">
         </testcase>
-        <testcase classname="src/agents/__tests__/tools.test.ts" name="Financial Tools &gt; Analysis Tools &gt; should analyze budget variance" time="0.015">
+        <testcase classname="src/agents/__tests__/tools.test.ts" name="Financial Tools &gt; Analysis Tools &gt; should analyze budget variance" time="0.001">
         </testcase>
-        <testcase classname="src/agents/__tests__/tools.test.ts" name="Financial Tools &gt; Insight Tools &gt; should generate personalized recommendations" time="0.001">
+        <testcase classname="src/agents/__tests__/tools.test.ts" name="Financial Tools &gt; Insight Tools &gt; should generate personalized recommendations" time="0">
         </testcase>
-        <testcase classname="src/agents/__tests__/tools.test.ts" name="Financial Tools &gt; Insight Tools &gt; should identify financial opportunities" time="0.003">
+        <testcase classname="src/agents/__tests__/tools.test.ts" name="Financial Tools &gt; Insight Tools &gt; should identify financial opportunities" time="0.002">
         </testcase>
         <testcase classname="src/agents/__tests__/tools.test.ts" name="Financial Tools &gt; Agent Handoff Tool &gt; should execute agent handoff successfully" time="0">
         </testcase>
-        <testcase classname="src/agents/__tests__/tools.test.ts" name="Financial Tools &gt; Tool Error Handling &gt; should handle non-existent tool gracefully" time="0.001">
+        <testcase classname="src/agents/__tests__/tools.test.ts" name="Financial Tools &gt; Tool Error Handling &gt; should handle non-existent tool gracefully" time="0">
         </testcase>
-        <testcase classname="src/agents/__tests__/tools.test.ts" name="Financial Tools &gt; Tool Error Handling &gt; should handle tool execution timeout" time="0.102">
+        <testcase classname="src/agents/__tests__/tools.test.ts" name="Financial Tools &gt; Tool Error Handling &gt; should handle tool execution timeout" time="0.1">
         </testcase>
     </testsuite>
-    <testsuite name="src/agents/__tests__/validation.test.ts" timestamp="2025-09-01T01:39:00.213Z" hostname="c5326278d835" tests="20" failures="0" errors="0" skipped="0" time="0.02">
-        <testcase classname="src/agents/__tests__/validation.test.ts" name="Data Validation Tests &gt; Schema Validation &gt; AgentConfigSchema &gt; should validate correct agent configuration" time="0.005">
+    <testsuite name="src/agents/__tests__/validation.test.ts" timestamp="2025-09-01T01:46:18.730Z" hostname="c5326278d835" tests="20" failures="0" errors="0" skipped="0" time="0.014">
+        <testcase classname="src/agents/__tests__/validation.test.ts" name="Data Validation Tests &gt; Schema Validation &gt; AgentConfigSchema &gt; should validate correct agent configuration" time="0.004">
         </testcase>
         <testcase classname="src/agents/__tests__/validation.test.ts" name="Data Validation Tests &gt; Schema Validation &gt; AgentConfigSchema &gt; should reject invalid agent configuration" time="0.001">
         </testcase>
@@ -161,21 +161,21 @@
         </testcase>
         <testcase classname="src/agents/__tests__/validation.test.ts" name="Data Validation Tests &gt; Schema Validation &gt; AgentResponseSchema &gt; should validate correct agent response" time="0.001">
         </testcase>
-        <testcase classname="src/agents/__tests__/validation.test.ts" name="Data Validation Tests &gt; Schema Validation &gt; AgentResponseSchema &gt; should reject invalid agent response" time="0.001">
+        <testcase classname="src/agents/__tests__/validation.test.ts" name="Data Validation Tests &gt; Schema Validation &gt; AgentResponseSchema &gt; should reject invalid agent response" time="0">
         </testcase>
         <testcase classname="src/agents/__tests__/validation.test.ts" name="Data Validation Tests &gt; Tool Parameter Validation &gt; should validate budget analysis parameters" time="0.001">
         </testcase>
-        <testcase classname="src/agents/__tests__/validation.test.ts" name="Data Validation Tests &gt; Tool Parameter Validation &gt; should reject invalid tool parameters" time="0.001">
+        <testcase classname="src/agents/__tests__/validation.test.ts" name="Data Validation Tests &gt; Tool Parameter Validation &gt; should reject invalid tool parameters" time="0">
         </testcase>
-        <testcase classname="src/agents/__tests__/validation.test.ts" name="Data Validation Tests &gt; Error Handling Validation &gt; should handle database validation errors gracefully" time="0">
+        <testcase classname="src/agents/__tests__/validation.test.ts" name="Data Validation Tests &gt; Error Handling Validation &gt; should handle database validation errors gracefully" time="0.001">
         </testcase>
-        <testcase classname="src/agents/__tests__/validation.test.ts" name="Data Validation Tests &gt; Error Handling Validation &gt; should validate agent handoff parameters" time="0.001">
+        <testcase classname="src/agents/__tests__/validation.test.ts" name="Data Validation Tests &gt; Error Handling Validation &gt; should validate agent handoff parameters" time="0">
         </testcase>
-        <testcase classname="src/agents/__tests__/validation.test.ts" name="Data Validation Tests &gt; Error Handling Validation &gt; should reject invalid handoff parameters" time="0">
+        <testcase classname="src/agents/__tests__/validation.test.ts" name="Data Validation Tests &gt; Error Handling Validation &gt; should reject invalid handoff parameters" time="0.001">
         </testcase>
         <testcase classname="src/agents/__tests__/validation.test.ts" name="Data Validation Tests &gt; Input Sanitization &gt; should sanitize user input messages" time="0.001">
         </testcase>
-        <testcase classname="src/agents/__tests__/validation.test.ts" name="Data Validation Tests &gt; Input Sanitization &gt; should handle SQL injection attempts in parameters" time="0.001">
+        <testcase classname="src/agents/__tests__/validation.test.ts" name="Data Validation Tests &gt; Input Sanitization &gt; should handle SQL injection attempts in parameters" time="0">
         </testcase>
         <testcase classname="src/agents/__tests__/validation.test.ts" name="Data Validation Tests &gt; Input Sanitization &gt; should validate envelope creation with proper limits" time="0">
         </testcase>

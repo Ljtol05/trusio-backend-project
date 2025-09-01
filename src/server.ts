@@ -30,13 +30,10 @@ import testVoiceKYCRoutes from './routes/test-voice-kyc.js';
 import routingRoutes from './routes/routing.js';
 import webhookRoutes from './routes/webhooks.js';
 
-// Initialize agent registry
-import { agentRegistry } from './agents/agentRegistry.js';
+// Initialize agent system
+import { initializeAgentSystem } from './agents/bootstrap.js';
 
-// Ensure agent registry is initialized
-if (!agentRegistry.isInitialized()) {
-  throw new Error('Agent registry failed to initialize');
-}
+// Initialize agent system asynchronously in startServer function
 
 const app = express();
 
@@ -122,6 +119,16 @@ async function startServer() {
       logger.info('Database connected successfully');
     }
 
+    // Initialize agent system (skip in test mode)
+    if (process.env.NODE_ENV !== 'test') {
+      try {
+        await initializeAgentSystem();
+        logger.info('Agent system initialized successfully');
+      } catch (agentError) {
+        logger.warn({ error: agentError }, 'Agent system initialization failed, continuing without agents');
+      }
+    }
+
     // Initialize Global AI Brain (skip in test mode)
     if (process.env.NODE_ENV !== 'test') {
       try {
@@ -148,13 +155,15 @@ async function startServer() {
       const server = app.listen(env.PORT, '0.0.0.0', () => {
         logger.info({
           port: env.PORT,
+          host: '0.0.0.0',
           environment: env.NODE_ENV,
           features: {
             ai: openaiConfigured,
             coaching: openaiConfigured,
             database: true,
+            agents: true,
           }
-        }, 'Server started successfully');
+        }, 'Server started successfully - Ready for Expo frontend');
       });
 
       // Graceful shutdown
