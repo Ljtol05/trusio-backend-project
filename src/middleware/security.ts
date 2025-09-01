@@ -38,6 +38,99 @@ const SECURITY_PATTERNS = {
   ],
 };
 
+// Rate limiting store (in production, use Redis)
+const rateLimitStore = new Map<string, { count: number; resetTime: number }>();
+
+// Recursive input validation function
+export function validateInput(input: any): { isValid: boolean; threats: string[]; sanitized: any } {
+  const threats: string[] = [];
+  
+  function processValue(value: any): any {
+    if (typeof value === 'string') {
+      // Check for threats
+      if (detectXSS(value)) threats.push('XSS');
+      if (detectSQLInjection(value)) threats.push('SQL_INJECTION');
+      if (detectPathTraversal(value)) threats.push('PATH_TRAVERSAL');
+      if (detectCommandInjection(value)) threats.push('COMMAND_INJECTION');
+      
+      // Return sanitized string
+      return sanitizeString(value);
+    } else if (Array.isArray(value)) {
+      return value.map(processValue);
+    } else if (value && typeof value === 'object') {
+      const sanitized: any = {};
+      for (const [key, val] of Object.entries(value)) {
+        sanitized[key] = processValue(val);
+      }
+      return sanitized;
+    }
+    return value;
+  }
+  
+  const sanitized = processValue(input);
+  return {
+    isValid: threats.length === 0,
+    threats: [...new Set(threats)], // Remove duplicates
+    sanitized
+  };
+}
+
+// Security middleware
+export function securityMiddleware(options: {
+  sanitize?: boolean;
+  validateInput?: boolean;
+  rateLimit?: { maxRequests: number; windowMs: number };
+} = {}) {
+  const { sanitize = false, validateInput: validateInputOption = true, rateLimit } = options;
+  
+  return (req: any, res: any, next: any) => {
+    // Add security headers
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('X-XSS-Protection', '1; mode=block');
+    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+    res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'");
+    
+    // Rate limiting
+    if (rateLimit) {
+      const clientId = req.ip || 'unknown';
+      const now = Date.now();
+      const windowStart = now - rateLimit.windowMs;
+      
+      let clientData = rateLimitStore.get(clientId);
+      if (!clientData || clientData.resetTime < windowStart) {
+        clientData = { count: 0, resetTime: now + rateLimit.windowMs };
+        rateLimitStore.set(clientId, clientData);
+      }
+      
+      clientData.count++;
+      
+      if (clientData.count > rateLimit.maxRequests) {
+        return res.status(429).json({ error: 'Rate limit exceeded' });
+      }
+    }
+    
+    // Input validation and sanitization
+    if (req.body && (validateInputOption || sanitize)) {
+      const result = validateInput(req.body);
+      
+      if (validateInputOption && !result.isValid) {
+        return res.status(400).json({
+          ok: false,
+          error: 'Invalid input detected',
+          threats: result.threats
+        });
+      }
+      
+      if (sanitize) {
+        req.body = result.sanitized;
+      }
+    }
+    
+    next();
+  };
+}
+
 // Sanitization functions
 export function sanitizeString(input: string): string {
   // Remove script tags and dangerous attributes
@@ -52,6 +145,40 @@ export function sanitizeString(input: string): string {
     .replace(/data:text\/html/gi, '');
 
   return sanitized.trim();
+}
+
+export function sanitizeEmail(input: string): string {
+  // First apply basic string sanitization
+  let sanitized = sanitizeString(input);
+  
+  // Convert to lowercase and remove any remaining HTML tags or dangerous patterns
+  sanitized = sanitized.toLowerCase()
+    .replace(/<[^>]*>/g, '') // Remove any remaining HTML tags
+    .replace(/[<>"']/g, ''); // Remove potentially dangerous characters
+  
+  return sanitized.trim();
+}
+
+export function sanitizeAlphanumeric(input: string): string {
+  // Remove any characters that are not alphanumeric, spaces, dots, underscores, or hyphens
+  return input.replace(/[^a-zA-Z0-9\s._-]/g, '').trim();
+}
+
+// Threat detection functions
+export function detectXSS(input: string): boolean {
+  return SECURITY_PATTERNS.xss.some(pattern => pattern.test(input));
+}
+
+export function detectSQLInjection(input: string): boolean {
+  return SECURITY_PATTERNS.sqlInjection.some(pattern => pattern.test(input));
+}
+
+export function detectPathTraversal(input: string): boolean {
+  return SECURITY_PATTERNS.pathTraversal.some(pattern => pattern.test(input));
+}
+
+export function detectCommandInjection(input: string): boolean {
+  return SECURITY_PATTERNS.commandInjection.some(pattern => pattern.test(input));
 }
 
 export function sanitizeNumeric(input: any): number | null {
