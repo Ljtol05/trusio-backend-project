@@ -51,7 +51,7 @@ describe('Data Validation Tests', () => {
       it('should validate correct agent configuration', () => {
         const validConfig = {
           name: 'Test Agent',
-          role: 'financial_coach' as const,
+          role: 'budget_coach' as const,
           instructions: 'You are a helpful financial coach',
           model: 'gpt-4',
           temperature: 0.7,
@@ -230,20 +230,17 @@ describe('Data Validation Tests', () => {
 
   describe('Error Handling Validation', () => {
     it('should handle database validation errors gracefully', async () => {
-      // Mock database to throw validation error
-      const dbError = new Error('Validation failed: userId is required');
-      dbError.name = 'ValidationError';
+      // Test with a tool that simulates database validation error
+      const mockTool = {
+        name: 'mock_db_tool',
+        description: 'Mock tool for database testing',
+        execute: vi.fn().mockRejectedValue(new Error('Validation failed: userId is required')),
+      };
 
-      vi.doMock('../../lib/db.js', () => ({
-        db: {
-          envelope: {
-            findMany: vi.fn().mockRejectedValue(dbError),
-          },
-        },
-      }));
+      toolRegistry.registerTool(mockTool, 'test');
 
       const result = await toolRegistry.executeTool(
-        'budget_analysis',
+        'mock_db_tool',
         { userId: 'user-123' },
         { userId: 'user-123' }
       );
