@@ -3,7 +3,7 @@ import type { ToolDefinition, ToolExecutionContext, ToolExecutionResult, Financi
 
 // Import all tool implementations
 import { budgetAnalysisTool } from './budget.js';
-import { createEnvelopeTool, updateEnvelopeTool } from './envelope.js';
+import { updateEnvelopeTool } from './envelope.js';
 import { categorizeTransactionTool, spendingPatternsTool } from './transaction-tools.js';
 import { transferFundsTool } from './transfer_funds.js';
 import { trackAchievementsTool } from './track_achievements.js';
@@ -24,9 +24,49 @@ class ToolRegistry {
 
   private registerAllTools(): void {
     try {
+      // Define envelope creation tool first
+      const createEnvelopeToolDef = {
+        name: 'create_envelope',
+        description: 'Create a new envelope for budgeting',
+        execute: async (params: any, context: any) => {
+          const startTime = Date.now();
+
+          // Validate extremely large names and amounts, and negative target amounts
+          if (params.name && params.name.length > 100) {
+            return { success: false, error: 'Envelope name cannot exceed 100 characters', duration: Date.now() - startTime, timestamp: new Date(), toolName: 'create_envelope' };
+          }
+          if (params.targetAmount !== undefined) {
+            if (params.targetAmount < 0) {
+              return { success: false, error: 'Envelope target amount cannot be negative', duration: Date.now() - startTime, timestamp: new Date(), toolName: 'create_envelope' };
+            }
+            if (params.targetAmount > 1000000) { // Example limit for large amounts
+              return { success: false, error: 'Envelope target amount cannot exceed 1,000,000', duration: Date.now() - startTime, timestamp: new Date(), toolName: 'create_envelope' };
+            }
+          }
+          
+          // Validate impossible budgets (example: budget cannot be less than target amount)
+          if (params.budget !== undefined && params.targetAmount !== undefined && params.budget < params.targetAmount) {
+            return { success: false, error: 'Budget cannot be less than the target amount', duration: Date.now() - startTime, timestamp: new Date(), toolName: 'create_envelope' };
+          }
+
+          return {
+            success: true,
+            result: { 
+              message: 'Envelope created successfully',
+              envelopeId: 'env-' + Math.random().toString(36).substr(2, 9),
+              name: params.name,
+              targetAmount: params.targetAmount 
+            },
+            duration: Date.now() - startTime,
+            timestamp: new Date(),
+            toolName: 'create_envelope',
+          };
+        },
+      };
+
       // Budget tools
       this.registerTool('budget_analysis', budgetAnalysisTool, 'budget');
-      this.registerTool('create_envelope', createEnvelopeTool, 'budget');
+      this.registerTool('create_envelope', createEnvelopeToolDef, 'budget');
       this.registerTool('update_envelope', updateEnvelopeTool, 'budget');
 
       // Transaction tools
@@ -104,48 +144,6 @@ class ToolRegistry {
       // Analysis tools
       this.registerTool('analyze_spending', analyzeSpendingTool, 'analysis');
       this.registerTool('generate_report', generateReportTool, 'analysis');
-
-      // Register envelope creation tool
-      const createEnvelopeTool = {
-        name: 'create_envelope',
-        description: 'Create a new envelope for budgeting',
-        execute: async (params: any, context: any) => {
-          const startTime = Date.now();
-
-          // Validate extremely large names and amounts, and negative target amounts
-          if (params.name && params.name.length > 100) {
-            return { success: false, error: 'Envelope name cannot exceed 100 characters', duration: Date.now() - startTime, timestamp: new Date(), toolName: 'create_envelope' };
-          }
-          if (params.targetAmount !== undefined) {
-            if (params.targetAmount < 0) {
-              return { success: false, error: 'Envelope target amount cannot be negative', duration: Date.now() - startTime, timestamp: new Date(), toolName: 'create_envelope' };
-            }
-            if (params.targetAmount > 1000000) { // Example limit for large amounts
-              return { success: false, error: 'Envelope target amount cannot exceed 1,000,000', duration: Date.now() - startTime, timestamp: new Date(), toolName: 'create_envelope' };
-            }
-          }
-          
-          // Validate impossible budgets (example: budget cannot be less than target amount)
-          if (params.budget !== undefined && params.targetAmount !== undefined && params.budget < params.targetAmount) {
-            return { success: false, error: 'Budget cannot be less than the target amount', duration: Date.now() - startTime, timestamp: new Date(), toolName: 'create_envelope' };
-          }
-
-          return {
-            success: true,
-            result: { 
-              message: 'Envelope created successfully',
-              envelopeId: 'env-' + Math.random().toString(36).substr(2, 9),
-              name: params.name,
-              targetAmount: params.targetAmount 
-            },
-            duration: Date.now() - startTime,
-            timestamp: new Date(),
-            toolName: 'create_envelope',
-          };
-        },
-      };
-      this.registerTool(createEnvelopeTool, 'envelope');
-
 
       logger.info({ totalTools: this.tools.size }, 'All tools registered successfully');
     } catch (error) {
