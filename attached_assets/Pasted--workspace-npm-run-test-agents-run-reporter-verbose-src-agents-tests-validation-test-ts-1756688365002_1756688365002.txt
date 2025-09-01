@@ -1,0 +1,122 @@
+~/workspace$ npm run test:agents -- --run --reporter=verbose src/agents/__tests__/validation.test.ts
+
+> envelope-app-backend@1.0.0 test:agents
+> vitest run --config vitest.config.agents.ts --run --reporter=verbose src/agents/__tests__/validation.test.ts
+
+
+ RUN  v1.6.1 /home/runner/workspace
+
+ ❯ |agents| src/agents/__tests__/validation.test.ts (20)
+   ❯ Data Validation Tests (20)
+     ✓ Schema Validation (7)
+       ✓ AgentConfigSchema (2)
+         ✓ should validate correct agent configuration
+         ✓ should reject invalid agent configuration
+       ✓ FinancialContextSchema (3)
+         ✓ should validate correct financial context
+         ✓ should accept minimal financial context
+         ✓ should reject invalid financial context
+       ✓ AgentResponseSchema (2)
+         ✓ should validate correct agent response
+         ✓ should reject invalid agent response
+     ✓ Tool Parameter Validation (2)
+       ✓ should validate budget analysis parameters
+       ✓ should reject invalid tool parameters
+     ❯ Error Handling Validation (3)
+       ✓ should handle database validation errors gracefully
+       ✓ should validate agent handoff parameters
+       × should reject invalid handoff parameters
+     ❯ Input Sanitization (3)
+       ✓ should sanitize user input messages
+       ✓ should handle SQL injection attempts in parameters
+       × should validate envelope creation with proper limits
+     ✓ Type Safety Validation (2)
+       ✓ should enforce type safety in agent responses
+       ✓ should enforce type safety in financial context
+     ❯ Business Logic Validation (3)
+       × should validate financial constraints
+       × should validate budget constraints
+       ✓ should validate date constraints
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |agents| src/agents/__tests__/validation.test.ts > Data Validation Tests > Error Handling Validation > should reject invalid handoff parameters
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ src/agents/__tests__/validation.test.ts:284:30
+    282|       );
+    283| 
+    284|       expect(result.success).toBe(false);
+       |                              ^
+    285|       expect(result.error).toContain('vali…
+    286|     });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯
+
+ FAIL  |agents| src/agents/__tests__/validation.test.ts > Data Validation Tests > Input Sanitization > should validate envelope creation with proper limits
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ src/agents/__tests__/validation.test.ts:335:30
+    333|       );
+    334| 
+    335|       expect(result.success).toBe(false);
+       |                              ^
+    336|       expect(result.error).toContain('vali…
+    337|     });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/4]⎯
+
+ FAIL  |agents| src/agents/__tests__/validation.test.ts > Data Validation Tests > Business Logic Validation > should validate financial constraints
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ src/agents/__tests__/validation.test.ts:379:30
+    377|       );
+    378| 
+    379|       expect(result.success).toBe(false);
+       |                              ^
+    380|       expect(result.error).toContain('posi…
+    381|     });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/4]⎯
+
+ FAIL  |agents| src/agents/__tests__/validation.test.ts > Data Validation Tests > Business Logic Validation > should validate budget constraints
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ src/agents/__tests__/validation.test.ts:397:30
+    395|       );
+    396| 
+    397|       expect(result.success).toBe(false);
+       |                              ^
+    398|       expect(result.error).toContain('vali…
+    399|     });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/4]⎯
+
+ Test Files  1 failed (1)
+      Tests  4 failed | 16 passed (20)
+   Start at  00:59:03
+   Duration  847ms (transform 309ms, setup 99ms, collect 337ms, tests 27ms, environment 0ms, prepare 106ms)
