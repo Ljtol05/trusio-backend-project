@@ -38,14 +38,14 @@ router.post('/start', authenticateToken, async (req, res) => {
     const age = now.getFullYear() - dob.getFullYear();
 
     if (dob > now) {
-      return res.status(400).json({ 
-        error: 'Date of birth cannot be in the future' 
+      return res.status(400).json({
+        error: 'Date of birth cannot be in the future'
       });
     }
 
     if (age < 18) {
-      return res.status(400).json({ 
-        error: 'Must be at least 18 years old' 
+      return res.status(400).json({
+        error: 'Must be at least 18 years old'
       });
     }
 
@@ -87,11 +87,11 @@ router.post('/start', authenticateToken, async (req, res) => {
 router.get('/status', authenticateToken, async (req, res) => {
   try {
     const memoryStatus = getKycStatus(req.user.id.toString());
-    
+
     // Also check database for consistency
     const user = await db.user.findUnique({ where: { id: req.user.id } });
     const dbKycApproved = user?.kycApproved || false;
-    
+
     // If memory shows approved but database doesn't, update database
     if (memoryStatus.status === 'approved' && !dbKycApproved) {
       await db.user.update({
@@ -100,8 +100,20 @@ router.get('/status', authenticateToken, async (req, res) => {
       });
       logger.info({ userId: req.user.id }, 'Database KYC status synced with memory store');
     }
-    
-    res.json(memoryStatus);
+
+    // Add next step information to the response
+    const response = {
+      ...memoryStatus,
+      nextStep: memoryStatus.status === 'approved' ? 'plaid' : 'kyc',
+      readyForPlaid: memoryStatus.status === 'approved',
+      user: {
+        id: req.user.id,
+        kycApproved: memoryStatus.status === 'approved',
+        nextStep: memoryStatus.status === 'approved' ? 'plaid' : 'kyc'
+      }
+    };
+
+    res.json(response);
   } catch (error) {
     logger.error({ error, userId: req.user?.id }, 'Error getting KYC status');
     res.status(500).json({ error: 'Internal server error' });
@@ -120,8 +132,8 @@ router.post('/webhooks/kyc', async (req, res) => {
     );
 
     if (!updated) {
-      return res.status(404).json({ 
-        error: 'Provider reference not found' 
+      return res.status(404).json({
+        error: 'Provider reference not found'
       });
     }
 
@@ -132,10 +144,10 @@ router.post('/webhooks/kyc', async (req, res) => {
         where: { id: parseInt(kycStatus.userId) },
         data: { kycApproved: payload.decision === 'approved' },
       });
-      logger.info({ 
-        userId: kycStatus.userId, 
-        providerRef: payload.providerRef, 
-        decision: payload.decision 
+      logger.info({
+        userId: kycStatus.userId,
+        providerRef: payload.providerRef,
+        decision: payload.decision
       }, 'Database updated with KYC decision');
     }
 

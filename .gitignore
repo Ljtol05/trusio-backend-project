@@ -237,3 +237,26 @@ dist
 # Prisma
 prisma/dev.db
 prisma/migrations/
+
+# Documentation examples (exclude from type checking)
+docs/OpenAI_Agent_Repos/**/*.ts
+docs/OpenAI_Agent_Repos/**/*.tsx
+docs/OpenAI_Agent_Repos/**/*.js
+docs/OpenAI_Agent_Repos/**/*.jsx
+
+# Build artifacts
+dist/
+*.tsbuildinfo
+
+# Test artifacts
+coverage/
+*.lcov
+.nyc_output
+
+# Environment files
+.env*
+!.env.example
+
+# IDE files
+.vscode/
+.cursor/

@@ -6,7 +6,7 @@ import type { FinancialContext, AgentInteraction } from '../types.js';
 
 // Context schema for validation
 export const AgentContextSchema = z.object({
-  userId: z.string(),
+  userId: z.number(),
   sessionId: z.string(),
   agentName: z.string(),
   timestamp: z.date(),
@@ -141,11 +141,11 @@ export class AgentContextManager {
         })),
       };
 
-      logger.debug({ 
+      logger.debug({
         userId,
         envelopeCount: envelopes.length,
         transactionCount: transactions.length,
-        goalCount: goals.length 
+        goalCount: goals.length
       }, 'Financial context built successfully');
 
       return financialContext;
@@ -160,8 +160,8 @@ export class AgentContextManager {
    * Get conversation history for a session
    */
   async getConversationHistory(
-    userId: string, 
-    sessionId: string, 
+    userId: string,
+    sessionId: string,
     limit: number = 20
   ): Promise<AgentInteraction[]> {
     try {
@@ -203,7 +203,7 @@ export class AgentContextManager {
   ): Promise<AgentContext> {
     try {
       const cacheKey = `${userId}:${sessionId}:${agentName}`;
-      
+
       // Check cache first
       const cached = this.contextCache.get(cacheKey);
       if (cached && Date.now() - cached.timestamp.getTime() < this.cacheTtlMs) {
@@ -253,11 +253,11 @@ export class AgentContextManager {
       // Cache the context
       this.cacheContext(cacheKey, context);
 
-      logger.debug({ 
-        userId, 
-        sessionId, 
+      logger.debug({
+        userId,
+        sessionId,
         agentName,
-        historyCount: conversationHistory.length 
+        historyCount: conversationHistory.length
       }, 'Agent context created successfully');
 
       return context;
@@ -327,7 +327,7 @@ export class AgentContextManager {
   private invalidateSessionCache(userId: string, sessionId: string): void {
     const keysToDelete = Array.from(this.contextCache.keys())
       .filter(key => key.startsWith(`${userId}:${sessionId}:`));
-    
+
     keysToDelete.forEach(key => this.contextCache.delete(key));
   }
 

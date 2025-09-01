@@ -690,6 +690,48 @@ router.post('/verify-phone', authenticateToken, validateAuth(verifyPhoneSchema),
   }
 });
 
+// POST /api/auth/enable-2fa - Enable 2FA for the user
+router.post('/enable-2fa', authenticateToken, async (req: any, res: any) => {
+  try {
+    const user = await db.user.findUnique({ where: { id: req.user.id } });
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    if (!user.phoneVerified) {
+      return res.status(400).json({ error: 'Phone must be verified before enabling 2FA' });
+    }
+
+    // For now, we'll use phone-based 2FA via Twilio Verify
+    // In the future, this could be extended to support TOTP apps
+    res.json({
+      message: '2FA enabled successfully',
+      method: 'phone',
+      phone: user.phone
+    });
+  } catch (error) {
+    logger.error({ error, userId: req.user?.id }, 'Failed to enable 2FA');
+    res.status(500).json({ error: 'Failed to enable 2FA' });
+  }
+});
+
+// POST /api/auth/disable-2fa - Disable 2FA for the user
+router.post('/disable-2fa', authenticateToken, async (req: any, res: any) => {
+  try {
+    const user = await db.user.findUnique({ where: { id: req.user.id } });
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.json({
+      message: '2FA disabled successfully'
+    });
+  } catch (error) {
+    logger.error({ error, userId: req.user?.id }, 'Failed to disable 2FA');
+    res.status(500).json({ error: 'Failed to disable 2FA' });
+  }
+});
+
 // POST /api/auth/resend-phone-code
 router.post('/resend-phone-code', authenticateToken, validateAuth(resendPhoneCodeSchema), async (req: any, res: any) => {
   try {

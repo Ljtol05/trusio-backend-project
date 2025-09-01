@@ -6,6 +6,7 @@ import { db } from '../lib/db.js';
 import { transactionIntelligence, TransactionChoice } from '../lib/transactionIntelligence.js';
 import { mccDatabase } from '../lib/mccDatabase.js';
 import { CreateTransactionSchema, PaginationSchema } from '../types/dto.js';
+import { batchClassifyTransactions } from '../lib/transactionClassifier.js';
 
 const router = Router();
 router.use(auth);
@@ -90,6 +91,55 @@ router.get('/:id', async (req: any, res) => {
   } catch (error) {
     logger.error(error, 'Error fetching transaction');
     res.status(500).json({ error: 'Failed to fetch transaction' });
+  }
+});
+
+// PATCH /api/transactions/:id - Update transaction (for user feedback and classification)
+router.patch('/:id', async (req: any, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const { envelopeId, merchant, mcc, location, reason } = req.body;
+
+    // Validate transaction exists and belongs to user
+    const existingTransaction = await db.transaction.findFirst({
+      where: { id, userId: req.user.id }
+    });
+
+    if (!existingTransaction) {
+      return res.status(404).json({ error: 'Transaction not found' });
+    }
+
+    // Update transaction with user feedback
+    const updatedTransaction = await db.transaction.update({
+      where: { id },
+      data: {
+        ...(envelopeId !== undefined && { envelopeId: envelopeId ? parseInt(envelopeId) : null }),
+        ...(merchant !== undefined && { merchant }),
+        ...(mcc !== undefined && { mcc }),
+        ...(location !== undefined && { location }),
+        ...(reason !== undefined && { reason }),
+        updatedAt: new Date()
+      },
+      include: {
+        envelope: { select: { id: true, name: true, icon: true, color: true } },
+        card: { select: { id: true, last4: true, label: true } },
+      }
+    });
+
+    logger.info({
+      userId: req.user.id,
+      transactionId: id,
+      updates: req.body
+    }, 'Transaction updated with user feedback');
+
+    res.json({
+      transaction: updatedTransaction,
+      message: 'Transaction updated successfully'
+    });
+
+  } catch (error) {
+    logger.error({ error, userId: req.user?.id }, 'Error updating transaction');
+    res.status(500).json({ error: 'Failed to update transaction' });
   }
 });
 
@@ -187,7 +237,7 @@ router.get('/analytics/spending', async (req: any, res) => {
           .sort(([,a]: any, [,b]: any) => b - a)[0],
         mostFrequentMerchant: topMerchants[0]?.merchant || 'N/A',
         avgDailySpending: Math.round(
-          Object.values(dailySpending).reduce((sum: number, amount: any) => sum + amount, 0) / 
+          Object.values(dailySpending).reduce((sum: number, amount: any) => sum + amount, 0) /
           Object.keys(dailySpending).length
         ),
       },
@@ -202,9 +252,9 @@ router.get('/analytics/spending', async (req: any, res) => {
 router.get('/pending', async (req: any, res) => {
   try {
     const pendingTransactions = await db.transaction.findMany({
-      where: { 
-        userId: req.user.id, 
-        status: 'PENDING' 
+      where: {
+        userId: req.user.id,
+        status: 'PENDING'
       },
       include: {
         envelope: { select: { id: true, name: true, icon: true, color: true } },
@@ -216,22 +266,22 @@ router.get('/pending', async (req: any, res) => {
     // Get available envelopes for potential reassignment
     const availableEnvelopes = await db.envelope.findMany({
       where: { userId: req.user.id, isActive: true },
-      select: { 
-        id: true, 
-        name: true, 
-        icon: true, 
-        color: true, 
-        balanceCents: true 
+      select: {
+        id: true,
+        name: true,
+        icon: true,
+        color: true,
+        balanceCents: true
       },
       orderBy: { order: 'asc' },
     });
 
-    res.json({ 
+    res.json({
       pendingTransactions,
       availableEnvelopes,
       totalPending: pendingTransactions.length,
       totalPendingAmount: pendingTransactions.reduce(
-        (sum, txn) => sum + Math.abs(txn.amountCents), 
+        (sum, txn) => sum + Math.abs(txn.amountCents),
         0
       ),
     });
@@ -370,6 +420,25 @@ router.post('/import', async (req: any, res) => {
   } catch (error) {
     logger.error(error, 'Error importing transactions');
     res.status(500).json({ error: 'Failed to import transactions' });
+  }
+});
+
+// POST /api/transactions/batch-classify - Batch classify unclassified transactions
+router.post('/batch-classify', async (req: any, res) => {
+  try {
+    const { limit = 50 } = req.body;
+
+    const result = await batchClassifyTransactions(req.user.id, limit);
+
+    res.json({
+      ok: true,
+      message: 'Batch classification completed',
+      result
+    });
+
+  } catch (error) {
+    logger.error({ error, userId: req.user?.id }, 'Error in batch classification');
+    res.status(500).json({ error: 'Failed to perform batch classification' });
   }
 });
 

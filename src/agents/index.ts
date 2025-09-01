@@ -6,9 +6,9 @@ export * from './tools/index.js';
 
 // Re-export commonly used OpenAI Agents SDK types and functions
 export { Agent, run, tool, Runner } from '@openai/agents';
-export type { Tool, ToolFunction, RunContext } from '@openai/agents';
+export type { Tool, RunContext } from '@openai/agents';
 
-import { agentManager, ensureRegistryReady } from './registry.js';
+import { agentManager } from './registry.js';
 import { agentRegistry } from './agentRegistry.js';
 import { toolRegistry } from './tools/registry.js';
 import type { FinancialContext } from './tools/types.js';
@@ -20,28 +20,15 @@ export const initializeAgentSystem = async (): Promise<boolean> => {
   try {
     logger.info('Initializing multi-agent financial coaching system...');
 
-    // Initialize financial tools first
-    const { initializeTools } = await import('./tools/index.js');
-    const toolsInitialized = await initializeTools();
-
-    if (!toolsInitialized) {
-      throw new Error('Failed to initialize financial tools');
-    }
-
-    // Initialize the agent manager and its registries
-    await agentManager.initialize();
-    await agentRegistry.initialize(); // Ensure agent registry is initialized
-    await toolRegistry.initialize(); // Ensure tool registry is initialized
-
-    // Ensure registry is properly initialized
-    if (!ensureRegistryReady()) {
-      throw new Error('Agent registry validation failed');
+    // Initialize the agent manager (tools are auto-initialized)
+    if (!agentManager.isReady()) {
+      throw new Error('Agent manager not ready');
     }
 
     // Get system health check
-    const healthStatus = agentManager.getAgentHealth();
+    const healthStatus = agentManager.getAgentMetrics();
     const unhealthyAgents = Object.entries(healthStatus)
-      .filter(([_, health]) => !health.isActive || !health.isInitialized)
+      .filter(([_, health]) => !health.isAvailable)
       .map(([role, _]) => role);
 
     if (unhealthyAgents.length > 0) {
@@ -49,11 +36,16 @@ export const initializeAgentSystem = async (): Promise<boolean> => {
     }
 
     // Log system statistics
-    const initializedCount = agentManager.getInitializedCount();
+    const totalAgents = Object.keys(agentManager.getAllAgents()).length;
+    const readyAgents = agentManager.getAgentNames().filter(name => {
+      const agent = agentManager.getAgent(name);
+      return agent && agent.isReady();
+    }).length;
+
     logger.info({
-      initializedCount,
-      totalAgents: Object.keys(agentManager.getAllAgents()).length,
-      roles: Object.keys(agentManager.getAllAgents())
+      readyAgents,
+      totalAgents,
+      roles: agentManager.getAgentNames()
     }, 'Agent system initialized successfully');
 
     return true;
@@ -363,7 +355,7 @@ export function isAgentAvailable(agentRole: AgentRole): boolean {
 /**
  * Get agent capabilities
  */
-export function getAgentCapabilities(agentRole: AgentRole): string[] {
+export function getAgentCapabilities(agentRole: AgentRole): readonly string[] {
   return AGENT_CAPABILITIES[agentRole as keyof typeof AGENT_CAPABILITIES] || [];
 }
 
@@ -374,12 +366,12 @@ export async function initializeMultiAgentSystem(): Promise<void> {
   try {
     // Initialize the agent system
     await initializeAgentSystem();
-    
+
     // Verify all agents are ready
     if (!agentManager.isReady()) {
       throw new Error('Agent system failed to initialize properly');
     }
-    
+
     console.log('✅ Multi-Agent Financial Coaching System initialized successfully');
     console.log(`📊 Available agents: ${agentManager.getAgentNames().join(', ')}`);
   } catch (error) {

@@ -24,13 +24,13 @@ const VoiceInputSchema = z.object({
 router.post('/start', auth, async (req, res) => {
   try {
     const userId = req.user!.id;
-    
+
     logger.info({ userId }, 'Starting voice KYC onboarding session');
 
     // Verify prerequisites
     const user = await db.user.findUnique({
       where: { id: userId },
-      select: { 
+      select: {
         emailVerified: true,
         phoneVerified: true,
         kycApproved: true,
@@ -105,7 +105,7 @@ router.post('/start', auth, async (req, res) => {
 
   } catch (error: any) {
     logger.error({ error, userId: req.user?.id }, 'Failed to start voice KYC onboarding');
-    
+
     if (error.message.includes('must complete')) {
       return res.status(400).json({
         ok: false,
@@ -165,7 +165,7 @@ router.get('/status/:sessionId', auth, async (req, res) => {
     logger.info({ userId, sessionId }, 'Getting voice KYC session status');
 
     const session = await voiceKYCAgent.getSessionStatus(sessionId, userId);
-    
+
     if (!session) {
       return res.status(404).json({
         ok: false,
@@ -203,6 +203,107 @@ router.get('/status/:sessionId', auth, async (req, res) => {
   }
 });
 
+// POST /api/voice-onboarding/orchestrate - Trigger multi-agent orchestration
+router.post('/orchestrate', auth, async (req, res) => {
+  try {
+    const userId = req.user!.id;
+    const { sessionId } = req.body;
+
+    logger.info({ userId, sessionId }, 'Starting multi-agent orchestration for voice KYC');
+
+    // Verify session exists and belongs to user
+    const session = await voiceKYCAgent.getSessionStatus(sessionId, userId);
+    if (!session) {
+      return res.status(404).json({
+        ok: false,
+        error: 'Session not found',
+        code: 'SESSION_NOT_FOUND'
+      });
+    }
+
+    // Trigger multi-agent analysis
+    const multiAgentResults = await voiceKYCAgent.orchestrateMultiAgentAnalysis(userId, sessionId);
+
+    res.json({
+      ok: true,
+      message: 'Multi-agent orchestration completed successfully',
+      sessionId,
+      results: {
+        budgetCoach: multiAgentResults.budgetCoach,
+        transactionAnalyst: multiAgentResults.transactionAnalyst,
+        insightGenerator: multiAgentResults.insightGenerator,
+        financialAdvisor: multiAgentResults.financialAdvisor
+      },
+      metadata: {
+        orchestrationType: 'parallel',
+        agentsUsed: ['budget_coach', 'transaction_analyst', 'insight_generator', 'financial_advisor'],
+        timestamp: new Date().toISOString()
+      }
+    });
+
+  } catch (error: any) {
+    logger.error({ error, userId: req.user?.id }, 'Failed to orchestrate multi-agent analysis');
+    res.status(500).json({
+      ok: false,
+      error: 'Failed to orchestrate multi-agent analysis',
+      code: 'ORCHESTRATION_ERROR'
+    });
+  }
+});
+
+// POST /api/voice-onboarding/handoff - Handoff to specialized agent
+router.post('/handoff', auth, async (req, res) => {
+  try {
+    const userId = req.user!.id;
+    const { sessionId, fromStage, toAgent, reason, context } = req.body;
+
+    logger.info({ userId, sessionId, fromStage, toAgent, reason }, 'Initiating agent handoff');
+
+    // Verify session exists and belongs to user
+    const session = await voiceKYCAgent.getSessionStatus(sessionId, userId);
+    if (!session) {
+      return res.status(404).json({
+        ok: false,
+        error: 'Session not found',
+        code: 'SESSION_NOT_FOUND'
+      });
+    }
+
+    // Execute handoff
+    const handoffResult = await voiceKYCAgent.handoffToSpecialist(
+      fromStage,
+      toAgent,
+      userId,
+      sessionId,
+      reason,
+      context
+    );
+
+    res.json({
+      ok: true,
+      message: 'Agent handoff completed successfully',
+      handoffId: handoffResult.handoffId,
+      targetAgent: handoffResult.targetAgent,
+      response: handoffResult.response,
+      contextPreserved: handoffResult.contextPreserved,
+      metadata: {
+        fromStage,
+        toAgent,
+        reason,
+        timestamp: new Date().toISOString()
+      }
+    });
+
+  } catch (error: any) {
+    logger.error({ error, userId: req.user?.id }, 'Failed to execute agent handoff');
+    res.status(500).json({
+      ok: false,
+      error: 'Failed to execute agent handoff',
+      code: 'HANDOFF_ERROR'
+    });
+  }
+});
+
 // POST /api/voice-onboarding/switch-to-text - Switch from voice to text mode for budget review
 router.post('/switch-to-text', auth, async (req, res) => {
   try {
@@ -212,7 +313,7 @@ router.post('/switch-to-text', auth, async (req, res) => {
     logger.info({ userId, sessionId }, 'Switching to text mode for budget review');
 
     const session = await voiceKYCAgent.getSessionStatus(sessionId, userId);
-    
+
     if (!session) {
       return res.status(404).json({
         ok: false,
@@ -263,7 +364,7 @@ router.get('/budget/:sessionId', auth, async (req, res) => {
     const { sessionId } = req.params;
 
     const session = await voiceKYCAgent.getSessionStatus(sessionId, userId);
-    
+
     if (!session) {
       return res.status(404).json({
         ok: false,
@@ -273,7 +374,7 @@ router.get('/budget/:sessionId', auth, async (req, res) => {
     }
 
     const budgetRecommendations = session.responses.budgetRecommendations;
-    
+
     if (!budgetRecommendations) {
       return res.status(400).json({
         ok: false,
@@ -313,7 +414,7 @@ router.post('/approve-budget', auth, async (req, res) => {
     logger.info({ userId, sessionId }, 'Approving and implementing budget');
 
     const session = await voiceKYCAgent.getSessionStatus(sessionId, userId);
-    
+
     if (!session) {
       return res.status(404).json({
         ok: false,
@@ -323,7 +424,7 @@ router.post('/approve-budget', auth, async (req, res) => {
     }
 
     const budgetRecommendations = session.responses.budgetRecommendations;
-    
+
     if (!budgetRecommendations) {
       return res.status(400).json({
         ok: false,

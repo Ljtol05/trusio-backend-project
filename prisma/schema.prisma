@@ -3,8 +3,9 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 model User {
@@ -18,10 +19,11 @@ model User {
   phone                    String?
   phoneVerificationCode    String?
   kycApproved              Boolean       @default(false)
-  kycData                  String?       // Changed from Json to String for SQLite
+  kycData                  Json?         // Changed back to Json for PostgreSQL
   plaidConnected           Boolean       @default(false)
   plaidAccessToken         String?       // Encrypted Plaid access token
   plaidItemId              String?       // Plaid item ID
+  plaidSyncMetadata        Json?         // Plaid sync metadata and status
   onboardingCompleted      Boolean       @default(false)
   transactionDataReady     Boolean       @default(false) // Indicates if 90-day transaction analysis is complete
   createdAt                DateTime      @default(now())
@@ -38,6 +40,7 @@ model User {
   serviceAccounts          ServiceAccount[]
   goals                    Goal[]
   conversations            Conversation[]
+  embeddings               Embedding[]
 }
 
 model Envelope {
@@ -83,11 +86,14 @@ model Transaction {
   wasHold         Boolean  @default(false)
   holdAmountCents Int?
   externalId      String?  @unique
+  plaidTransactionId String? @unique // Plaid transaction ID
+  accountId       String?  // Plaid account ID
   envelopeId      Int?
   userId          Int
   cardId          Int?
   authorizedAt    DateTime?
   postedAt        DateTime?
+  pending         Boolean  @default(false) // Plaid pending status
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
@@ -263,4 +269,22 @@ model Conversation {
   @@index([userId, sessionId])
   @@index([sessionId])
   @@map("conversations")
+}
+
+// Vector embeddings for RAG (Retrieval-Augmented Generation)
+model Embedding {
+  id          String   @id @default(cuid())
+  ownerId     Int      // User ID who owns this embedding
+  docType     String   // Type of document (conversation, bank_statement, spending_pattern, goal, etc.)
+  content     String   // The actual content/text
+  embedding   Unsupported("vector(1536)") // pgvector embedding (1536 dimensions for OpenAI ada-002)
+  metadata    Json?    // Additional metadata
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@index([ownerId, docType])
+  @@index([docType])
+  @@map("embeddings")
 }

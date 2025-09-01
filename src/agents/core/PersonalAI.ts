@@ -2,7 +2,7 @@ import { logger } from '../../lib/logger.js';
 import { createAgentResponse } from '../../lib/openai.js';
 import { db } from '../../lib/db.js';
 import { Agent } from '@openai/agents';
-import { globalAIBrain, getUserContext, storeUserContext } from '../../lib/vectorstore.js';
+import { globalAIBrain } from '../../lib/ai/globalAIBrain.js';
 import { onboardingAgent } from './OnboardingAgent.js';
 import { financialCoachAgent } from './FinancialCoachAgent.js';
 import crypto from 'crypto';
@@ -174,8 +174,8 @@ class PersonalAI {
   }
 
   async processVoiceInput(
-    sessionId: string, 
-    voiceInput: string, 
+    sessionId: string,
+    voiceInput: string,
     audioMetadata?: any
   ): Promise<{
     response: string;
@@ -412,8 +412,8 @@ class PersonalAI {
     if (transactionCount < 50 && avgTransaction > 100) return 'analytical';
 
     // Medium patterns with emotional spending indicators
-    const hasEmotionalMerchants = analysis.frequentMerchants?.some(([merchant]: [string, number]) => 
-      merchant.toLowerCase().includes('amazon') || 
+    const hasEmotionalMerchants = analysis.frequentMerchants?.some(([merchant]: [string, number]) =>
+      merchant.toLowerCase().includes('amazon') ||
       merchant.toLowerCase().includes('starbucks') ||
       merchant.toLowerCase().includes('target')
     );
@@ -441,7 +441,7 @@ class PersonalAI {
     }, {} as Record<string, number>);
 
     const months = Object.keys(monthlySpending);
-    const averageMonthly = months.length > 0 
+    const averageMonthly = months.length > 0
       ? Object.values(monthlySpending).reduce((a, b) => a + b, 0) / months.length
       : 0;
 
@@ -505,7 +505,7 @@ class PersonalAI {
     }
 
     // Large purchases
-    const largePurchases = transactions.filter(t => 
+    const largePurchases = transactions.filter(t =>
       Math.abs(t.amountCents) > 50000 // > $500
     );
 
@@ -572,16 +572,16 @@ class PersonalAI {
   private extractInsightsFromConversation(history: any[]) {
     const userResponses = history.filter(msg => msg.role === 'user');
     return {
-      mentionedGoals: userResponses.some(msg => 
-        msg.content.toLowerCase().includes('save') || 
+      mentionedGoals: userResponses.some(msg =>
+        msg.content.toLowerCase().includes('save') ||
         msg.content.toLowerCase().includes('goal')
       ),
-      expressedStress: userResponses.some(msg => 
-        msg.content.toLowerCase().includes('stress') || 
+      expressedStress: userResponses.some(msg =>
+        msg.content.toLowerCase().includes('stress') ||
         msg.content.toLowerCase().includes('worry')
       ),
-      prefersSimplicity: userResponses.some(msg => 
-        msg.content.toLowerCase().includes('simple') || 
+      prefersSimplicity: userResponses.some(msg =>
+        msg.content.toLowerCase().includes('simple') ||
         msg.content.toLowerCase().includes('easy')
       )
     };

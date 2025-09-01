@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { logger } from '../lib/logger.js';
-import { auth } from '../services/auth.js';
+import { authenticateToken } from '../services/auth.js';
 import { db } from '../lib/db.js';
 import { Configuration, PlaidApi, PlaidEnvironments, Products, CountryCode } from 'plaid';
 
@@ -27,8 +27,25 @@ const ExchangeTokenSchema = z.object({
   publicToken: z.string().min(1),
 });
 
-// POST /api/plaid/create-link-token - Create Plaid Link token for post-KYC integration
-router.post('/create-link-token', auth, async (req, res) => {
+const TransactionSyncSchema = z.object({
+  days: z.number().min(1).max(365).default(120),
+});
+
+// Extend Express Request to include user
+declare global {
+  namespace Express {
+    interface Request {
+      user?: {
+        id: number;
+        email: string;
+        name: string;
+      };
+    }
+  }
+}
+
+// POST /api/plaid/link-token - Create Plaid Link token for post-KYC integration
+router.post('/link-token', authenticateToken, async (req, res) => {
   try {
     const userId = req.user!.id;
 
@@ -40,14 +57,13 @@ router.post('/create-link-token', auth, async (req, res) => {
       select: {
         id: true,
         email: true,
-        firstName: true,
-        lastName: true,
-        kycCompleted: true,
+        name: true,
+        kycApproved: true,
         plaidConnected: true
       }
     });
 
-    if (!user || !user.kycCompleted) {
+    if (!user || !user.kycApproved) {
       return res.status(400).json({
         ok: false,
         error: 'KYC must be completed before connecting bank accounts',
@@ -66,9 +82,9 @@ router.post('/create-link-token', auth, async (req, res) => {
     // Create link token for financial coaching and budgeting
     const linkTokenRequest = {
       user: {
-        client_user_id: userId,
+        client_user_id: userId.toString(),
         email_address: user.email,
-        legal_name: `${user.firstName} ${user.lastName}`,
+        legal_name: user.name,
       },
       client_name: 'Envelope Budgeting App',
       products: [Products.Transactions, Products.Auth, Products.Identity],
@@ -100,8 +116,8 @@ router.post('/create-link-token', auth, async (req, res) => {
   }
 });
 
-// POST /api/plaid/exchange-token - Exchange public token and start transaction sync
-router.post('/exchange-token', auth, async (req, res) => {
+// POST /api/plaid/exchange - Exchange public token and start transaction sync
+router.post('/exchange', authenticateToken, async (req, res) => {
   try {
     const userId = req.user!.id;
     const { publicToken } = ExchangeTokenSchema.parse(req.body);
@@ -109,136 +125,126 @@ router.post('/exchange-token', auth, async (req, res) => {
     logger.info({ userId }, 'Exchanging Plaid public token');
 
     // Exchange public token for access token
-    const response = await plaidClient.itemPublicTokenExchange({
-      public_token: publicToken,
+    const exchangeResponse = await plaidClient.itemPublicTokenExchange({
+      public_token: publicToken
     });
 
-    const { access_token, item_id } = response.data;
+    const accessToken = exchangeResponse.data.access_token;
+    const itemId = exchangeResponse.data.item_id;
 
     // Get account information
     const accountsResponse = await plaidClient.accountsGet({
-      access_token,
+      access_token: accessToken
     });
 
-    const accounts = accountsResponse.data.accounts;
-
-    // Get identity information for verification
-    const identityResponse = await plaidClient.identityGet({
-      access_token,
-    });
-
-    // Store encrypted access token and update user status
+    // Store access token and item ID
     await db.user.update({
       where: { id: userId },
       data: {
         plaidConnected: true,
-        plaidAccessToken: access_token, // In production, encrypt this
-        plaidItemId: item_id,
+        plaidAccessToken: accessToken, // In production, encrypt this
+        plaidItemId: itemId,
+        plaidSyncMetadata: {
+          connectedAt: new Date().toISOString(),
+          accountCount: accountsResponse.data.accounts.length,
+          accounts: accountsResponse.data.accounts.map(acc => ({
+            id: acc.account_id,
+            name: acc.name,
+            type: acc.type,
+            subtype: acc.subtype,
+            mask: acc.mask
+          }))
+        }
       }
     });
 
-    // Start background transaction sync for last 90 days
-    await startTransactionSync(userId, access_token);
+    // Start background transaction sync for last 120 days
+    await startTransactionSync(userId, accessToken);
 
+    logger.info({ userId, itemId }, 'Plaid token exchanged successfully');
     res.json({
       ok: true,
-      message: 'Bank accounts connected successfully',
-      accounts: accounts.map(account => ({
-        id: account.account_id,
-        name: account.name,
-        type: account.type,
-        subtype: account.subtype,
-        mask: account.mask,
-      })),
-      nextStep: 'transaction_analysis',
-      estimatedAnalysisTime: '2-3 minutes',
+      message: 'Bank account connected successfully. Transaction sync started.',
+      accounts: accountsResponse.data.accounts,
+      nextStep: 'transaction_sync'
     });
 
   } catch (error: any) {
     logger.error({ error, userId: req.user?.id }, 'Failed to exchange Plaid token');
     res.status(500).json({
       ok: false,
-      error: 'Failed to connect bank accounts',
-      code: 'TOKEN_EXCHANGE_ERROR'
+      error: 'Failed to connect bank account',
+      code: 'EXCHANGE_ERROR'
     });
   }
 });
 
-// POST /api/plaid/enhance-transactions - Re-process existing transactions with enhanced categorization
-router.post('/enhance-transactions', auth, async (req, res) => {
+// POST /api/plaid/sync - Manual transaction sync trigger
+router.post('/sync', authenticateToken, async (req, res) => {
   try {
     const userId = req.user!.id;
+    const { days } = TransactionSyncSchema.parse(req.body);
 
-    logger.info({ userId }, 'Starting transaction enhancement process');
-
-    // Get existing transactions
-    const existingTransactions = await db.transaction.findMany({
-      where: { userId },
-      select: {
-        id: true,
-        merchant: true,
-        amountCents: true,
-        category: true,
-        mcc: true,
-        description: true
-      }
+    const user = await db.user.findUnique({
+      where: { id: userId },
+      select: { plaidAccessToken: true, plaidConnected: true }
     });
 
-    let enhancedCount = 0;
-
-    for (const transaction of existingTransactions) {
-      const mockPlaidTransaction = {
-        merchant_name: transaction.merchant,
-        name: transaction.description,
-        amount: transaction.amountCents / 100,
-        category: transaction.category ? [transaction.category] : null
-      };
-
-      const enhancedCategory = await enhanceTransactionCategory(mockPlaidTransaction);
-      const inferredMCC = inferMCCFromMerchant(transaction.merchant);
-
-      if (enhancedCategory.wasEnhanced || (inferredMCC && !transaction.mcc)) {
-        await db.transaction.update({
-          where: { id: transaction.id },
-          data: {
-            category: enhancedCategory.primary,
-            subcategory: enhancedCategory.secondary,
-            mcc: inferredMCC || transaction.mcc,
-            metadata: JSON.stringify({
-              enhancedAt: new Date(),
-              enhancedCategory,
-              inferredMCC,
-              wasAutoEnhanced: true
-            })
-          }
-        });
-        enhancedCount++;
-      }
+    if (!user?.plaidConnected || !user.plaidAccessToken) {
+      return res.status(400).json({
+        ok: false,
+        error: 'Bank account not connected',
+        code: 'NOT_CONNECTED'
+      });
     }
+
+    // Start transaction sync
+    await startTransactionSync(userId, user.plaidAccessToken, days);
 
     res.json({
       ok: true,
-      message: 'Transaction enhancement completed',
-      statistics: {
-        totalTransactions: existingTransactions.length,
-        enhancedTransactions: enhancedCount,
-        enhancementRate: `${Math.round((enhancedCount / existingTransactions.length) * 100)}%`
-      }
+      message: `Transaction sync started for last ${days} days`,
+      syncDays: days
     });
 
-  } catch (error) {
-    logger.error({ error, userId: req.user?.id }, 'Failed to enhance transactions');
+  } catch (error: any) {
+    logger.error({ error, userId: req.user?.id }, 'Failed to start transaction sync');
     res.status(500).json({
       ok: false,
-      error: 'Failed to enhance transaction data',
-      code: 'ENHANCEMENT_ERROR'
+      error: 'Failed to start transaction sync',
+      code: 'SYNC_ERROR'
     });
   }
 });
 
+// POST /api/plaid/webhook - Handle Plaid webhooks
+router.post('/webhook', async (req, res) => {
+  try {
+    const { webhook_type, webhook_code, item_id, new_transactions } = req.body;
+
+    logger.info({ webhook_type, webhook_code, item_id }, 'Plaid webhook received');
+
+    if (webhook_type === 'TRANSACTIONS' && webhook_code === 'DEFAULT_UPDATE') {
+      // Handle new transactions
+      const user = await db.user.findFirst({
+        where: { plaidItemId: item_id }
+      });
+
+      if (user && user.plaidAccessToken) {
+        // Sync new transactions
+        await syncNewTransactions(user.id, user.plaidAccessToken, new_transactions);
+      }
+    }
+
+    res.json({ ok: true });
+  } catch (error: any) {
+    logger.error({ error }, 'Error processing Plaid webhook');
+    res.status(500).json({ error: 'Webhook processing failed' });
+  }
+});
 
 // GET /api/plaid/status - Check Plaid connection and transaction sync status
-router.get('/status', auth, async (req, res) => {
+router.get('/status', authenticateToken, async (req, res) => {
   try {
     const userId = req.user!.id;
 
@@ -246,70 +252,39 @@ router.get('/status', auth, async (req, res) => {
       where: { id: userId },
       select: {
         plaidConnected: true,
-        transactionDataReady: true,
         plaidItemId: true,
+        transactionDataReady: true,
+        plaidSyncMetadata: true
       }
     });
 
     if (!user) {
-      return res.status(404).json({
-        ok: false,
-        error: 'User not found',
-        code: 'USER_NOT_FOUND'
-      });
-    }
-
-    // Check transaction count if connected
-    let transactionCount = 0;
-    let oldestTransaction = null;
-    let newestTransaction = null;
-
-    if (user.plaidConnected) {
-      const transactions = await db.transaction.findMany({
-        where: { userId },
-        select: { createdAt: true },
-        orderBy: { createdAt: 'desc' },
-      });
-
-      transactionCount = transactions.length;
-      if (transactions.length > 0) {
-        newestTransaction = transactions[0].createdAt;
-        oldestTransaction = transactions[transactions.length - 1].createdAt;
-      }
+      return res.status(404).json({ error: 'User not found' });
     }
 
     res.json({
       ok: true,
-      plaidConnected: user.plaidConnected || false,
-      transactionDataReady: user.transactionDataReady || false,
-      transactionCount,
-      dataRange: transactionCount > 0 ? {
-        oldest: oldestTransaction,
-        newest: newestTransaction,
-        days: Math.ceil((Date.now() - new Date(oldestTransaction!).getTime()) / (1000 * 60 * 60 * 24))
-      } : null,
-      readyForOnboarding: user.plaidConnected && user.transactionDataReady,
+      plaidConnected: user.plaidConnected,
+      transactionDataReady: user.transactionDataReady,
+      syncMetadata: user.plaidSyncMetadata,
+      nextStep: user.transactionDataReady ? 'voice_onboarding' : 'transaction_sync'
     });
 
-  } catch (error) {
+  } catch (error: any) {
     logger.error({ error, userId: req.user?.id }, 'Failed to check Plaid status');
-    res.status(500).json({
-      ok: false,
-      error: 'Failed to check connection status',
-      code: 'STATUS_CHECK_ERROR'
-    });
+    res.status(500).json({ error: 'Failed to check status' });
   }
 });
 
 // Helper function to start transaction sync
-async function startTransactionSync(userId: string, accessToken: string) {
+async function startTransactionSync(userId: number, accessToken: string, days: number = 120) {
   try {
-    logger.info({ userId }, 'Starting enhanced 90-day transaction sync with intelligence');
+    logger.info({ userId, days }, 'Starting transaction sync');
 
-    // Get last 90 days of transactions
+    // Calculate date range
     const endDate = new Date();
     const startDate = new Date();
-    startDate.setDate(startDate.getDate() - 90);
+    startDate.setDate(startDate.getDate() - days);
 
     let allTransactions: any[] = [];
     let offset = 0;
@@ -321,8 +296,10 @@ async function startTransactionSync(userId: string, accessToken: string) {
         access_token: accessToken,
         start_date: startDate.toISOString().split('T')[0],
         end_date: endDate.toISOString().split('T')[0],
-        count: 500,
-        offset,
+        options: {
+          count: 500,
+          offset,
+        }
       });
 
       const transactions = transactionsResponse.data.transactions;
@@ -338,195 +315,170 @@ async function startTransactionSync(userId: string, accessToken: string) {
     logger.info({
       userId,
       totalFetched: allTransactions.length,
-    }, 'Fetched all available transactions');
+      dateRange: `${startDate.toISOString().split('T')[0]} to ${endDate.toISOString().split('T')[0]}`
+    }, 'Fetched transactions from Plaid');
 
-    // Enhanced transaction processing
+    // Process and store transactions
     let processedCount = 0;
-    let enhancedCount = 0;
+    let newCount = 0;
 
     for (const transaction of allTransactions) {
-      // Enhanced categorization
-      const enhancedCategory = await enhanceTransactionCategory(transaction);
-      const inferredMCC = inferMCCFromMerchant(transaction.merchant_name || transaction.name);
+      try {
+        // Check if transaction already exists
+        const existing = await db.transaction.findUnique({
+          where: { plaidTransactionId: transaction.transaction_id }
+        });
 
-      await db.transaction.upsert({
-        where: {
-          plaidTransactionId: transaction.transaction_id
-        },
-        create: {
-          userId,
-          plaidTransactionId: transaction.transaction_id,
-          accountId: transaction.account_id,
-          amountCents: Math.round(transaction.amount * 100),
-          merchant: transaction.merchant_name || transaction.name || 'Unknown',
-          description: transaction.name,
-          category: enhancedCategory.primary || transaction.category?.[0] || 'Other',
-          subcategory: enhancedCategory.secondary || transaction.category?.[1] || null,
-          mcc: inferredMCC || extractMCCFromTransaction(transaction),
-          location: transaction.location?.city ?
-            `${transaction.location.city}, ${transaction.location.region}` : null,
-          pending: transaction.pending,
-          metadata: JSON.stringify({
-            originalCategory: transaction.category,
-            enhancedCategory,
-            inferredMCC,
-            locationData: transaction.location,
-            transactionType: transaction.transaction_type,
-            paymentChannel: transaction.payment_channel
-          }),
-          createdAt: new Date(transaction.date),
-          authorizedAt: new Date(transaction.authorized_date || transaction.date),
-        },
-        update: {
-          pending: transaction.pending,
-          metadata: JSON.stringify({
-            originalCategory: transaction.category,
-            enhancedCategory,
-            inferredMCC,
-            locationData: transaction.location,
-            transactionType: transaction.transaction_type,
-            paymentChannel: transaction.payment_channel,
-            lastUpdated: new Date()
-          }),
+        if (!existing) {
+          // Create new transaction
+          await db.transaction.create({
+            data: {
+              userId,
+              plaidTransactionId: transaction.transaction_id,
+              accountId: transaction.account_id,
+              amountCents: Math.round(transaction.amount * 100),
+              merchant: transaction.merchant_name || transaction.name || 'Unknown',
+              reason: transaction.name,
+              mcc: extractMCCFromTransaction(transaction),
+              location: transaction.location?.city ?
+                `${transaction.location.city}, ${transaction.location.region}` : null,
+              pending: transaction.pending,
+              status: transaction.pending ? 'PENDING' : 'SETTLED',
+              authorizedAt: transaction.authorized_date ? new Date(transaction.authorized_date) : null,
+              postedAt: new Date(transaction.date),
+              externalId: transaction.transaction_id,
+            }
+          });
+          newCount++;
+        } else {
+          // Update existing transaction
+          await db.transaction.update({
+            where: { id: existing.id },
+            data: {
+              pending: transaction.pending,
+              status: transaction.pending ? 'PENDING' : 'SETTLED',
+              updatedAt: new Date()
+            }
+          });
         }
-      });
 
-      processedCount++;
-      if (enhancedCategory.wasEnhanced) enhancedCount++;
+        processedCount++;
+      } catch (error) {
+        logger.error({ error, transactionId: transaction.transaction_id }, 'Failed to process transaction');
+      }
     }
 
-    // Mark transaction data as ready and store summary
-    const updatedUser = await db.user.update({
+    // Mark transaction data as ready
+    await db.user.update({
       where: { id: userId },
       data: {
         transactionDataReady: true,
-        plaidSyncMetadata: JSON.stringify({
-          lastSyncAt: new Date(),
+        plaidSyncMetadata: {
+          lastSync: new Date().toISOString(),
           totalTransactions: processedCount,
-          enhancedTransactions: enhancedCount,
-          syncVersion: '2.0',
-          dateRange: {
-            start: startDate.toISOString().split('T')[0],
-            end: endDate.toISOString().split('T')[0]
-          }
-        })
-      },
-      select: {
-        emailVerified: true,
-        phoneVerified: true,
-        kycApproved: true,
-        plaidConnected: true,
-        transactionDataReady: true
+          newTransactions: newCount,
+          syncDays: days,
+          syncCompleted: true
+        }
       }
     });
 
-    // Check if user is now ready for voice KYC
-    const readyForVoiceKYC = updatedUser.emailVerified &&
-                            updatedUser.phoneVerified &&
-                            updatedUser.kycApproved &&
-                            updatedUser.plaidConnected &&
-                            updatedUser.transactionDataReady;
-
     logger.info({
       userId,
-      transactionCount: processedCount,
-      enhancedCount,
-      enhancementRate: `${Math.round((enhancedCount / processedCount) * 100)}%`,
-      dateRange: `${startDate.toISOString().split('T')[0]} to ${endDate.toISOString().split('T')[0]}`,
-      syncDuration: '120 days',
-      readyForVoiceKYC
-    }, 'Enhanced 120-day transaction sync completed for voice KYC onboarding');
-
-    return {
-      transactionCount: processedCount,
-      enhancedCount,
-      readyForVoiceKYC,
-      syncDuration: '120 days'
-    };
+      processed: processedCount,
+      new: newCount
+    }, 'Transaction sync completed successfully');
 
   } catch (error) {
-    logger.error({ error, userId }, 'Enhanced transaction sync failed');
-    // Don't throw - let user proceed with manual budget setup
+    logger.error({ error, userId }, 'Transaction sync failed');
+    throw error;
   }
 }
 
-// Enhanced categorization helper
-async function enhanceTransactionCategory(transaction: any): Promise<{
-  primary: string;
-  secondary: string | null;
-  wasEnhanced: boolean;
-}> {
-  const merchantName = (transaction.merchant_name || transaction.name || '').toLowerCase();
-  const amount = Math.abs(transaction.amount);
+// Helper function to sync new transactions from webhook
+async function syncNewTransactions(userId: number, accessToken: string, newTransactionCount: number) {
+  try {
+    logger.info({ userId, newTransactionCount }, 'Syncing new transactions from webhook');
 
-  // If Plaid already provided good categories, use them
-  if (transaction.category && transaction.category.length > 0 && transaction.category[0] !== 'Other') {
-    return {
-      primary: transaction.category[0],
-      secondary: transaction.category[1] || null,
-      wasEnhanced: false
-    };
-  }
+    // Get recent transactions
+    const endDate = new Date();
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - 7); // Last 7 days
 
-  // Enhanced categorization logic
-  const categoryMappings = [
-    { keywords: ['grocery', 'market', 'walmart', 'target', 'safeway'], primary: 'Groceries', secondary: 'Food' },
-    { keywords: ['gas', 'fuel', 'shell', 'chevron', 'exxon', 'bp'], primary: 'Gas', secondary: 'Transportation' },
-    { keywords: ['mcdonald', 'starbucks', 'subway', 'taco bell', 'burger'], primary: 'Fast Food', secondary: 'Dining' },
-    { keywords: ['restaurant', 'cafe', 'bistro', 'grill', 'pizza'], primary: 'Dining', secondary: 'Food' },
-    { keywords: ['airline', 'southwest', 'delta', 'american airlines'], primary: 'Travel', secondary: 'Airlines' },
-    { keywords: ['verizon', 'at&t', 'comcast', 'internet', 'phone'], primary: 'Bills', secondary: 'Utilities' },
-    { keywords: ['uber', 'lyft', 'taxi'], primary: 'Transportation', secondary: 'Rideshare' },
-    { keywords: ['amazon', 'ebay', 'online'], primary: 'Shopping', secondary: 'Online' },
-    { keywords: ['pharmacy', 'cvs', 'walgreens', 'medical'], primary: 'Healthcare', secondary: 'Pharmacy' }
-  ];
+    const response = await plaidClient.transactionsGet({
+      access_token: accessToken,
+      start_date: startDate.toISOString().split('T')[0],
+      end_date: endDate.toISOString().split('T')[0],
+      options: {
+        count: newTransactionCount + 10, // Get a few extra to be safe
+      }
+    });
 
-  for (const mapping of categoryMappings) {
-    if (mapping.keywords.some(keyword => merchantName.includes(keyword))) {
-      return {
-        primary: mapping.primary,
-        secondary: mapping.secondary,
-        wasEnhanced: true
-      };
+    const transactions = response.data.transactions;
+    let newCount = 0;
+
+    for (const transaction of transactions) {
+      try {
+        const existing = await db.transaction.findUnique({
+          where: { plaidTransactionId: transaction.transaction_id }
+        });
+
+        if (!existing) {
+          await db.transaction.create({
+            data: {
+              userId,
+              plaidTransactionId: transaction.transaction_id,
+              accountId: transaction.account_id,
+              amountCents: Math.round(transaction.amount * 100),
+              merchant: transaction.merchant_name || transaction.name || 'Unknown',
+              reason: transaction.name,
+              mcc: extractMCCFromTransaction(transaction),
+              location: transaction.location?.city ?
+                `${transaction.location.city}, ${transaction.location.region}` : null,
+              pending: transaction.pending,
+              status: transaction.pending ? 'PENDING' : 'SETTLED',
+              authorizedAt: transaction.authorized_date ? new Date(transaction.authorized_date) : null,
+              postedAt: new Date(transaction.date),
+              externalId: transaction.transaction_id,
+            }
+          });
+          newCount++;
+        }
+      } catch (error) {
+        logger.error({ error, transactionId: transaction.transaction_id }, 'Failed to sync new transaction');
+      }
     }
-  }
 
-  // Amount-based categorization
-  if (amount > 1000) {
-    return { primary: 'Large Purchase', secondary: 'Miscellaneous', wasEnhanced: true };
-  }
+    logger.info({ userId, newCount }, 'New transactions synced from webhook');
 
-  return { primary: 'Other', secondary: null, wasEnhanced: false };
+  } catch (error) {
+    logger.error({ error, userId }, 'Failed to sync new transactions');
+  }
 }
 
-// Extract MCC helper functions
-function inferMCCFromMerchant(merchantName: string): string | null {
-  if (!merchantName) return null;
-
-  const merchantLower = merchantName.toLowerCase();
-  const mccMappings: { [key: string]: string } = {
-    'walmart': '5411', 'target': '5411', 'safeway': '5411',
-    'shell': '5541', 'chevron': '5541', 'exxon': '5541',
-    'mcdonald': '5814', 'starbucks': '5814', 'subway': '5814',
-    'southwest': '4511', 'delta': '4511', 'american airlines': '4511',
-    'verizon': '4814', 'at&t': '4814', 'comcast': '4814',
-    'uber': '4121', 'lyft': '4121',
-    'amazon': '5999', 'ebay': '5999'
-  };
-
-  for (const [merchant, mcc] of Object.entries(mccMappings)) {
-    if (merchantLower.includes(merchant)) {
-      return mcc;
-    }
-  }
-  return null;
-}
-
+// Helper function to extract MCC from transaction
 function extractMCCFromTransaction(transaction: any): string | null {
-  // Plaid sometimes provides MCC in different fields
-  return transaction.merchant_entity_id ||
-         transaction.payment_meta?.ppd_id ||
-         null;
+  // Try to extract MCC from various sources
+  if (transaction.category && transaction.category.length > 0) {
+    // Map common Plaid categories to MCC codes
+    const categoryToMCC: Record<string, string> = {
+      'Food and Drink': '5814', // Fast food restaurants
+      'Shopping': '5311', // Department stores
+      'Transportation': '5541', // Service stations
+      'Travel': '4511', // Airline tickets
+      'Bills and Utilities': '4900', // Utilities
+      'Entertainment': '7832', // Motion picture theaters
+      'Health and Fitness': '8011', // Doctors
+      'Professional Services': '8099', // Health practitioners
+      'Education': '8220', // Colleges and universities
+      'Personal Care': '7230', // Beauty shops
+    };
+
+    const primaryCategory = transaction.category[0];
+    return categoryToMCC[primaryCategory] || null;
+  }
+
+  return null;
 }
 
 export default router;

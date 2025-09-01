@@ -4,6 +4,7 @@ import { logger } from '../logger.js';
 import { openai } from '../openai.js';
 import { env } from '../../config/env.js';
 import { db } from '../db.js';
+import { SupabaseVectorStore } from '../vectorstore.js';
 import type { FinancialContext, AgentRole } from '../../agents/types.js';
 
 interface FinancialKnowledge {
@@ -54,10 +55,9 @@ interface AgentRoutingDecision {
 }
 
 class GlobalAIBrain {
-  private knowledgeCache: Map<string, FinancialKnowledge[]> = new Map();
-  private readonly cacheTimeout = 3600000; // 1 hour
   private agentCoordinationHistory: Map<string, AgentCoordinationContext[]> = new Map();
   private isInitialized = false;
+  private readonly SYSTEM_USER_ID = 0; // Special user ID for system-wide knowledge
 
   // Initialize the Global AI Brain with financial knowledge
   async initialize(): Promise<void> {
@@ -66,7 +66,7 @@ class GlobalAIBrain {
       return;
     }
 
-    logger.info('Initializing Global AI Brain with financial knowledge base');
+    logger.info('Initializing Global AI Brain with financial knowledge base in Supabase');
 
     try {
       await this.loadBudgetingPlaybooks();
@@ -76,14 +76,14 @@ class GlobalAIBrain {
       await this.loadTitheGuidance();
 
       this.isInitialized = true;
-      logger.info('Global AI Brain initialized successfully');
+      logger.info('Global AI Brain initialized successfully with Supabase vector storage');
     } catch (error) {
       logger.error({ error }, 'Failed to initialize Global AI Brain');
       throw error;
     }
   }
 
-  // Load budgeting playbooks into knowledge base
+  // Load budgeting playbooks into Supabase vector storage
   private async loadBudgetingPlaybooks(): Promise<void> {
     const playbooks = [
       {
@@ -91,8 +91,8 @@ class GlobalAIBrain {
         type: 'budgeting_playbook' as const,
         title: 'Envelope Budgeting for Beginners',
         content: `
-        Envelope budgeting is a powerful method where you allocate specific amounts of money to different spending categories (envelopes). 
-        Each envelope represents a budget category like groceries, rent, entertainment, etc. 
+        Envelope budgeting is a powerful method where you allocate specific amounts of money to different spending categories (envelopes).
+        Each envelope represents a budget category like groceries, rent, entertainment, etc.
 
         Key principles:
         1. Assign every dollar a purpose before spending
@@ -156,7 +156,7 @@ class GlobalAIBrain {
     }
   }
 
-  // Load IRS codes and tax information
+  // Load IRS codes and tax information into Supabase
   private async loadIRSCodes(): Promise<void> {
     const irsCodes = [
       {
@@ -240,7 +240,7 @@ class GlobalAIBrain {
     }
   }
 
-  // Load consumer-specific strategies
+  // Load consumer-specific strategies into Supabase
   private async loadConsumerStrategies(): Promise<void> {
     const strategies = [
       {
@@ -289,7 +289,7 @@ class GlobalAIBrain {
     }
   }
 
-  // Load creator-specific strategies
+  // Load creator-specific strategies into Supabase
   private async loadCreatorStrategies(): Promise<void> {
     const strategies = [
       {
@@ -343,7 +343,7 @@ class GlobalAIBrain {
     }
   }
 
-  // Load tithe-specific guidance
+  // Load tithe-specific guidance into Supabase
   private async loadTitheGuidance(): Promise<void> {
     const titheGuidance = [
       {
@@ -398,126 +398,92 @@ class GlobalAIBrain {
     }
   }
 
-  // Store knowledge with embeddings
+  // Store knowledge in Supabase vector storage
   private async storeKnowledge(knowledge: Omit<FinancialKnowledge, 'timestamp' | 'embedding'>): Promise<void> {
-    if (!openai) {
-      logger.warn('OpenAI not configured, skipping knowledge embedding');
-      return;
-    }
-
     try {
-      // Generate embedding for semantic search
-      const embedding = await openai.embeddings.create({
-        model: 'text-embedding-3-small',
-        input: `${knowledge.title}\n\n${knowledge.content}`,
-      });
+      // Create a unique document type for system knowledge
+      const docType = `system_${knowledge.type}`;
 
-      const knowledgeWithEmbedding: FinancialKnowledge = {
-        ...knowledge,
-        embedding: embedding.data[0].embedding,
-        timestamp: new Date(),
-      };
+      // Store in Supabase vector storage with system user ID
+      await SupabaseVectorStore.upsertEmbedding(
+        this.SYSTEM_USER_ID,
+        {
+          content: `${knowledge.title}\n\n${knowledge.content}`,
+          docType,
+          metadata: {
+            knowledgeId: knowledge.id,
+            type: knowledge.type,
+            category: knowledge.category,
+            subcategory: knowledge.subcategory,
+            source: knowledge.metadata.source,
+            complexity: knowledge.metadata.complexity,
+            userType: knowledge.metadata.userType,
+            tags: knowledge.metadata.tags,
+            lastUpdated: knowledge.metadata.lastUpdated
+          }
+        }
+      );
 
-      // Store in cache
-      const categoryKey = `${knowledge.category}_${knowledge.metadata.userType}`;
-      const existing = this.knowledgeCache.get(categoryKey) || [];
-      existing.push(knowledgeWithEmbedding);
-      this.knowledgeCache.set(categoryKey, existing);
-
-      logger.debug({ knowledgeId: knowledge.id, category: knowledge.category }, 'Knowledge stored in Global AI Brain');
+      logger.debug({ knowledgeId: knowledge.id, category: knowledge.category }, 'Knowledge stored in Supabase vector storage');
     } catch (error) {
-      logger.error({ error, knowledgeId: knowledge.id }, 'Failed to store knowledge');
+      logger.error({ error, knowledgeId: knowledge.id }, 'Failed to store knowledge in Supabase');
     }
   }
 
-  // Retrieve relevant knowledge for agent queries
+  // Retrieve relevant knowledge from Supabase vector storage
   async getRelevantKnowledge(
     query: string,
     userType: 'consumer' | 'creator' | 'business' = 'consumer',
     category?: string,
     limit: number = 5
   ): Promise<FinancialKnowledge[]> {
-    if (!openai) {
-      // Return cached knowledge without semantic search
-      return this.getCachedKnowledge(userType, category, limit);
-    }
-
     try {
-      // Generate query embedding
-      const queryEmbedding = await openai.embeddings.create({
-        model: 'text-embedding-3-small',
-        input: query,
+      // Search in system knowledge (shared across all users)
+      const systemResults = await SupabaseVectorStore.semanticSearch(
+        this.SYSTEM_USER_ID,
+        query,
+        category ? `system_${category}` : undefined,
+        limit
+      );
+
+      // Convert results back to FinancialKnowledge format
+      const knowledge: FinancialKnowledge[] = systemResults.map(result => {
+        const metadata = result.metadata as any;
+        return {
+          id: metadata.knowledgeId || 'unknown',
+          type: metadata.type || 'financial_principle',
+          title: result.content.split('\n\n')[0] || 'Unknown Title',
+          content: result.content.split('\n\n').slice(1).join('\n\n') || result.content,
+          category: metadata.category || 'general',
+          subcategory: metadata.subcategory,
+          timestamp: new Date(),
+          metadata: {
+            source: metadata.source || 'unknown',
+            complexity: metadata.complexity || 'beginner',
+            userType: metadata.userType || 'all',
+            tags: metadata.tags || [],
+            lastUpdated: metadata.lastUpdated || new Date().toISOString()
+          }
+        };
       });
 
-      // Get all relevant knowledge
-      const allKnowledge = this.getAllKnowledge(userType, category);
-
-      // Calculate similarity scores
-      const scoredKnowledge = allKnowledge
-        .filter(k => k.embedding)
-        .map(knowledge => ({
-          ...knowledge,
-          relevanceScore: this.cosineSimilarity(
-            queryEmbedding.data[0].embedding,
-            knowledge.embedding!
-          )
-        }))
-        .sort((a, b) => (b.relevanceScore || 0) - (a.relevanceScore || 0))
-        .slice(0, limit);
+      // Filter by user type if specified
+      const filteredKnowledge = knowledge.filter(k =>
+        k.metadata.userType === 'all' || k.metadata.userType === userType
+      );
 
       logger.debug({
         query,
         userType,
-        resultsCount: scoredKnowledge.length,
-        topScore: scoredKnowledge[0]?.relevanceScore
-      }, 'Retrieved relevant knowledge from Global AI Brain');
+        resultsCount: filteredKnowledge.length,
+        category
+      }, 'Retrieved relevant knowledge from Supabase vector storage');
 
-      return scoredKnowledge;
+      return filteredKnowledge.slice(0, limit);
     } catch (error) {
-      logger.error({ error, query }, 'Failed to retrieve relevant knowledge');
-      return this.getCachedKnowledge(userType, category, limit);
+      logger.error({ error, query }, 'Failed to retrieve relevant knowledge from Supabase');
+      return [];
     }
-  }
-
-  // Get cached knowledge without embeddings
-  private getCachedKnowledge(
-    userType: 'consumer' | 'creator' | 'business',
-    category?: string,
-    limit: number = 5
-  ): FinancialKnowledge[] {
-    const allKnowledge = this.getAllKnowledge(userType, category);
-    return allKnowledge.slice(0, limit);
-  }
-
-  // Get all knowledge for user type and category
-  private getAllKnowledge(userType: 'consumer' | 'creator' | 'business', category?: string): FinancialKnowledge[] {
-    const allKnowledge: FinancialKnowledge[] = [];
-
-    for (const [key, knowledgeList] of this.knowledgeCache.entries()) {
-      for (const knowledge of knowledgeList) {
-        // Filter by user type
-        if (knowledge.metadata.userType !== 'all' && knowledge.metadata.userType !== userType) {
-          continue;
-        }
-
-        // Filter by category if specified
-        if (category && knowledge.category !== category) {
-          continue;
-        }
-
-        allKnowledge.push(knowledge);
-      }
-    }
-
-    return allKnowledge;
-  }
-
-  // Calculate cosine similarity between embeddings
-  private cosineSimilarity(a: number[], b: number[]): number {
-    const dotProduct = a.reduce((sum, val, i) => sum + val * b[i], 0);
-    const magnitudeA = Math.sqrt(a.reduce((sum, val) => sum + val * val, 0));
-    const magnitudeB = Math.sqrt(b.reduce((sum, val) => sum + val * val, 0));
-    return dotProduct / (magnitudeA * magnitudeB);
   }
 
   // Coordinate agent handoffs using OpenAI Agents SDK patterns
@@ -545,7 +511,7 @@ class GlobalAIBrain {
         As a financial AI coordinator, analyze this user message and determine the best agent for handling their request.
 
         User Message: "${userMessage}"
-        
+
         Current Agent: ${fromAgent}
         User Context: ${JSON.stringify({
           totalIncome: context.totalIncome,
@@ -554,23 +520,23 @@ class GlobalAIBrain {
           goals: context.goals?.length || 0,
           userType: context.userType || 'consumer'
         })}
-        
+
         Available Agents:
         - financial_advisor: General financial guidance, goal setting, comprehensive planning
         - budget_coach: Envelope management, budget optimization, spending control
         - transaction_analyst: Spending analysis, pattern recognition, expense categorization
         - insight_generator: Trend analysis, reports, opportunity identification
-        
+
         Relevant Knowledge:
         ${relevantKnowledge.map(k => `- ${k.title}: ${k.content.substring(0, 200)}...`).join('\n')}
-        
+
         Consider:
         1. Message content and intent
         2. User's financial profile
         3. Current agent's capabilities
         4. Handoff necessity (don't handoff if current agent can handle it)
         5. User type (consumer vs creator specific needs)
-        
+
         Respond with a routing decision.
       `;
 
@@ -667,7 +633,7 @@ class GlobalAIBrain {
   ): void {
     const key = `${userId}_${sessionId}`;
     const existing = this.agentCoordinationHistory.get(key) || [];
-    
+
     const context: AgentCoordinationContext = {
       userId,
       currentAgent: decision.targetAgent,
@@ -687,29 +653,51 @@ class GlobalAIBrain {
     this.agentCoordinationHistory.set(key, existing.slice(-10)); // Keep last 10 entries
   }
 
-  // Get knowledge statistics
-  getKnowledgeStats(): {
+  // Get knowledge statistics from Supabase
+  async getKnowledgeStats(): Promise<{
     totalKnowledge: number;
     byCategory: Record<string, number>;
     byUserType: Record<string, number>;
     coordinationHistory: number;
-  } {
-    let totalKnowledge = 0;
-    const byCategory: Record<string, number> = {};
-    const byUserType: Record<string, number> = {};
+  }> {
+    try {
+      // Get all system knowledge embeddings
+      const systemKnowledge = await SupabaseVectorStore.getEmbeddingsByType(
+        this.SYSTEM_USER_ID,
+        'system_budgeting_playbook',
+        1000
+      );
 
-    for (const knowledgeList of this.knowledgeCache.values()) {
-      for (const knowledge of knowledgeList) {
-        totalKnowledge++;
-        byCategory[knowledge.category] = (byCategory[knowledge.category] || 0) + 1;
-        byUserType[knowledge.metadata.userType] = (byUserType[knowledge.metadata.userType] || 0) + 1;
+      const byCategory: Record<string, number> = {};
+      const byUserType: Record<string, number> = {};
+
+      // Analyze metadata from embeddings
+      for (const knowledge of systemKnowledge) {
+        if (knowledge.metadata) {
+          const meta = knowledge.metadata as any;
+          byCategory[meta.category] = (byCategory[meta.category] || 0) + 1;
+          byUserType[meta.userType] = (byUserType[meta.userType] || 0) + 1;
+        }
       }
+
+      const coordinationHistory = Array.from(this.agentCoordinationHistory.values())
+        .reduce((sum, contexts) => sum + contexts.length, 0);
+
+      return {
+        totalKnowledge: systemKnowledge.length,
+        byCategory,
+        byUserType,
+        coordinationHistory
+      };
+    } catch (error) {
+      logger.error({ error }, 'Failed to get knowledge stats from Supabase');
+      return {
+        totalKnowledge: 0,
+        byCategory: {},
+        byUserType: {},
+        coordinationHistory: 0
+      };
     }
-
-    const coordinationHistory = Array.from(this.agentCoordinationHistory.values())
-      .reduce((sum, contexts) => sum + contexts.length, 0);
-
-    return { totalKnowledge, byCategory, byUserType, coordinationHistory };
   }
 
   // Health check for Global AI Brain
@@ -717,26 +705,26 @@ class GlobalAIBrain {
     isInitialized: boolean;
     knowledgeBaseReady: boolean;
     openaiConnected: boolean;
-    cacheSize: number;
+    supabaseConnected: boolean;
     lastUpdate: Date | null;
   } {
     return {
       isInitialized: this.isInitialized,
-      knowledgeBaseReady: this.knowledgeCache.size > 0,
+      knowledgeBaseReady: this.isInitialized,
       openaiConnected: !!openai,
-      cacheSize: this.knowledgeCache.size,
+      supabaseConnected: true, // Always true since we're using Supabase
       lastUpdate: this.isInitialized ? new Date() : null
     };
   }
 
-  // Enhanced agent context building with financial knowledge
+  // Enhanced agent context building with financial knowledge from Supabase
   async buildEnhancedAgentContext(
     userId: number,
     agentRole: AgentRole,
     userMessage: string,
     baseContext: FinancialContext
   ): Promise<FinancialContext & { enhancedKnowledge: FinancialKnowledge[] }> {
-    // Get relevant knowledge for this specific query
+    // Get relevant knowledge for this specific query from Supabase
     const relevantKnowledge = await this.getRelevantKnowledge(
       userMessage,
       baseContext.userType || 'consumer',

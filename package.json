@@ -8,12 +8,10 @@
     "dev": "nodemon --exec tsx src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
-    "prisma:generate": "prisma generate",
-    "prisma:deploy": "prisma migrate deploy",
-    "prisma:migrate": "prisma migrate dev",
-    "seed": "tsx prisma/seed.ts",
-    "prisma:seed": "npm run seed",
-    "prisma:studio": "prisma studio",
+    "lint": "eslint src --ext .ts,.tsx",
+    "lint:fix": "eslint src --ext .ts,.tsx --fix",
+    "format": "prettier --write src/**/*.{ts,tsx}",
+    "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:agents": "vitest run --config vitest.config.agents.ts",
@@ -23,12 +21,16 @@
     "test:integration": "vitest run src/agents/__tests__/integration.test.ts",
     "test:performance": "vitest run src/agents/__tests__/performance.test.ts",
     "test:validation": "vitest run src/agents/__tests__/validation.test.ts",
-    "test:all": "npm run test && npm run test:agents",
-    "lint": "eslint src --ext .ts,.tsx",
-    "lint:fix": "eslint src --ext .ts,.tsx --fix",
-    "type-check": "tsc --noEmit",
+    "test:all": "pnpm test && pnpm test:agents",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:deploy": "prisma migrate deploy",
+    "prisma:studio": "prisma studio",
+    "prisma:seed": "tsx prisma/seed.ts",
+    "db:seed": "pnpm prisma:seed",
     "health-check": "tsx -e \"import('./src/agents/health.js').then(m => m.getSystemHealth()).then(console.log)\"",
-    "agents:validate": "tsx -e \"import('./src/agents/index.js').then(m => console.log('Validation:', m.validateAgentConfiguration()))\""
+    "agents:validate": "tsx -e \"import('./src/agents/index.js').then(m => console.log('Validation:', m.validateAgentConfiguration()))\"",
+    "postinstall": "prisma generate"
   },
   "keywords": [
     "envelope-budgeting",
@@ -81,10 +83,11 @@
     "@typescript-eslint/parser": "^8.39.1",
     "@vitest/coverage-v8": "^1.2.0",
     "eslint": "^9.33.0",
+    "eslint-config-prettier": "^10.1.8",
     "nodemon": "^3.1.10",
     "prettier": "^3.6.2",
     "supertest": "^6.3.4",
-    "vitest": "^1.2.0"
+    "vitest": "^1.6.1"
   },
   "engines": {
     "node": ">=18.0.0"

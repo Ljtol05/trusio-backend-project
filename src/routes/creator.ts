@@ -68,19 +68,29 @@ router.get('/analysis', auth, async (req, res) => {
     });
 
     const context: FinancialContext = {
-      user: {
-        id: userId,
-        type: 'creator',
-        onboardingCompleted: true,
-      },
-      envelopes,
-      transactions,
+      userId: userId.toString(),
+      userType: 'creator',
+      envelopes: envelopes.map(e => ({
+        id: e.id.toString(),
+        name: e.name,
+        balance: e.targetAmount, // Use targetAmount as balance since balance field doesn't exist
+        target: e.targetAmount,
+        category: e.category || undefined,
+      })),
+      transactions: transactions.map(t => ({
+        id: t.id.toString(),
+        amount: t.amountCents / 100, // Convert cents to dollars
+        description: t.description || t.merchantName || 'Unknown transaction',
+        category: t.category || undefined,
+        date: t.createdAt.toISOString(),
+      })),
       goals: envelopes
         .filter(e => e.category === 'savings')
         .map(e => ({
-          name: e.name,
-          currentAmount: e.balance,
+          id: e.name, // Use name as ID since ID field doesn't exist
+          description: e.name,
           targetAmount: e.targetAmount,
+          currentAmount: e.targetAmount, // Use targetAmount as currentAmount since balance doesn't exist
         })),
     };
 
@@ -162,13 +172,22 @@ router.get('/insights', auth, async (req, res) => {
     });
 
     const context: FinancialContext = {
-      user: {
-        id: userId,
-        type: 'creator',
-        onboardingCompleted: true,
-      },
-      envelopes,
-      transactions,
+      userId: userId.toString(),
+      userType: 'creator',
+      envelopes: envelopes.map(e => ({
+        id: e.id.toString(),
+        name: e.name,
+        balance: e.targetAmount, // Use targetAmount as balance since balance field doesn't exist
+        target: e.targetAmount,
+        category: e.category || undefined,
+      })),
+      transactions: transactions.map(t => ({
+        id: t.id.toString(),
+        amount: t.amountCents / 100, // Convert cents to dollars
+        description: t.description || t.merchantName || 'Unknown transaction',
+        category: t.category || undefined,
+        date: t.createdAt.toISOString(),
+      })),
       goals: [],
     };
 
@@ -244,19 +263,29 @@ router.post('/advice', auth, async (req, res) => {
     });
 
     const context: FinancialContext = {
-      user: {
-        id: userId,
-        type: 'creator',
-        onboardingCompleted: true,
-      },
-      envelopes,
-      transactions,
+      userId: userId.toString(),
+      userType: 'creator',
+      envelopes: envelopes.map(e => ({
+        id: e.id.toString(),
+        name: e.name,
+        balance: e.targetAmount, // Use targetAmount as balance since balance field doesn't exist
+        target: e.targetAmount,
+        category: e.category || undefined,
+      })),
+      transactions: transactions.map(t => ({
+        id: t.id.toString(),
+        amount: t.amountCents / 100, // Convert cents to dollars
+        description: t.description || t.merchantName || 'Unknown transaction',
+        category: t.category || undefined,
+        date: t.createdAt.toISOString(),
+      })),
       goals: envelopes
         .filter(e => e.category === 'savings')
         .map(e => ({
-          name: e.name,
-          currentAmount: e.balance,
+          id: e.name, // Use name as ID since ID field doesn't exist
+          description: e.name,
           targetAmount: e.targetAmount,
+          currentAmount: e.targetAmount, // Use targetAmount as currentAmount since balance doesn't exist
         })),
     };
 

@@ -4,8 +4,12 @@ import { createAgentResponse } from '../../lib/openai.js';
 import { db } from '../../lib/db.js';
 import { onboardingAgent } from './OnboardingAgent.js';
 import { billAnalyzer } from '../../lib/billAnalyzer.js';
+import { globalAIBrain } from '../../lib/ai/globalAIBrain.js';
+import { personalAIAgent } from './PersonalAIAgent.js';
 import type { Agent } from '@openai/agents';
-import { createAgent } from '@openai/agents-openai';
+import { agentManager } from '../core/AgentManager.js';
+import { handoffManager } from '../core/HandoffManager.js';
+import { memoryManager } from '../core/MemoryManager.js';
 
 export interface VoiceSession {
   sessionId: string;
@@ -25,31 +29,29 @@ export interface VoiceSession {
   }>;
   createdAt: Date;
   lastActivity: Date;
+  personalAIInsights?: any[];
+  globalKnowledgeUsed?: any[];
 }
 
 export interface TransactionInsights {
   totalTransactions: number;
-  billCount: number;
   averageMonthlySpending: number;
   averageMonthlyIncome: number;
+  savingsRate: number;
   topSpendingCategories: Array<{
     category: string;
     amount: number;
     percentage: number;
-  }>;
-  spendingPersonality: 'analytical' | 'emotional' | 'impulsive' | 'conservative';
-  userType: 'consumer' | 'creator' | 'hybrid';
-  riskProfile: 'low' | 'medium' | 'high';
-  savingsRate: number;
-  detectedBills: Array<{
-    name: string;
-    amount: number;
     frequency: string;
   }>;
 }
 
 class VoiceKYCAgent {
   private sessions = new Map<string, VoiceSession>();
+  private responseCache = new Map<string, { response: string; timestamp: number; ttl: number }>();
+  private knowledgeCache = new Map<string, { knowledge: any[]; timestamp: number; ttl: number }>();
+  private readonly CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+  private readonly MAX_CACHE_SIZE = 100;
   private readonly systemPrompt = `
 You are an expert financial voice coach specializing in personalized budgeting and envelope system design.
 
@@ -59,36 +61,79 @@ Your role is to:
 3. Determine if they're a consumer, content creator, or hybrid user type
 4. Create a personalized 10-envelope budget based on their actual spending patterns
 5. Provide warm, encouraging guidance throughout the process
+6. Integrate relevant financial knowledge and personalized insights
 
 Voice Conversation Guidelines:
-- Speak naturally and conversationally 
+- Speak naturally and conversationally
 - Keep responses concise but informative (2-3 sentences max)
 - Ask one question at a time
 - Reference their actual spending data when relevant
 - Be encouraging and supportive
 - Use their name when appropriate
 - Transition smoothly between topics
+- Incorporate relevant financial knowledge naturally
 
 Financial Analysis Integration:
 - Reference their actual monthly spending patterns
 - Mention specific bills you've detected
 - Comment on their spending personality based on transaction patterns
 - Suggest envelope amounts based on their real expenses
+- Use personalized insights from their learning profile
+- Integrate relevant budgeting playbooks and IRS guidance
 
-Remember: This is a VOICE conversation, so keep responses natural and spoken-friendly.
+Remember: This is a VOICE conversation, so keep responses natural and spoken-friendly while being informative.
   `;
+
+  // Cache management methods
+  private getCachedResponse(cacheKey: string): string | null {
+    const cached = this.responseCache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < cached.ttl) {
+      return cached.response;
+    }
+    return null;
+  }
+
+  private setCachedResponse(cacheKey: string, response: string, ttl: number = this.CACHE_TTL): void {
+    // Implement LRU cache eviction
+    if (this.responseCache.size >= this.MAX_CACHE_SIZE) {
+      const oldestKey = this.responseCache.keys().next().value;
+      this.responseCache.delete(oldestKey);
+    }
+
+    this.responseCache.set(cacheKey, {
+      response,
+      timestamp: Date.now(),
+      ttl
+    });
+  }
+
+  private getCachedKnowledge(cacheKey: string): any[] | null {
+    const cached = this.knowledgeCache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < cached.ttl) {
+      return cached.knowledge;
+    }
+    return null;
+  }
+
+  private setCachedKnowledge(cacheKey: string, knowledge: any[], ttl: number = this.CACHE_TTL): void {
+    if (this.knowledgeCache.size >= this.MAX_CACHE_SIZE) {
+      const oldestKey = this.knowledgeCache.keys().next().value;
+      this.knowledgeCache.delete(oldestKey);
+    }
+
+    this.knowledgeCache.set(cacheKey, {
+      knowledge,
+      timestamp: Date.now(),
+      ttl
+    });
+  }
 
   async startVoiceKYCSession(userId: string): Promise<VoiceSession> {
     try {
-      logger.info({ userId }, 'Starting voice KYC onboarding session');
-
-      // Check if user has completed auth flow and Plaid connection
+      // Verify user has completed prerequisites
       const user = await db.user.findUnique({
-        where: { id: userId },
-        select: { 
-          id: true,
-          name: true,
-          email: true,
+        where: { id: parseInt(userId) },
+        select: {
           emailVerified: true,
           phoneVerified: true,
           kycApproved: true,
@@ -97,83 +142,131 @@ Remember: This is a VOICE conversation, so keep responses natural and spoken-fri
         }
       });
 
-      if (!user) {
-        throw new Error('User not found');
+      if (!user?.emailVerified || !user?.phoneVerified || !user?.kycApproved || !user?.plaidConnected || !user?.transactionDataReady) {
+        throw new Error('User must complete email verification, phone verification, KYC, and bank connection before starting voice KYC');
       }
 
-      if (!user.emailVerified || !user.phoneVerified || !user.kycApproved) {
-        throw new Error('User must complete email, phone, and KYC verification before voice onboarding');
-      }
-
-      if (!user.plaidConnected || !user.transactionDataReady) {
-        throw new Error('User must connect bank accounts and complete transaction sync before voice onboarding');
-      }
-
-      const sessionId = `voice_kyc_${userId}_${Date.now()}`;
-      
-      // Perform comprehensive financial analysis
-      const transactionAnalysis = await this.performTransactionAnalysis(userId);
-      const billAnalysis = await billAnalyzer.analyzeBillsFromTransactions(userId, 120);
-      const financialProfile = await this.generateFinancialProfile(userId, transactionAnalysis, billAnalysis);
-
-      // Generate personalized greeting
-      const greetingPrompt = `
-        Create a warm, personalized greeting for ${user.name} based on their financial analysis:
-
-        Financial Profile:
-        - Total transactions: ${transactionAnalysis.totalTransactions}
-        - Monthly spending: $${transactionAnalysis.averageMonthlySpending.toFixed(2)}
-        - Monthly income: $${transactionAnalysis.averageMonthlyIncome.toFixed(2)}
-        - Detected bills: ${billAnalysis.detectedBills.length}
-        - Savings rate: ${transactionAnalysis.savingsRate.toFixed(1)}%
-        - User type: ${financialProfile.userType}
-
-        Greet them by name, acknowledge their financial journey, and explain that you've analyzed their 120 days of transactions to create a personalized budget. Keep it under 3 sentences and voice-friendly.
-      `;
-
-      const greeting = await createAgentResponse(
-        this.systemPrompt,
-        greetingPrompt,
-        [],
-        { temperature: 0.7, maxTokens: 150 }
+      // Initialize user's personal AI profile (with timeout)
+      const profilePromise = personalAIAgent.initializeUserProfile(parseInt(userId));
+      const profileTimeout = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Profile initialization timeout')), 10000)
       );
 
+      await Promise.race([profilePromise, profileTimeout]);
+
+      // Get transaction insights for analysis (with timeout)
+      const insightsPromise = this.getTransactionInsights(userId);
+      const insightsTimeout = new Promise<TransactionInsights | null>((resolve) =>
+        setTimeout(() => resolve(null), 15000)
+      );
+
+      const transactionInsights = await Promise.race([insightsPromise, insightsTimeout]);
+
+      // Get bill analysis and financial profile in parallel
+      const [billAnalysis, financialProfile] = await Promise.all([
+        this.analyzeUserBills(userId as string),
+        this.buildFinancialProfile(userId as string)
+      ]);
+
+      // Create voice session
       const session: VoiceSession = {
-        sessionId,
+        sessionId: this.generateSessionId(),
         userId,
         stage: 'greeting',
         isVoiceActive: true,
         currentQuestionIndex: 0,
         responses: {},
-        transactionAnalysis,
+        transactionAnalysis: transactionInsights,
         billAnalysis,
         financialProfile,
-        conversationHistory: [
-          {
-            role: 'assistant',
-            content: greeting,
-            timestamp: new Date()
-          }
-        ],
+        conversationHistory: [],
         createdAt: new Date(),
         lastActivity: new Date()
       };
 
-      this.sessions.set(sessionId, session);
+      // Generate personalized greeting using Global AI Brain and Personal AI
+      const greeting = await this.generatePersonalizedGreeting(userId, session);
+      session.conversationHistory.push({
+        role: 'assistant',
+        content: greeting,
+        timestamp: new Date()
+      });
 
-      logger.info({
-        userId,
-        sessionId,
-        transactionCount: transactionAnalysis.totalTransactions,
-        billCount: billAnalysis.detectedBills.length,
-        userType: financialProfile.userType
-      }, 'Voice KYC session initialized with financial analysis');
+      this.sessions.set(session.sessionId, session);
 
+      logger.info({ userId, sessionId: session.sessionId }, 'Voice KYC session started with AI integration');
       return session;
-
     } catch (error) {
       logger.error({ error, userId }, 'Failed to start voice KYC session');
+
+      // Provide user-friendly error message
+      if (error instanceof Error && error.message.includes('timeout')) {
+        throw new Error('System is taking longer than expected to prepare your session. Please try again in a moment.');
+      }
+
       throw error;
+    }
+  }
+
+  // Generate personalized greeting using Global AI Brain and Personal AI
+  private async generatePersonalizedGreeting(userId: string, session: VoiceSession): Promise<string> {
+    try {
+      // Check cache first
+      const cacheKey = `greeting_${userId}`;
+      const cachedGreeting = this.getCachedResponse(cacheKey);
+      if (cachedGreeting) {
+        return cachedGreeting;
+      }
+
+      // Get user's personal AI profile
+      const userProfile = await personalAIAgent.getUserProfile(parseInt(userId));
+
+      // Get relevant knowledge from Global AI Brain (with timeout)
+      const knowledgePromise = globalAIBrain.getRelevantKnowledge(
+        'voice onboarding greeting financial coaching',
+        userProfile?.spendingPersonality === 'conservative' ? 'consumer' : 'creator',
+        'budgeting',
+        2
+      );
+
+      const knowledgeTimeout = new Promise<any[]>((resolve) =>
+        setTimeout(() => resolve([]), 5000)
+      );
+
+      const relevantKnowledge = await Promise.race([knowledgePromise, knowledgeTimeout]);
+
+      // Store knowledge used for tracking
+      session.globalKnowledgeUsed = relevantKnowledge.map(k => ({ id: k.id, title: k.title }));
+
+      // Build personalized greeting
+      let greeting = '';
+
+      if (userProfile) {
+        const personality = userProfile.spendingPersonality;
+        const priorities = userProfile.financialPriorities.slice(0, 2).join(' and ');
+
+        greeting = `Hi there! I'm excited to help you create a personalized budget that fits your ${personality} spending style. I can see you're focused on ${priorities}, and I have some great strategies to share. Let's start with a few questions to tailor this perfectly for you. `;
+      } else {
+        greeting = `Hi there! I'm here to help you create a personalized budget that works for your unique financial situation. I have access to proven strategies and can analyze your spending patterns to make recommendations that fit your lifestyle. Let's start with a few questions to get to know your financial goals better. `;
+      }
+
+      // Add relevant knowledge snippet
+      if (relevantKnowledge.length > 0) {
+        const knowledge = relevantKnowledge[0];
+        if (knowledge.title.includes('Envelope Budgeting')) {
+          greeting += `I'll be using proven envelope budgeting methods to help you allocate your money effectively. `;
+        }
+      }
+
+      greeting += `Ready to get started?`;
+
+      // Cache the greeting
+      this.setCachedResponse(cacheKey, greeting, 10 * 60 * 1000); // 10 minutes for greetings
+
+      return greeting;
+    } catch (error) {
+      logger.error({ error, userId }, 'Failed to generate personalized greeting');
+      return "Hi there! I'm here to help you create a personalized budget. Let's start with a few questions to understand your financial goals.";
     }
   }
 
@@ -185,12 +278,11 @@ Remember: This is a VOICE conversation, so keep responses natural and spoken-fri
     response: string;
     shouldContinueVoice: boolean;
     onboardingComplete: boolean;
-    nextAction?: string;
+    nextAction: string;
     stage: string;
-    progress: {
-      questionsAnswered: number;
-      totalQuestions: number;
-    };
+    progress: any;
+    personalInsights?: any[];
+    knowledgeUsed?: any[];
   }> {
     try {
       const session = this.sessions.get(sessionId);
@@ -198,435 +290,663 @@ Remember: This is a VOICE conversation, so keep responses natural and spoken-fri
         throw new Error('Session not found');
       }
 
-      // Update conversation history
+      // Add user input to conversation history
       session.conversationHistory.push({
         role: 'user',
         content: transcription,
-        timestamp: new Date()
+        timestamp: new Date(),
+        audioData: audioMetadata ? JSON.stringify(audioMetadata) : undefined
       });
-      session.lastActivity = new Date();
 
-      let response = '';
-      let shouldContinueVoice = true;
-      let onboardingComplete = false;
-      let nextAction = '';
+      // Check cache for similar responses
+      const cacheKey = `response_${sessionId}_${transcription.substring(0, 50)}`;
+      const cachedResponse = this.getCachedResponse(cacheKey);
+      if (cachedResponse) {
+        // Use cached response but still update session
+        session.currentQuestionIndex++;
+        session.lastActivity = new Date();
 
-      switch (session.stage) {
-        case 'greeting':
-          response = await this.handleGreetingResponse(session, transcription);
-          session.stage = 'financial_analysis';
-          break;
-
-        case 'financial_analysis':
-          response = await this.handleFinancialAnalysisStage(session, transcription);
-          session.stage = 'questioning';
-          break;
-
-        case 'questioning':
-          const questionResult = await this.handleQuestioningStage(session, transcription);
-          response = questionResult.response;
-          if (questionResult.moveToNextStage) {
-            session.stage = 'budget_creation';
-          }
-          break;
-
-        case 'budget_creation':
-          response = await this.handleBudgetCreation(session, transcription);
-          session.stage = 'review';
-          shouldContinueVoice = false; // Switch to text for budget review
-          nextAction = 'switch_to_text_review';
-          break;
-
-        case 'review':
-          // This shouldn't happen as we switch to text mode
-          response = "Let's switch to text mode to review your personalized budget.";
-          shouldContinueVoice = false;
-          nextAction = 'switch_to_text_review';
-          break;
-
-        case 'completed':
-          response = "Your personalized budget has been created! You can now start using your envelope system.";
-          onboardingComplete = true;
-          shouldContinueVoice = false;
-          break;
+        return {
+          response: cachedResponse,
+          shouldContinueVoice: session.currentQuestionIndex < 12,
+          onboardingComplete: session.currentQuestionIndex >= 12,
+          nextAction: session.currentQuestionIndex >= 12 ? 'budget_review' : 'continue_questions',
+          stage: session.stage,
+          progress: {
+            questionsAnswered: session.currentQuestionIndex,
+            totalQuestions: 12,
+            stage: session.stage
+          },
+          personalInsights: [],
+          knowledgeUsed: []
+        };
       }
 
-      // Add assistant response to history
+      // Get user's personal AI profile for enhanced context
+      const userProfile = await personalAIAgent.getUserProfile(parseInt(session.userId));
+
+      // Get relevant knowledge from Global AI Brain based on user input (with timeout)
+      const knowledgePromise = globalAIBrain.getRelevantKnowledge(
+        transcription,
+        userProfile?.spendingPersonality === 'conservative' ? 'consumer' : 'creator',
+        undefined,
+        3
+      );
+
+      const knowledgeTimeout = new Promise<any[]>((resolve) =>
+        setTimeout(() => resolve([]), 8000)
+      );
+
+      const relevantKnowledge = await Promise.race([knowledgePromise, knowledgeTimeout]);
+
+      // Update session with knowledge used
+      session.globalKnowledgeUsed = [
+        ...(session.globalKnowledgeUsed || []),
+        ...relevantKnowledge.map(k => ({ id: k.id, title: k.title }))
+      ];
+
+      // Generate enhanced response using Global AI Brain knowledge and Personal AI insights
+      const response = await this.generateEnhancedResponse(
+        transcription,
+        session,
+        relevantKnowledge,
+        userProfile
+      );
+
+      // Add AI response to conversation history
       session.conversationHistory.push({
         role: 'assistant',
-        content: response,
+        content: response.response,
         timestamp: new Date()
       });
 
-      // Calculate progress
-      const totalQuestions = 12;
-      const questionsAnswered = Object.keys(session.responses).length;
+      // Update session state
+      session.currentQuestionIndex++;
+      session.lastActivity = new Date();
+
+      // Check if onboarding is complete
+      const onboardingComplete = session.currentQuestionIndex >= 12;
+      if (onboardingComplete) {
+        session.stage = 'completed';
+        session.isVoiceActive = false;
+
+        // Generate final budget recommendations using enhanced knowledge
+        const budgetRecommendations = await this.generateFinalBudgetRecommendations(session, relevantKnowledge);
+        session.responses.budgetRecommendations = budgetRecommendations;
+      }
+
+      // Generate personal insights for learning (non-blocking)
+      const personalInsightsPromise = this.generatePersonalInsights(session, transcription, response.response);
+      personalInsightsPromise.then(insights => {
+        session.personalAIInsights = [
+          ...(session.personalAIInsights || []),
+          ...insights
+        ];
+      }).catch(error => {
+        logger.error({ error }, 'Failed to generate personal insights (non-blocking)');
+      });
+
+      // Cache the response
+      this.setCachedResponse(cacheKey, response.response);
+
+      logger.info({
+        sessionId,
+        userId: session.userId,
+        questionIndex: session.currentQuestionIndex,
+        knowledgeUsed: relevantKnowledge.length
+      }, 'Processed voice input with AI integration');
 
       return {
-        response,
-        shouldContinueVoice,
+        response: response.response,
+        shouldContinueVoice: !onboardingComplete,
         onboardingComplete,
-        nextAction,
+        nextAction: onboardingComplete ? 'budget_review' : 'continue_questions',
         stage: session.stage,
         progress: {
-          questionsAnswered,
-          totalQuestions
-        }
+          questionsAnswered: session.currentQuestionIndex,
+          totalQuestions: 12,
+          stage: session.stage
+        },
+        personalInsights: [],
+        knowledgeUsed: relevantKnowledge.map(k => ({ id: k.id, title: k.title }))
       };
 
     } catch (error) {
       logger.error({ error, sessionId }, 'Failed to process voice input');
+
+      // Provide user-friendly error message
+      if (error instanceof Error && error.message.includes('timeout')) {
+        return {
+          response: "I'm taking a bit longer than usual to process your request. Let me try a different approach.",
+          shouldContinueVoice: true,
+          onboardingComplete: false,
+          nextAction: 'retry',
+          stage: 'error_recovery',
+          progress: { questionsAnswered: 0, totalQuestions: 12, stage: 'error_recovery' },
+          personalInsights: [],
+          knowledgeUsed: []
+        };
+      }
+
       throw error;
     }
   }
 
-  private async performTransactionAnalysis(userId: string): Promise<any> {
+  // Generate enhanced response using Global AI Brain knowledge and Personal AI insights
+  private async generateEnhancedResponse(
+    userInput: string,
+    session: VoiceSession,
+    relevantKnowledge: any[],
+    userProfile: any
+  ): Promise<{
+    response: string;
+    suggestedActions: string[];
+  }> {
     try {
-      // Analyze 120 days of transactions
-      const endDate = new Date();
-      const startDate = new Date();
-      startDate.setDate(startDate.getDate() - 120);
-      
-      const transactions = await db.transaction.findMany({
-        where: {
-          userId,
-          createdAt: { 
-            gte: startDate,
-            lte: endDate 
-          }
-        },
-        orderBy: { createdAt: 'desc' }
-      });
-
-      if (transactions.length === 0) {
-        // Return default analysis for users with no transactions yet
+      // Check cache for similar responses
+      const cacheKey = `enhanced_response_${session.userId}_${userInput.substring(0, 50)}`;
+      const cachedResponse = this.getCachedResponse(cacheKey);
+      if (cachedResponse) {
         return {
-          totalTransactions: 0,
-          totalSpending: 0,
-          totalIncome: 0,
-          averageMonthlySpending: 0,
-          averageMonthlyIncome: 0,
-          savingsRate: 0,
-          topSpendingCategories: [],
-          dateRange: { start: startDate, end: endDate }
+          response: cachedResponse,
+          suggestedActions: []
         };
       }
 
-      // Calculate comprehensive metrics
-      const totalTransactions = transactions.length;
-      
-      // In Plaid, positive amounts are debits (money spent), negative amounts are credits (money received)
-      const spendingTransactions = transactions.filter(t => t.amountCents > 0);
-      const incomeTransactions = transactions.filter(t => t.amountCents < 0);
-      
-      const totalSpending = spendingTransactions.reduce((sum, t) => sum + t.amountCents, 0) / 100;
-      const totalIncome = Math.abs(incomeTransactions.reduce((sum, t) => sum + t.amountCents, 0)) / 100;
-
-      const averageMonthlySpending = totalSpending / 4; // 120 days = ~4 months
-      const averageMonthlyIncome = totalIncome / 4;
-      const savingsRate = totalIncome > 0 ? ((totalIncome - totalSpending) / totalIncome) * 100 : 0;
-
-      // Categorize spending using MCC codes and merchant names
-      const categorySpending: Record<string, number> = {};
-      spendingTransactions.forEach(transaction => {
-        let category = 'Other';
-        
-        // Categorize based on MCC code
-        if (transaction.mcc) {
-          if (transaction.mcc.startsWith('54')) category = 'Gas & Transportation';
-          else if (transaction.mcc.startsWith('58') || transaction.mcc.startsWith('57')) category = 'Dining & Entertainment';
-          else if (transaction.mcc.startsWith('53') || transaction.mcc.startsWith('52')) category = 'Retail & Shopping';
-          else if (transaction.mcc.startsWith('49')) category = 'Bills & Utilities';
-          else if (transaction.mcc === '5411' || transaction.mcc === '5499') category = 'Groceries';
-        }
-        
-        // Override with merchant-based categorization if more specific
-        const merchant = (transaction.merchant || '').toLowerCase();
-        if (merchant.includes('grocery') || merchant.includes('market') || merchant.includes('safeway')) {
-          category = 'Groceries';
-        } else if (merchant.includes('gas') || merchant.includes('shell') || merchant.includes('chevron')) {
-          category = 'Gas & Transportation';
-        } else if (merchant.includes('restaurant') || merchant.includes('coffee') || merchant.includes('starbucks')) {
-          category = 'Dining & Entertainment';
-        }
-        
-        categorySpending[category] = (categorySpending[category] || 0) + (transaction.amountCents / 100);
-      });
-
-      const topSpendingCategories = Object.entries(categorySpending)
-        .map(([category, amount]) => ({
-          category,
-          amount,
-          percentage: totalSpending > 0 ? (amount / totalSpending) * 100 : 0
-        }))
-        .sort((a, b) => b.amount - a.amount)
-        .slice(0, 10);
-
-      return {
-        totalTransactions,
-        totalSpending,
-        totalIncome,
-        averageMonthlySpending,
-        averageMonthlyIncome,
-        savingsRate,
-        topSpendingCategories,
-        dateRange: { start: startDate, end: endDate }
-      };
-    } catch (error) {
-      logger.error({ error, userId }, 'Failed to perform transaction analysis');
-      // Return safe defaults if analysis fails
-      return {
-        totalTransactions: 0,
-        totalSpending: 0,
-        totalIncome: 0,
-        averageMonthlySpending: 0,
-        averageMonthlyIncome: 0,
-        savingsRate: 0,
-        topSpendingCategories: [],
-        dateRange: { start: new Date(), end: new Date() }
-      };
-    }
-  }
-
-  private async generateFinancialProfile(userId: string, transactionAnalysis: any, billAnalysis: any): Promise<any> {
-    // Determine user type based on transaction patterns
-    let userType: 'consumer' | 'creator' | 'hybrid' = 'consumer';
-    
-    // Look for creator indicators
-    const creatorIndicators = transactionAnalysis.topSpendingCategories.filter(cat => 
-      cat.category.toLowerCase().includes('business') ||
-      cat.category.toLowerCase().includes('equipment') ||
-      cat.category.toLowerCase().includes('software') ||
-      cat.category.toLowerCase().includes('subscription')
-    );
-
-    const irregularIncomePattern = transactionAnalysis.savingsRate < 10 || 
-      transactionAnalysis.averageMonthlyIncome < transactionAnalysis.averageMonthlySpending * 1.2;
-
-    if (creatorIndicators.length > 2) {
-      userType = irregularIncomePattern ? 'creator' : 'hybrid';
-    }
-
-    // Determine spending personality
-    let spendingPersonality: 'analytical' | 'emotional' | 'impulsive' | 'conservative' = 'conservative';
-    
-    if (transactionAnalysis.totalTransactions > 200) {
-      spendingPersonality = 'analytical';
-    } else if (transactionAnalysis.savingsRate < 5) {
-      spendingPersonality = 'impulsive';
-    } else if (transactionAnalysis.topSpendingCategories.find(cat => 
-      cat.category.toLowerCase().includes('entertainment') || 
-      cat.category.toLowerCase().includes('dining')
-    )?.percentage > 15) {
-      spendingPersonality = 'emotional';
-    }
-
-    return {
-      userType,
-      spendingPersonality,
-      riskProfile: transactionAnalysis.savingsRate > 15 ? 'low' : 
-                   transactionAnalysis.savingsRate > 5 ? 'medium' : 'high',
-      monthlyBudgetCapacity: transactionAnalysis.averageMonthlyIncome,
-      fixedExpenses: billAnalysis.totalMonthlyBills,
-      discretionarySpending: transactionAnalysis.averageMonthlySpending - billAnalysis.totalMonthlyBills
-    };
-  }
-
-  private async handleGreetingResponse(session: VoiceSession, transcription: string): Promise<string> {
-    const analysisPrompt = `
-      The user responded: "${transcription}"
-      
-      Based on their financial analysis:
-      - Monthly spending: $${session.transactionAnalysis.averageMonthlySpending.toFixed(2)}
-      - Monthly income: $${session.transactionAnalysis.averageMonthlyIncome.toFixed(2)}
-      - Detected ${session.billAnalysis.detectedBills.length} recurring bills
-      - User type appears to be: ${session.financialProfile.userType}
-
-      Transition to explaining what you found in their spending patterns and ask if they're ready to dive into creating their personalized budget. Keep it conversational and under 3 sentences.
-    `;
-
-    return await createAgentResponse(
-      this.systemPrompt,
-      analysisPrompt,
-      session.conversationHistory.slice(-4),
-      { temperature: 0.7, maxTokens: 150 }
-    );
-  }
-
-  private async handleFinancialAnalysisStage(session: VoiceSession, transcription: string): Promise<string> {
-    const analysisPrompt = `
-      The user responded: "${transcription}"
-      
-      Share 2-3 key insights from their financial analysis:
-      - Top spending category: ${session.transactionAnalysis.topSpendingCategories[0]?.category} ($${session.transactionAnalysis.topSpendingCategories[0]?.amount.toFixed(2)}/month)
-      - Detected bills: ${session.billAnalysis.detectedBills.slice(0, 3).map(b => b.name).join(', ')}
-      - Savings rate: ${session.transactionAnalysis.savingsRate.toFixed(1)}%
-      
-      Then ask the first onboarding question about their primary financial goal. Keep it conversational.
-    `;
-
-    return await createAgentResponse(
-      this.systemPrompt,
-      analysisPrompt,
-      session.conversationHistory.slice(-4),
-      { temperature: 0.7, maxTokens: 200 }
-    );
-  }
-
-  private async handleQuestioningStage(session: VoiceSession, transcription: string): Promise<{
-    response: string;
-    moveToNextStage: boolean;
-  }> {
-    // Get onboarding questions
-    const questions = await onboardingAgent.getOnboardingQuestions();
-    const currentQuestion = questions[session.currentQuestionIndex];
-
-    if (currentQuestion) {
-      // Store response
-      session.responses[currentQuestion.id] = transcription;
-      session.currentQuestionIndex++;
-    }
-
-    // Check if we have all responses
-    if (session.currentQuestionIndex >= questions.length) {
-      const finalPrompt = `
-        Great! I have all the information I need. Based on our conversation and your spending patterns, I'm going to create your personalized 10-envelope budget. 
-        
-        Your responses: ${JSON.stringify(session.responses)}
-        Your spending analysis: Monthly spending $${session.transactionAnalysis.averageMonthlySpending.toFixed(2)}, Bills: ${session.billAnalysis.detectedBills.length}
-        
-        Let me create your budget now. This will take just a moment.
-      `;
-
-      return {
-        response: await createAgentResponse(
-          this.systemPrompt,
-          finalPrompt,
-          session.conversationHistory.slice(-2),
-          { temperature: 0.7, maxTokens: 100 }
-        ),
-        moveToNextStage: true
-      };
-    }
-
-    // Ask next question
-    const nextQuestion = questions[session.currentQuestionIndex];
-    const questionPrompt = `
-      The user answered: "${transcription}" for ${currentQuestion?.question}
-      
-      Now ask this question naturally: "${nextQuestion.question}"
-      
-      Make it conversational and reference their spending data when relevant. Keep it under 2 sentences.
-    `;
-
-    return {
-      response: await createAgentResponse(
-        this.systemPrompt,
-        questionPrompt,
-        session.conversationHistory.slice(-4),
-        { temperature: 0.7, maxTokens: 150 }
-      ),
-      moveToNextStage: false
-    };
-  }
-
-  private async handleBudgetCreation(session: VoiceSession, transcription: string): Promise<string> {
-    try {
-      // Create comprehensive onboarding profile
-      const onboardingResult = await onboardingAgent.processOnboarding(
-        session.userId,
-        session.responses,
+      // Build enhanced context using Global AI Brain (with timeout)
+      const contextPromise = globalAIBrain.buildEnhancedAgentContext(
+        parseInt(session.userId),
+        'voice_kyc' as any,
+        userInput,
         {
           userId: session.userId,
-          transactions: [],
+          totalIncome: session.transactionAnalysis?.averageMonthlyIncome || 0,
+          totalExpenses: session.transactionAnalysis?.averageMonthlySpending || 0,
+          userType: userProfile?.spendingPersonality === 'conservative' ? 'consumer' : 'business',
           envelopes: [],
-          monthlyIncome: session.transactionAnalysis.averageMonthlyIncome,
-          totalSpent: session.transactionAnalysis.averageMonthlySpending
+          transactions: [],
+          goals: userProfile?.financialPriorities || []
         }
       );
 
-      // Store the budget recommendations in session
-      session.responses.budgetRecommendations = onboardingResult;
+      const contextTimeout = new Promise<any>((resolve) =>
+        setTimeout(() => resolve({
+          totalIncome: session.transactionAnalysis?.averageMonthlyIncome || 0,
+          totalExpenses: session.transactionAnalysis?.averageMonthlySpending || 0,
+          userType: 'consumer',
+          enhancedKnowledge: []
+        }), 10000)
+      );
 
-      return `Perfect! I've created your personalized budget with ${onboardingResult.recommendedEnvelopes.length} envelopes based on your actual spending patterns. Let's switch to text mode so you can review the details and make any adjustments you'd like.`;
+      const enhancedContext = await Promise.race([contextPromise, contextTimeout]);
+
+      // Create enhanced prompt with knowledge integration
+      const prompt = `
+${this.systemPrompt}
+
+User Profile Context:
+- Spending Personality: ${userProfile?.spendingPersonality || 'unknown'}
+- Financial Priorities: ${userProfile?.financialPriorities?.join(', ') || 'not specified'}
+- Current Stage: ${session.stage}
+- Questions Answered: ${session.currentQuestionIndex}/12
+
+Transaction Analysis:
+- Monthly Spending: $${session.transactionAnalysis?.averageMonthlySpending || 0}
+- Monthly Income: $${session.transactionAnalysis?.averageMonthlyIncome || 0}
+- Savings Rate: ${session.transactionAnalysis?.savingsRate || 0}%
+- Top Categories: ${session.transactionAnalysis?.topSpendingCategories?.slice(0, 3).map((c: any) => c.category).join(', ') || 'none'}
+
+Relevant Financial Knowledge:
+${relevantKnowledge.map(k => `- ${k.title}: ${k.content.substring(0, 150)}...`).join('\n')}
+
+Enhanced Context:
+- Total Income: $${enhancedContext.totalIncome}
+- Total Expenses: $${enhancedContext.totalExpenses}
+- User Type: ${enhancedContext.userType}
+- Enhanced Knowledge: ${enhancedContext.enhancedKnowledge?.length || 0} relevant items
+
+User Input: "${userInput}"
+
+Generate a voice-friendly response that:
+1. Answers their question naturally and conversationally
+2. References their specific financial data when relevant
+3. Integrates relevant financial knowledge naturally
+4. Provides encouraging, actionable guidance
+5. Adapts to their spending personality and priorities
+6. Moves the onboarding process forward appropriately
+
+Response:`;
+
+      // Use OpenAI to generate response (with timeout)
+      const responsePromise = createAgentResponse(
+        this.systemPrompt,
+        prompt,
+        [],
+        { temperature: 0.7, maxTokens: 300 }
+      );
+
+      const responseTimeout = new Promise<string>((resolve) =>
+        setTimeout(() => resolve('I understand your question. Let me help you with that.'), 15000)
+      );
+
+      const response = await Promise.race([responsePromise, responseTimeout]);
+
+      // Extract suggested actions
+      const suggestedActions = this.extractSuggestedActions(response);
+
+      // Cache the response
+      this.setCachedResponse(cacheKey, response);
+
+      return {
+        response,
+        suggestedActions
+      };
 
     } catch (error) {
-      logger.error({ error, sessionId: session.sessionId }, 'Failed to create budget');
-      return "I encountered an issue creating your budget. Let me try again, or we can switch to text mode to continue.";
+      logger.error({ error }, 'Failed to generate enhanced response');
+      return {
+        response: "I'm having trouble processing your request right now. Let me try a different approach.",
+        suggestedActions: []
+      };
     }
   }
 
-  async getSessionStatus(sessionId: string, userId: string): Promise<VoiceSession | null> {
-    const session = this.sessions.get(sessionId);
-    if (!session || session.userId !== userId) {
-      return null;
+  // Generate final budget recommendations using enhanced knowledge
+  private async generateFinalBudgetRecommendations(session: VoiceSession, relevantKnowledge: any[]): Promise<any> {
+    try {
+      const userProfile = await personalAIAgent.getUserProfile(parseInt(session.userId));
+
+      // Get additional relevant knowledge for budget creation
+      const budgetKnowledge = await globalAIBrain.getRelevantKnowledge(
+        'envelope budget creation allocation strategy',
+        userProfile?.spendingPersonality === 'conservative' ? 'consumer' : 'creator',
+        'budgeting',
+        5
+      );
+
+      // Combine all knowledge used
+      const allKnowledge = [...relevantKnowledge, ...budgetKnowledge];
+      session.globalKnowledgeUsed = [
+        ...(session.globalKnowledgeUsed || []),
+        ...budgetKnowledge.map(k => ({ id: k.id, title: k.title }))
+      ];
+
+      // Build comprehensive budget recommendations
+      const recommendations = {
+        userType: userProfile?.spendingPersonality === 'conservative' ? 'consumer' : 'creator',
+        envelopeStructure: this.generateEnvelopeStructure(session, userProfile, allKnowledge),
+        allocationStrategy: this.generateAllocationStrategy(session, userProfile, allKnowledge),
+        knowledgeSources: allKnowledge.map(k => ({ id: k.id, title: k.title, category: k.category })),
+        personalInsights: session.personalAIInsights || [],
+        nextSteps: this.generateNextSteps(session, userProfile)
+      };
+
+      return recommendations;
+    } catch (error) {
+      logger.error({ error, sessionId: session.sessionId }, 'Failed to generate final budget recommendations');
+      return { error: 'Failed to generate recommendations' };
     }
-    return session;
   }
 
-  async endSession(sessionId: string): Promise<boolean> {
-    const session = this.sessions.get(sessionId);
-    if (session) {
-      session.isVoiceActive = false;
-      session.stage = 'completed';
-      session.lastActivity = new Date();
-      
-      // Optionally persist session data to database for analytics
-      try {
-        await db.userMemory.create({
-          data: {
-            userId: session.userId,
-            type: 'voice_onboarding_session',
-            content: JSON.stringify({
-              sessionId,
-              responses: session.responses,
-              transactionInsights: {
-                totalTransactions: session.transactionAnalysis.totalTransactions,
-                monthlySpending: session.transactionAnalysis.averageMonthlySpending,
-                monthlyIncome: session.transactionAnalysis.averageMonthlyIncome,
-                savingsRate: session.transactionAnalysis.savingsRate,
-                userType: session.financialProfile.userType
-              },
-              duration: new Date().getTime() - session.createdAt.getTime(),
-              completedAt: new Date()
-            }),
-            metadata: JSON.stringify({
-              sessionType: 'voice_kyc_onboarding',
-              stage: session.stage,
-              questionCount: Object.keys(session.responses).length
-            })
+  // Generate personalized envelope structure
+  private generateEnvelopeStructure(session: VoiceSession, userProfile: any, knowledge: any[]): any[] {
+    const baseEnvelopes = [
+      { name: 'Housing', percentage: 25, priority: 'high' },
+      { name: 'Transportation', percentage: 15, priority: 'high' },
+      { name: 'Food & Groceries', percentage: 15, priority: 'high' },
+      { name: 'Utilities', percentage: 10, priority: 'high' },
+      { name: 'Emergency Fund', percentage: 20, priority: 'high' },
+      { name: 'Debt Payment', percentage: 10, priority: 'medium' },
+      { name: 'Entertainment', percentage: 5, priority: 'low' }
+    ];
+
+    // Adjust based on user profile and knowledge
+    if (userProfile?.spendingPersonality === 'conservative') {
+      baseEnvelopes.find(e => e.name === 'Emergency Fund')!.percentage = 25;
+      baseEnvelopes.find(e => e.name === 'Entertainment')!.percentage = 3;
+    }
+
+    // Add creator-specific envelopes if applicable
+    if (userProfile?.spendingPersonality !== 'conservative') {
+      baseEnvelopes.push(
+        { name: 'Equipment & Software', percentage: 8, priority: 'medium' },
+        { name: 'Tax Savings', percentage: 12, priority: 'high' }
+      );
+    }
+
+    return baseEnvelopes;
+  }
+
+  // Generate allocation strategy
+  private generateAllocationStrategy(session: VoiceSession, userProfile: any, knowledge: any[]): any {
+    const strategy = {
+      approach: userProfile?.spendingPersonality === 'conservative' ? 'conservative' : 'balanced',
+      automation: 'high',
+      reviewFrequency: 'monthly',
+      adjustmentStrategy: 'gradual',
+      knowledgeBased: knowledge.filter(k => k.category === 'strategy').map(k => k.title)
+    };
+
+    return strategy;
+  }
+
+  // Generate next steps
+  private generateNextSteps(session: VoiceSession, userProfile: any): string[] {
+    const steps = [
+      'Review your personalized envelope structure',
+      'Set up automatic transfers for each envelope',
+      'Track your spending for the first month',
+      'Schedule a monthly budget review'
+    ];
+
+    if (userProfile?.spendingPersonality !== 'conservative') {
+      steps.push('Set up quarterly tax savings plan');
+      steps.push('Create business expense tracking system');
+    }
+
+    return steps;
+  }
+
+  // Generate personal insights for learning
+  private async generatePersonalInsights(session: VoiceSession, userInput: string, aiResponse: string): Promise<any[]> {
+    try {
+      // Use Personal AI Agent to generate insights
+      const insights = await personalAIAgent.processUserInput(
+        session.sessionId,
+        userInput,
+        { sessionType: 'voice_kyc', stage: session.stage }
+      );
+
+      return insights.insights || [];
+    } catch (error) {
+      logger.error({ error }, 'Failed to generate personal insights');
+      return [];
+    }
+  }
+
+  // Extract suggested actions from response
+  private extractSuggestedActions(response: string): string[] {
+    const actions: string[] = [];
+
+    const actionPatterns = [
+      /consider\s+(.+?)(?:\.|$)/gi,
+      /try\s+(.+?)(?:\.|$)/gi,
+      /focus\s+on\s+(.+?)(?:\.|$)/gi,
+      /review\s+(.+?)(?:\.|$)/gi
+    ];
+
+    actionPatterns.forEach(pattern => {
+      const matches = response.match(pattern);
+      if (matches) {
+        matches.forEach(match => {
+          const action = match.replace(/^(consider|try|focus on|review)\s+/i, '').replace(/\.$/, '');
+          if (action && action.length > 10) {
+            actions.push(action);
           }
         });
-      } catch (error) {
-        logger.error({ error, sessionId }, 'Failed to persist session data');
       }
+    });
 
-      this.sessions.delete(sessionId);
-      return true;
-    }
-    return false;
+    return actions.slice(0, 3);
   }
 
+  // Generate session ID
+  private generateSessionId(): string {
+    return `voice_kyc_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  }
+
+  // Analyze user bills
+  private async analyzeUserBills(userId: string): Promise<any> {
+    try {
+      return await billAnalyzer.analyzeBillsFromTransactions(userId, 120);
+    } catch (error) {
+      logger.error({ error, userId }, 'Failed to analyze user bills');
+      return { detectedBills: [], totalMonthlyBills: 0 };
+    }
+  }
+
+  // Build financial profile
+  private async buildFinancialProfile(userId: string): Promise<any> {
+    try {
+      const user = await db.user.findUnique({
+        where: { id: parseInt(userId) },
+        select: { id: true, name: true, email: true }
+      });
+
+      return {
+        userId: user?.id,
+        name: user?.name,
+        email: user?.email,
+        userType: 'consumer', // Default, will be refined during onboarding
+        spendingPersonality: 'conservative', // Default, will be learned
+        riskProfile: 'medium'
+      };
+    } catch (error) {
+      logger.error({ error, userId }, 'Failed to build financial profile');
+      return {
+        userType: 'consumer',
+        spendingPersonality: 'conservative',
+        riskProfile: 'medium'
+      };
+    }
+  }
+
+  // Get transaction insights
   async getTransactionInsights(userId: string): Promise<TransactionInsights | null> {
     try {
       const session = Array.from(this.sessions.values()).find(s => s.userId === userId);
-      if (!session) return null;
+      if (!session?.transactionAnalysis) {
+        return null;
+      }
 
       return {
         totalTransactions: session.transactionAnalysis.totalTransactions,
-        billCount: session.billAnalysis.detectedBills.length,
         averageMonthlySpending: session.transactionAnalysis.averageMonthlySpending,
         averageMonthlyIncome: session.transactionAnalysis.averageMonthlyIncome,
-        topSpendingCategories: session.transactionAnalysis.topSpendingCategories.slice(0, 5),
-        spendingPersonality: session.financialProfile.spendingPersonality,
-        userType: session.financialProfile.userType,
-        riskProfile: session.financialProfile.riskProfile,
         savingsRate: session.transactionAnalysis.savingsRate,
-        detectedBills: session.billAnalysis.detectedBills.slice(0, 10)
+        topSpendingCategories: session.transactionAnalysis.topSpendingCategories.slice(0, 5)
       };
     } catch (error) {
       logger.error({ error, userId }, 'Failed to get transaction insights');
       return null;
+    }
+  }
+
+  /**
+   * Orchestrate multi-agent analysis for comprehensive financial insights
+   */
+  async orchestrateMultiAgentAnalysis(userId: string, sessionId: string): Promise<{
+    budgetCoach: any;
+    transactionAnalyst: any;
+    insightGenerator: any;
+    financialAdvisor: any;
+  }> {
+    try {
+      logger.info({ userId, sessionId }, 'Starting multi-agent orchestration for voice KYC');
+
+      const context = {
+        userId: userId,
+        sessionId,
+        timestamp: new Date(),
+        previousInteractions: [],
+        routingMetadata: {
+          reason: 'voice_kyc_analysis',
+          confidence: 0.95,
+          originalAgent: 'voice_kyc',
+        }
+      };
+
+      // Run all agents in parallel for comprehensive analysis
+      const [budgetCoach, transactionAnalyst, insightGenerator, financialAdvisor] = await Promise.all([
+        agentManager.runAgent('budget_coach', 'Analyze spending patterns and suggest envelope structure', context),
+        agentManager.runAgent('transaction_analyst', 'Analyze transaction history and categorize spending', context),
+        agentManager.runAgent('insight_generator', 'Generate personalized financial insights and recommendations', context),
+        agentManager.runAgent('financial_advisor', 'Provide high-level financial guidance and goal setting', context)
+      ]);
+
+      // Store multi-agent results in memory for context preservation
+      await memoryManager.storeInteraction(
+        userId,
+        'voice_kyc_orchestrator',
+        sessionId,
+        'Multi-agent analysis request',
+        'Multi-agent analysis completed',
+        {
+          userId: userId,
+          userType: 'consumer'
+        },
+        {
+          agents: ['budget_coach', 'transaction_analyst', 'insight_generator', 'financial_advisor'],
+          confidence: 0.95,
+          orchestrationType: 'parallel',
+          analysisResults: {
+            budgetCoach,
+            transactionAnalyst,
+            insightGenerator,
+            financialAdvisor,
+            timestamp: new Date(),
+            analysisId: `analysis_${Date.now()}`
+          }
+        }
+      );
+
+      logger.info({ userId, sessionId }, 'Multi-agent orchestration completed successfully');
+
+      return {
+        budgetCoach,
+        transactionAnalyst,
+        insightGenerator,
+        financialAdvisor
+      };
+
+    } catch (error) {
+      logger.error({ error, userId, sessionId }, 'Failed to orchestrate multi-agent analysis');
+      throw error;
+    }
+  }
+
+  // Get session status
+  async getSessionStatus(sessionId: string, userId: string): Promise<VoiceSession | null> {
+    const session = this.sessions.get(sessionId);
+    if (session && session.userId === userId) {
+      return session;
+    }
+    return null;
+  }
+
+  // Get all sessions for a user
+  async getUserSessions(userId: string): Promise<VoiceSession[]> {
+    return Array.from(this.sessions.values()).filter(s => s.userId === userId);
+  }
+
+  // End session
+  async endSession(sessionId: string): Promise<void> {
+    const session = this.sessions.get(sessionId);
+    if (session) {
+      session.isVoiceActive = false;
+      session.lastActivity = new Date();
+
+      // End personal AI session
+      await personalAIAgent.endSession(sessionId);
+
+      logger.info({ sessionId, userId: session.userId }, 'Voice KYC session ended');
+    }
+  }
+
+  // Get session statistics
+  getSessionStats(): {
+    activeSessions: number;
+    totalSessions: number;
+    totalUsers: number;
+  } {
+    const activeSessions = Array.from(this.sessions.values()).filter(s => s.isVoiceActive).length;
+    const totalSessions = this.sessions.size;
+    const uniqueUsers = new Set(Array.from(this.sessions.values()).map(s => s.userId)).size;
+
+    return {
+      activeSessions,
+      totalSessions,
+      totalUsers: uniqueUsers
+    };
+  }
+
+  /**
+   * Handoff to specialized agent for specific financial tasks
+   */
+  async handoffToSpecialist(
+    fromStage: string,
+    toAgent: string,
+    userId: string,
+    sessionId: string,
+    reason: string,
+    context: Record<string, any>
+  ): Promise<{
+    handoffId: string;
+    targetAgent: string;
+    response: string;
+    contextPreserved: boolean;
+  }> {
+    try {
+      logger.info({ fromStage, toAgent, userId, sessionId, reason }, 'Initiating specialist handoff');
+
+      const handoffRequest = {
+        fromAgent: 'voice_kyc',
+        toAgent,
+        userId: userId.toString(),
+        sessionId,
+        reason,
+        priority: 'high' as const,
+        context: {
+          ...context,
+          voiceStage: fromStage,
+          originalSession: sessionId,
+          userPreferences: await this.getUserPreferences(userId)
+        },
+        userMessage: `Handoff from voice KYC stage: ${fromStage}`,
+        preserveHistory: true,
+        escalationLevel: 0
+      };
+
+      const handoffResult = await handoffManager.executeHandoff(handoffRequest);
+
+      logger.info({ handoffId: handoffResult.handoffId, toAgent }, 'Specialist handoff completed');
+
+      return {
+        handoffId: handoffResult.handoffId,
+        targetAgent: handoffResult.toAgent,
+        response: handoffResult.response,
+        contextPreserved: handoffResult.contextPreserved
+      };
+    } catch (error) {
+      logger.error({ error, userId, sessionId }, 'Specialist handoff failed');
+      throw error;
+    }
+  }
+
+  /**
+   * Get user preferences for context preservation during handoffs
+   */
+  private async getUserPreferences(userId: string): Promise<Record<string, any>> {
+    try {
+      const user = await db.user.findUnique({
+        where: { id: parseInt(userId) },
+        select: {
+          name: true,
+          userType: true,
+          transactionDataReady: true,
+          plaidConnected: true
+        }
+      });
+
+      return {
+        name: user?.name,
+        userType: user?.userType,
+        transactionDataReady: user?.userType,
+        plaidConnected: user?.plaidConnected
+      };
+    } catch (error) {
+      logger.error({ error, userId }, 'Failed to get user preferences');
+      return {};
     }
   }
 }

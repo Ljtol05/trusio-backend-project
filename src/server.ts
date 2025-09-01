@@ -41,12 +41,38 @@ const app = express();
 app.use(cors({
   origin: env.NODE_ENV === 'production'
     ? ['https://your-production-domain.com']
-    : true,
+    : [
+        'http://localhost:3000',
+        'http://localhost:3001',
+        'http://localhost:8081', // Expo dev server
+        'http://localhost:19006', // Expo web
+        'exp://localhost:19000', // Expo Go
+        'http://localhost:19006', // Expo web
+        'exp://192.168.1.100:19000', // Expo Go on local network
+      ],
   credentials: true
 }));
 
 // Security middleware (before other middleware)
 app.use(publicSecurityMiddleware);
+
+// Basic request logging with correlation ID
+app.use((req, res, next) => {
+  const correlationId = req.headers['x-correlation-id'] || `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  req.headers['x-correlation-id'] = correlationId;
+
+  // Log request (without PII)
+  logger.info({
+    correlationId,
+    method: req.method,
+    url: req.url,
+    userAgent: req.get('User-Agent'),
+    ip: req.ip,
+    timestamp: new Date().toISOString()
+  }, 'Incoming request');
+
+  next();
+});
 
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
@@ -60,6 +86,31 @@ app.get('/healthz', (req, res) => {
     version: '1.0.0',
     environment: env.NODE_ENV
   });
+});
+
+// Readiness check
+app.get('/readyz', async (req, res) => {
+  try {
+    // Check database connection
+    await db.$queryRaw`SELECT 1`;
+
+    res.json({
+      ok: true,
+      timestamp: new Date().toISOString(),
+      service: 'envelope-budgeting-api',
+      database: 'connected',
+      environment: env.NODE_ENV
+    });
+  } catch (error) {
+    logger.error({ error }, 'Readiness check failed');
+    res.status(503).json({
+      ok: false,
+      timestamp: new Date().toISOString(),
+      service: 'envelope-budgeting-api',
+      database: 'disconnected',
+      error: 'Database connection failed'
+    });
+  }
 });
 
 // API Routes

@@ -25,14 +25,14 @@ export const authService = {
   },
 };
 
-import jwt from 'jsonwebtoken';
+import * as jwt from 'jsonwebtoken';
 import { Request, Response, NextFunction } from 'express';
 import { db } from '../lib/db.js';
 import { env } from '../config/env.js';
 
 export interface AuthenticatedRequest extends Request {
   user?: {
-    id: string;
+    id: number;
     email: string;
     name: string;
   };
@@ -53,10 +53,10 @@ export const authenticateToken = async (
   try {
     const decoded = jwt.verify(token, env.JWT_SECRET) as { userId: string };
 
-    const user = await db.user.findUnique({
-      where: { id: decoded.userId },
-      select: { id: true, email: true, name: true }
-    });
+          const user = await db.user.findUnique({
+        where: { id: parseInt(decoded.userId) },
+        select: { id: true, email: true, name: true }
+      });
 
     if (!user) {
       return res.status(403).json({ error: 'Invalid token' });

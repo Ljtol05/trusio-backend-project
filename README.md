@@ -4,22 +4,30 @@ A TypeScript/Express backend for envelope-style budgeting with smart transaction
 
 ## Required API Keys & Services
 
+### Supabase Setup (Required)
+1. **Create Supabase Project** at [supabase.com](https://supabase.com)
+2. **Enable pgvector extension** in Database → Extensions
+3. **Get connection details** from Settings → Database:
+   - `DATABASE_URL`: Use connection pooling URL (port 6543)
+   - `DIRECT_URL`: Use direct connection URL (port 5432)
+   - `SUPABASE_URL`: Your project URL
+   - `SUPABASE_ANON_KEY`: Public API key
+   - `SUPABASE_SERVICE_ROLE_KEY`: Service role key (keep secret)
+
 ### Currently Implemented
 - **OpenAI API** (for AI agents and financial coaching)
   - `OPENAI_API_KEY` - Main API key
-  - `OPENAI_PROJECT_ID` - Project identifier
-  - `OPENAI_ORG_ID` - Organization identifier
-- **Resend API** (for email verification)
+  - `EMBEDDINGS_MODEL` - text-embedding-ada-002
+- **Resend API** (for email verification via Supabase)
   - `RESEND_API_KEY` - Email delivery service
 - **Plaid API** (for bank integration and transaction analysis)
   - `PLAID_CLIENT_ID` - Sandbox/Development
-  - `PLAID_SECRET` - Sandbox/Development  
+  - `PLAID_SECRET` - Sandbox/Development
   - `PLAID_ENV` - sandbox/development/production
-  - `PLAID_PRODUCTS` - transactions,auth,identity,assets
-- **Twilio** (optional - for SMS verification)
+- **Twilio** (for phone verification and 2FA via Supabase)
   - `TWILIO_ACCOUNT_SID`
   - `TWILIO_AUTH_TOKEN`
-  - `TWILIO_PHONE_NUMBER`
+  - `TWILIO_VERIFY_SID`
 
 ### Future Production Requirements
 - **Banking-as-a-Service Provider** (for virtual accounts with routing numbers)
@@ -82,6 +90,40 @@ A TypeScript/Express backend for envelope-style budgeting with smart transaction
 - 🎯 Basic tax categorization and compliance tracking
 - 🏦 **BaaS-Ready Architecture** - Plug-and-play for future virtual account integration
 
+## Local Development Setup
+
+### Prerequisites
+- Node.js 20.x (use `.nvmrc`)
+- pnpm package manager
+- Supabase project with pgvector enabled
+
+### Quick Start
+```bash
+# Install dependencies
+pnpm install
+
+# Copy environment template
+cp env.example .env
+# Edit .env with your Supabase credentials
+
+# Generate Prisma client
+pnpm prisma:generate
+
+# Run database migrations
+pnpm prisma:migrate
+
+# Start development server
+pnpm dev
+```
+
+### Environment Variables
+Copy `env.example` to `.env` and fill in:
+- **Supabase**: Get from your project dashboard
+- **Resend**: Sign up at [resend.com](https://resend.com)
+- **Twilio**: Get from [twilio.com/console](https://twilio.com/console)
+- **Plaid**: Get from [plaid.com/dashboard](https://plaid.com/dashboard)
+- **OpenAI**: Get from [platform.openai.com](https://platform.openai.com)
+
 ## Implementation Plan - Individual Consumers & Content Creators Focus
 
 ### Phase 1: Core Consumer Features (Current Focus)
@@ -103,7 +145,7 @@ A TypeScript/Express backend for envelope-style budgeting with smart transaction
 
 ### Future Business Features (Separate Implementation)
 - **Business Expense Tracking & Tax Optimization**
-- **Quarterly Tax Estimator for Business Owners** 
+- **Quarterly Tax Estimator for Business Owners**
 - **Revenue Diversification for Small Business**
 - **Equipment Depreciation Tracking**
 - **Client Payment Optimization**
@@ -357,7 +399,7 @@ curl -X POST http://localhost:5000/api/transactions/categorize \
         "description": "Grocery shopping"
       },
       {
-        "merchant": "Shell Gas Station", 
+        "merchant": "Shell Gas Station",
         "amount": -45.20,
         "description": "Fuel"
       }
@@ -688,7 +730,7 @@ curl -X POST http://localhost:5000/api/transactions/categorize \
         "description": "Grocery shopping"
       },
       {
-        "merchant": "Shell Gas Station", 
+        "merchant": "Shell Gas Station",
         "amount": -45.20,
         "description": "Fuel"
       }
@@ -733,7 +775,7 @@ curl -X POST http://localhost:5000/api/kyc/start \
   -H "Authorization: Bearer <your-jwt-token>" \
   -d '{
     "legalFirstName": "John",
-    "legalLastName": "Doe", 
+    "legalLastName": "Doe",
     "dob": "1990-01-15",
     "ssnLast4": "1234",
     "addressLine1": "123 Main St",

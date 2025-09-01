@@ -2,7 +2,7 @@
 import { tool } from '@openai/agents';
 import { z } from 'zod';
 import { logger } from '../../lib/logger.js';
-import { prisma } from '../../lib/db.js';
+import { db } from '../../lib/db.js';
 import type { FinancialContext } from '../types.js';
 
 // Identify opportunities schema
@@ -53,14 +53,14 @@ export const identifyOpportunities = tool({
           }
         }),
         prisma.transaction.findMany({
-          where: { 
+          where: {
             userId,
             date: { gte: cutoffDate }
           },
           orderBy: { date: 'desc' }
         }),
         prisma.transfer.findMany({
-          where: { 
+          where: {
             userId,
             createdAt: { gte: cutoffDate }
           },
@@ -73,17 +73,17 @@ export const identifyOpportunities = tool({
       // Savings optimization opportunities
       if (analysisType === 'savings_optimization' || analysisType === 'all') {
         // Find overfunded envelopes
-        const overfundedEnvelopes = envelopes.filter(env => {
+        const overfundedEnvelopes = envelopes.filter((env: any) => {
           if (env.budget <= 0) return false;
-          const monthlySpending = env.transactions.reduce((sum, t) => sum + Math.abs(t.amount), 0);
+          const monthlySpending = env.transactions.reduce((sum: number, t: any) => sum + Math.abs(t.amount), 0);
           const avgMonthlySpending = monthlySpending / (timeframeDays / 30);
           return env.balance > (avgMonthlySpending * 3); // More than 3 months of spending
         });
 
         for (const envelope of overfundedEnvelopes) {
-          const monthlySpending = envelope.transactions.reduce((sum, t) => sum + Math.abs(t.amount), 0) / (timeframeDays / 30);
+          const monthlySpending = envelope.transactions.reduce((sum: number, t: any) => sum + Math.abs(t.amount), 0) / (timeframeDays / 30);
           const excessAmount = envelope.balance - (monthlySpending * 2); // Keep 2 months buffer
-          
+
           if (excessAmount > 50) { // Only suggest if meaningful amount
             opportunities.push({
               type: 'savings_optimization',
@@ -108,7 +108,7 @@ export const identifyOpportunities = tool({
             const actualSpending = env.transactions.reduce((sum, t) => sum + Math.abs(t.amount), 0);
             const avgMonthlySpending = actualSpending / (timeframeDays / 30);
             const budgetUtilization = avgMonthlySpending / env.budget;
-            
+
             return {
               envelope: env,
               budgetUtilization,
@@ -123,7 +123,7 @@ export const identifyOpportunities = tool({
 
         if (underutilized.length > 0 && overutilized.length > 0) {
           const totalUnderutilized = underutilized.reduce((sum, item) => sum + item.variance, 0);
-          
+
           opportunities.push({
             type: 'budget_reallocation',
             priority: 'high',
@@ -149,15 +149,15 @@ export const identifyOpportunities = tool({
       if (analysisType === 'spending_reduction' || analysisType === 'all') {
         // Analyze transaction patterns for reduction opportunities
         const categorySpending = {};
-        
+
         transactions.forEach(transaction => {
           const envelope = envelopes.find(env => env.id === transaction.envelopeId);
           const category = envelope?.category || 'uncategorized';
-          
+
           if (!categorySpending[category]) {
             categorySpending[category] = { total: 0, count: 0, transactions: [] };
           }
-          
+
           categorySpending[category].total += Math.abs(transaction.amount);
           categorySpending[category].count++;
           categorySpending[category].transactions.push(transaction);
@@ -167,10 +167,10 @@ export const identifyOpportunities = tool({
         Object.entries(categorySpending).forEach(([category, data]) => {
           const avgTransactionAmount = data.total / data.count;
           const monthlySpending = data.total / (timeframeDays / 30);
-          
+
           if (monthlySpending > 200 && category !== 'savings' && category !== 'investments') {
             const potentialReduction = monthlySpending * 0.15; // 15% reduction potential
-            
+
             opportunities.push({
               type: 'spending_reduction',
               priority: 'medium',
@@ -189,7 +189,7 @@ export const identifyOpportunities = tool({
 
       // Goal acceleration opportunities
       if (analysisType === 'goal_acceleration' || analysisType === 'all') {
-        const savingsEnvelopes = envelopes.filter(env => 
+        const savingsEnvelopes = envelopes.filter(env =>
           env.category === 'savings' || env.name.toLowerCase().includes('goal') || env.name.toLowerCase().includes('save')
         );
 
@@ -220,7 +220,7 @@ export const identifyOpportunities = tool({
           const transactionCount = env.transactions.length;
           const hasLowBalance = env.balance < 10;
           const hasLowActivity = transactionCount < 2;
-          
+
           return hasLowBalance && hasLowActivity && env.category !== 'savings';
         });
 
@@ -262,10 +262,10 @@ export const identifyOpportunities = tool({
         }
       };
 
-      logger.info({ 
-        userId, 
+      logger.info({
+        userId,
         opportunityCount: opportunities.length,
-        totalPotentialSavings: result.summary.totalPotentialSavings 
+        totalPotentialSavings: result.summary.totalPotentialSavings
       }, 'Opportunity analysis completed');
 
       return JSON.stringify(result);
