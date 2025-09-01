@@ -133,18 +133,6 @@ export const AgentOutputSchema = z.object({
 
 export type AgentOutput = z.infer<typeof AgentOutputSchema>;
 
-// Agent context schema
-export const AgentContextSchema = z.object({
-  userId: z.string(),
-  sessionId: z.string(),
-  agentName: z.string(),
-  timestamp: z.date(),
-  previousInteractions: z.array(z.any()).optional(),
-  financialContext: FinancialContextSchema.optional(),
-});
-
-export type AgentContext = z.infer<typeof AgentContextSchema>;
-
 // Tool execution context
 export interface ToolExecutionContext extends FinancialContext {
   sessionId: string;

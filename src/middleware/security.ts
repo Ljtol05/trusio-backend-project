@@ -1,4 +1,3 @@
-
 import { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { logger } from '../lib/logger.js';
@@ -7,16 +6,14 @@ import { logger } from '../lib/logger.js';
 const SECURITY_PATTERNS = {
   xss: [
     /<script[^>]*>.*?<\/script>/gi,
+    /<script[^>]*>/gi,
     /<iframe[^>]*>.*?<\/iframe>/gi,
-    /<object[^>]*>.*?<\/object>/gi,
-    /<embed[^>]*>/gi,
-    /<link[^>]*>/gi,
-    /<meta[^>]*>/gi,
     /javascript:/gi,
     /vbscript:/gi,
-    /data:text\/html/gi,
     /on\w+\s*=/gi,
-    /<.*?on\w+\s*=.*?>/gi,
+    /<img[^>]*onerror[^>]*>/gi,
+    /data:text\/html/gi,
+    /<[^>]*script[^>]*>/gi,
   ],
   sqlInjection: [
     /(\b(ALTER|CREATE|DELETE|DROP|EXEC(UTE)?|INSERT|MERGE|SELECT|UPDATE|UNION|USE)\b)/gi,
@@ -33,30 +30,28 @@ const SECURITY_PATTERNS = {
     /\.\.\\/gi,
   ],
   commandInjection: [
-    /[;&|`$()]/g,
-    /\b(eval|exec|system|shell_exec|passthru|file_get_contents|file_put_contents|fopen|fwrite)\b/gi,
-    /\b(rm|del|format|shutdown|halt|reboot)\b/gi,
+    /[;&|`$(){}]/,
+    /(&&|\|\|)/,
+    /\b(eval|exec|system|shell_exec|passthru|popen|proc_open)\s*\(/gi,
+    /\$\([^)]*\)/,  // Command substitution
+    /`[^`]*`/,      // Backtick command execution
   ],
 };
 
 // Sanitization functions
 export function sanitizeString(input: string): string {
-  if (typeof input !== 'string') return input;
-
-  return input
-    // Remove script tags and their content
+  // Remove script tags and dangerous attributes
+  let sanitized = input
     .replace(/<script[^>]*>.*?<\/script>/gi, '')
-    // Remove other potentially dangerous HTML tags
-    .replace(/<(iframe|object|embed|link|meta|form|input|textarea|select|option)[^>]*>/gi, '')
-    // Remove event handlers
-    .replace(/on\w+\s*=\s*["'][^"']*["']/gi, '')
-    // Remove javascript: and vbscript: protocols
-    .replace(/(javascript|vbscript):/gi, '')
-    // Remove data URLs that could contain HTML
-    .replace(/data:text\/html[^"'\s>]*/gi, '')
-    // Normalize whitespace
-    .replace(/\s+/g, ' ')
-    .trim();
+    .replace(/<script[^>]*>/gi, '')
+    .replace(/<\/script>/gi, '')
+    .replace(/<iframe[^>]*>.*?<\/iframe>/gi, '')
+    .replace(/javascript:/gi, '')
+    .replace(/vbscript:/gi, '')
+    .replace(/on\w+\s*=/gi, '')
+    .replace(/data:text\/html/gi, '');
+
+  return sanitized.trim();
 }
 
 export function sanitizeNumeric(input: any): number | null {
@@ -68,19 +63,16 @@ export function sanitizeNumeric(input: any): number | null {
   return null;
 }
 
-export function sanitizeEmail(input: string): string {
-  if (typeof input !== 'string') return '';
-  
-  return input
-    .toLowerCase()
-    .replace(/[^a-z0-9@._-]/g, '')
-    .trim();
+export function sanitizeEmail(email: string): string {
+  // Remove dangerous characters but preserve valid email characters like +
+  return email.toLowerCase().trim().replace(/[<>"']/g, '');
 }
 
 export function sanitizeAlphanumeric(input: string): string {
-  if (typeof input !== 'string') return '';
-  
-  return input.replace(/[^a-zA-Z0-9\s._-]/g, '').trim();
+  // Remove dangerous patterns first, then clean up
+  return input
+    .replace(/onclick|onload|onerror|javascript:|vbscript:|data:/gi, '')
+    .replace(/[^a-zA-Z0-9\s._-]/g, '');
 }
 
 // Security validation functions
@@ -102,7 +94,7 @@ export function detectCommandInjection(input: string): boolean {
 
 export function validateInput(input: any): { isValid: boolean; threats: string[]; sanitized?: any } {
   const threats: string[] = [];
-  
+
   if (typeof input === 'string') {
     if (detectXSS(input)) {
       threats.push('XSS');
@@ -126,7 +118,7 @@ export function validateInput(input: any): { isValid: boolean; threats: string[]
 
   if (typeof input === 'object' && input !== null) {
     const sanitizedObject: any = Array.isArray(input) ? [] : {};
-    
+
     for (const [key, value] of Object.entries(input)) {
       const validation = validateInput(value);
       threats.push(...validation.threats);
@@ -151,33 +143,33 @@ export function validateInput(input: any): { isValid: boolean; threats: string[]
 const rateLimitStore = new Map<string, { count: number; resetTime: number }>();
 
 export function checkRateLimit(
-  identifier: string, 
-  maxRequests: number = 100, 
+  identifier: string,
+  maxRequests: number = 100,
   windowMs: number = 15 * 60 * 1000 // 15 minutes
 ): { allowed: boolean; remaining: number; resetTime: number } {
   const now = Date.now();
   const key = `rate_limit:${identifier}`;
-  
+
   const existing = rateLimitStore.get(key);
-  
+
   if (!existing || now > existing.resetTime) {
     // Create new or reset expired
     const resetTime = now + windowMs;
     rateLimitStore.set(key, { count: 1, resetTime });
     return { allowed: true, remaining: maxRequests - 1, resetTime };
   }
-  
+
   if (existing.count >= maxRequests) {
     return { allowed: false, remaining: 0, resetTime: existing.resetTime };
   }
-  
+
   existing.count++;
   rateLimitStore.set(key, existing);
-  
-  return { 
-    allowed: true, 
-    remaining: maxRequests - existing.count, 
-    resetTime: existing.resetTime 
+
+  return {
+    allowed: true,
+    remaining: maxRequests - existing.count,
+    resetTime: existing.resetTime
   };
 }
 
@@ -200,16 +192,16 @@ export const securityMiddleware = (options: {
       const clientIp = req.ip || req.connection.remoteAddress || 'unknown';
       const userAgent = req.headers['user-agent'] || 'unknown';
       const userId = (req as any).user?.id || 'anonymous';
-      
+
       // Rate limiting
       if (rateLimit) {
         const identifier = `${clientIp}:${userId}`;
         const rateLimitResult = checkRateLimit(
-          identifier, 
-          rateLimit.maxRequests, 
+          identifier,
+          rateLimit.maxRequests,
           rateLimit.windowMs
         );
-        
+
         if (!rateLimitResult.allowed) {
           logger.warn({
             ip: clientIp,
@@ -218,14 +210,14 @@ export const securityMiddleware = (options: {
             url: req.originalUrl,
             method: req.method
           }, 'Rate limit exceeded');
-          
+
           return res.status(429).json({
             ok: false,
             error: 'Rate limit exceeded',
             resetTime: new Date(rateLimitResult.resetTime).toISOString()
           });
         }
-        
+
         // Set rate limit headers
         res.set({
           'X-RateLimit-Limit': rateLimit.maxRequests.toString(),
@@ -238,7 +230,7 @@ export const securityMiddleware = (options: {
       if (shouldValidate && (req.body || req.query)) {
         const allInputs = { ...req.body, ...req.query };
         const validation = validateInput(allInputs);
-        
+
         if (!validation.isValid) {
           if (logThreats) {
             logger.warn({
@@ -251,7 +243,7 @@ export const securityMiddleware = (options: {
               suspiciousInput: Object.keys(allInputs)
             }, 'Security threat detected');
           }
-          
+
           return res.status(400).json({
             ok: false,
             error: 'Invalid input detected',
@@ -259,7 +251,7 @@ export const securityMiddleware = (options: {
             code: 'SECURITY_VIOLATION'
           });
         }
-        
+
         // Apply sanitization if enabled
         if (sanitize && validation.sanitized) {
           if (req.body) {
