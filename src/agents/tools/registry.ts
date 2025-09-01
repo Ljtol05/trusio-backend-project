@@ -440,7 +440,7 @@ class ToolRegistry {
         const errors: string[] = [];
         if (parameters.amount !== undefined) {
           if (typeof parameters.amount !== 'number' || parameters.amount <= 0) {
-            errors.push('Transfer amount must be a positive number.');
+            errors.push('Transfer amount must be positive amount');
           }
         }
         if (errors.length > 0) {
