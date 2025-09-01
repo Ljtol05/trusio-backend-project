@@ -1,0 +1,72 @@
+~/workspace$ npm run test:agents -- --run --reporter=verbose src/agents/__tests__/integration.test.ts
+
+> envelope-app-backend@1.0.0 test:agents
+> vitest run --config vitest.config.agents.ts --run --reporter=verbose src/agents/__tests__/integration.test.ts
+
+
+ RUN  v1.6.1 /home/runner/workspace
+
+ ❯ |agents| src/agents/__tests__/integration.test.ts (0)
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ Failed Suites 1 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |agents| src/agents/__tests__/integration.test.ts [ src/agents/__tests__/integration.test.ts ]
+Error: [vitest] There was an error when mocking a module. If you are using "vi.mock" factory, make sure there are no top level variables inside, since this call is hoisted to top of the file. Read more: https://vitest.dev/api/vi.html#vi-mock
+ ❯ src/agents/__tests__/integration.test.ts:3:31
+      1| import { describe, it, expect, beforeEach,…
+      2| import request from 'supertest';
+      3| import testApp from '../../server.ts';
+       |                               ^
+      4| import { db } from '../../lib/db.ts';
+      5| import jwt from 'jsonwebtoken';
+
+Caused by: SyntaxError: Invalid regular expression: /('|(\\')|(;|--|\||`|@@|char|nchar|varchar|nvarchar|table)/gi: Unterminated group
+ ❯ literalRegExp node_modules/rollup/dist/es/shared/parseAst.js:1720:20
+ ❯ convertNode node_modules/rollup/dist/es/shared/parseAst.js:2048:12
+ ❯ convertNodeList node_modules/rollup/dist/es/shared/parseAst.js:2057:38
+ ❯ arrayExpression node_modules/rollup/dist/es/shared/parseAst.js:1128:23
+ ❯ convertNode node_modules/rollup/dist/es/shared/parseAst.js:2048:12
+ ❯ property node_modules/rollup/dist/es/shared/parseAst.js:1827:23
+ ❯ convertNode node_modules/rollup/dist/es/shared/parseAst.js:2048:12
+ ❯ convertNodeList node_modules/rollup/dist/es/shared/parseAst.js:2057:38
+ ❯ objectExpression node_modules/rollup/dist/es/shared/parseAst.js:1794:25
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+ Test Files  1 failed (1)
+      Tests  no tests
+   Start at  00:13:02
+   Duration  779ms (transform 97ms, setup 75ms, collect 0ms, tests 0ms, environment 0ms, prepare 84ms)
+
+~/workspace$ npm run test:agents -- --run --reporter=verbose src/agents/__tests__/performance.test.ts
+
+> envelope-app-backend@1.0.0 test:agents
+> vitest run --config vitest.config.agents.ts --run --reporter=verbose src/agents/__tests__/performance.test.ts
+
+
+ RUN  v1.6.1 /home/runner/workspace
+
+ ✓ |agents| src/agents/__tests__/performance.test.ts (12)
+   ✓ Agent Performance Tests (12)
+     ✓ Agent Response Times (3)
+       ✓ should respond within acceptable time limits
+       ✓ should handle multiple concurrent agent requests
+       ✓ should maintain performance with large financial context
+     ✓ Tool Performance (2)
+       ✓ should execute tools within acceptable time limits
+       ✓ should handle concurrent tool executions
+     ✓ Memory and Resource Usage (2)
+       ✓ should not leak memory during repeated operations
+       ✓ should handle agent registry operations efficiently
+     ✓ Stress Testing (2)
+       ✓ should handle high-frequency agent requests
+       ✓ should gracefully degrade under extreme load
+     ✓ Edge Cases and Resilience (3)
+       ✓ should handle malformed context gracefully
+       ✓ should handle very long messages efficiently
+       ✓ should maintain performance with frequent agent switching
+
+ Test Files  1 passed (1)
+      Tests  12 passed (12)
+   Start at  00:13:19
+   Duration  708ms (transform 245ms, setup 77ms, collect 270ms, tests 16ms, environment 0ms, prepare 109ms

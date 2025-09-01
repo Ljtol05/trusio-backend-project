@@ -1,0 +1,69 @@
+~/workspace$ npm run test:agents -- --run --reporter=verbose src/agents/__tests__/agentRegistry.test.ts src/agents/__tests__/tools.test.ts
+
+> envelope-app-backend@1.0.0 test:agents
+> vitest run --config vitest.config.agents.ts --run --reporter=verbose src/agents/__tests__/agentRegistry.test.ts src/agents/__tests__/tools.test.ts
+
+
+ RUN  v1.6.1 /home/runner/workspace
+
+ ✓ |agents| src/agents/__tests__/tools.test.ts (14)
+   ✓ Financial Tools (14)
+     ✓ Tool Registry (2)
+       ✓ should have all required transaction tools 
+registered
+       ✓ should return correct tool count
+     ✓ Budget Tools (2)
+       ✓ should execute budget analysis tool success
+fully
+       ✓ should handle budget analysis errors gracef
+ully
+     ✓ Envelope Tools (2)
+       ✓ should create envelope successfully
+ ✓ |agents| src/agents/__tests__/tools.test.ts (14)
+   ✓ Financial Tools (14)
+     ✓ Tool Registry (2)
+       ✓ should have all required transaction tools registered
+       ✓ should return correct tool count
+     ✓ Budget Tools (2)
+       ✓ should execute budget analysis tool successfully
+       ✓ should handle budget analysis errors gracefully
+     ✓ Envelope Tools (2)
+       ✓ should create envelope successfully
+       ✓ should transfer funds between envelopes
+     ✓ Transaction Tools (2)
+       ✓ should categorize transactions correctly
+       ✓ should analyze spending patterns
+     ✓ Analysis Tools (1)
+       ✓ should analyze budget variance
+     ✓ Insight Tools (2)
+       ✓ should generate personalized recommendations
+       ✓ should identify financial opportunities
+     ✓ Agent Handoff Tool (1)
+       ✓ should execute agent handoff successfully
+     ✓ Tool Error Handling (2)
+       ✓ should handle non-existent tool gracefully
+       ✓ should handle tool execution timeout
+ ✓ |agents| src/agents/__tests__/agentRegistry.test.ts (12)
+   ✓ AgentRegistry (12)
+     ✓ Agent Initialization (2)
+       ✓ should initialize all required agents
+       ✓ should properly assign tools to agents
+     ✓ Agent Routing (4)
+       ✓ should route budget-related messages to budget coach
+       ✓ should route transaction-related messages to transaction analyst
+       ✓ should route insight-related messages to insight generator
+       ✓ should default to financial advisor for general messages
+     ✓ Agent Execution (3)
+       ✓ should successfully run an agent with context
+       ✓ should handle agent execution errors gracefully
+       ✓ should throw error for non-existent agent
+     ✓ Agent Capabilities (2)
+       ✓ should return correct capabilities for each agent
+       ✓ should return empty array for non-existent agent capabilities
+     ✓ Agent Metrics (1)
+       ✓ should return comprehensive metrics for all agents
+
+ Test Files  2 passed (2)
+      Tests  26 passed (26)
+   Start at  00:11:08
+   Duration  1.10s (transform 385ms, setup 115ms, collect 430ms, tests 131ms, environment 0ms, prepare 133ms)
