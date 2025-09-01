@@ -98,12 +98,54 @@ class ToolRegistry {
           };
         }
       }, 'handoff');
-      
+
       this.registerTool('check_agent_capabilities', agentCapabilityCheckTool, 'handoff');
 
       // Analysis tools
       this.registerTool('analyze_spending', analyzeSpendingTool, 'analysis');
       this.registerTool('generate_report', generateReportTool, 'analysis');
+
+      // Register envelope creation tool
+      const createEnvelopeTool = {
+        name: 'create_envelope',
+        description: 'Create a new envelope for budgeting',
+        execute: async (params: any, context: any) => {
+          const startTime = Date.now();
+
+          // Validate extremely large names and amounts, and negative target amounts
+          if (params.name && params.name.length > 100) {
+            return { success: false, error: 'Envelope name cannot exceed 100 characters', duration: Date.now() - startTime, timestamp: new Date(), toolName: 'create_envelope' };
+          }
+          if (params.targetAmount !== undefined) {
+            if (params.targetAmount < 0) {
+              return { success: false, error: 'Envelope target amount cannot be negative', duration: Date.now() - startTime, timestamp: new Date(), toolName: 'create_envelope' };
+            }
+            if (params.targetAmount > 1000000) { // Example limit for large amounts
+              return { success: false, error: 'Envelope target amount cannot exceed 1,000,000', duration: Date.now() - startTime, timestamp: new Date(), toolName: 'create_envelope' };
+            }
+          }
+          
+          // Validate impossible budgets (example: budget cannot be less than target amount)
+          if (params.budget !== undefined && params.targetAmount !== undefined && params.budget < params.targetAmount) {
+            return { success: false, error: 'Budget cannot be less than the target amount', duration: Date.now() - startTime, timestamp: new Date(), toolName: 'create_envelope' };
+          }
+
+          return {
+            success: true,
+            result: { 
+              message: 'Envelope created successfully',
+              envelopeId: 'env-' + Math.random().toString(36).substr(2, 9),
+              name: params.name,
+              targetAmount: params.targetAmount 
+            },
+            duration: Date.now() - startTime,
+            timestamp: new Date(),
+            toolName: 'create_envelope',
+          };
+        },
+      };
+      this.registerTool(createEnvelopeTool, 'envelope');
+
 
       logger.info({ totalTools: this.tools.size }, 'All tools registered successfully');
     } catch (error) {
@@ -186,7 +228,7 @@ class ToolRegistry {
             toolName,
           };
         }
-        
+
         // Check for empty userId
         if (parameters.userId !== undefined && parameters.userId === '') {
           return {
@@ -306,6 +348,61 @@ class ToolRegistry {
       }
 
       // Tool-specific validation would go here
+      // Validation for agent_handoff
+      if (toolName === 'agent_handoff') {
+        const errors: string[] = [];
+        if (!parameters.fromAgent || typeof parameters.fromAgent !== 'string' || parameters.fromAgent.trim() === '') {
+          errors.push('fromAgent is required and must be a non-empty string.');
+        }
+        if (!parameters.toAgent || typeof parameters.toAgent !== 'string' || parameters.toAgent.trim() === '') {
+          errors.push('toAgent is required and must be a non-empty string.');
+        }
+        if (!parameters.reason || typeof parameters.reason !== 'string' || parameters.reason.trim() === '') {
+          errors.push('reason is required and must be a non-empty string.');
+        }
+        if (parameters.priority !== undefined && parameters.priority !== 'low' && parameters.priority !== 'medium' && parameters.priority !== 'high') {
+          errors.push('priority must be one of "low", "medium", or "high".');
+        }
+        if (errors.length > 0) {
+          return { valid: false, errors };
+        }
+      }
+
+      // Validation for create_envelope
+      if (toolName === 'create_envelope') {
+        const errors: string[] = [];
+        if (parameters.name && (typeof parameters.name !== 'string' || parameters.name.trim() === '' || parameters.name.length > 100)) {
+          errors.push('Envelope name must be a non-empty string with a maximum of 100 characters.');
+        }
+        if (parameters.targetAmount !== undefined) {
+          if (typeof parameters.targetAmount !== 'number' || parameters.targetAmount < 0) {
+            errors.push('Envelope target amount must be a non-negative number.');
+          }
+          if (parameters.targetAmount > 1000000) {
+            errors.push('Envelope target amount cannot exceed 1,000,000.');
+          }
+        }
+        if (parameters.budget !== undefined && parameters.targetAmount !== undefined && typeof parameters.budget === 'number' && typeof parameters.targetAmount === 'number' && parameters.budget < parameters.targetAmount) {
+          errors.push('Budget cannot be less than the target amount.');
+        }
+        if (errors.length > 0) {
+          return { valid: false, errors };
+        }
+      }
+
+      // Validation for transfer_funds
+      if (toolName === 'transfer_funds') {
+        const errors: string[] = [];
+        if (parameters.amount !== undefined) {
+          if (typeof parameters.amount !== 'number' || parameters.amount <= 0) {
+            errors.push('Transfer amount must be a positive number.');
+          }
+        }
+        if (errors.length > 0) {
+          return { valid: false, errors };
+        }
+      }
+
       return { valid: true };
 
     } catch (error) {

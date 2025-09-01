@@ -99,6 +99,28 @@ export const create_envelope = {
         };
       }
 
+      // Check for extremely long names (validation limit)
+      if (params.name && params.name.length > 100) {
+        return {
+          success: false,
+          error: 'Name validation failed: must be within valid length',
+          duration: Date.now() - startTime,
+          timestamp: new Date(),
+          toolName: 'create_envelope',
+        };
+      }
+
+      // Check for extremely long categories
+      if (params.category && params.category.length > 50) {
+        return {
+          success: false,
+          error: 'Category validation failed: must be within valid length',
+          duration: Date.now() - startTime,
+          timestamp: new Date(),
+          toolName: 'create_envelope',
+        };
+      }
+
       // Additional validation for business logic constraints
       if (params.initialBalance !== undefined && params.targetAmount !== undefined && 
           params.initialBalance > params.targetAmount && params.targetAmount > 0) {
