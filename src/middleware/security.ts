@@ -21,7 +21,7 @@ const SECURITY_PATTERNS = {
   sqlInjection: [
     /(\b(ALTER|CREATE|DELETE|DROP|EXEC(UTE)?|INSERT|MERGE|SELECT|UPDATE|UNION|USE)\b)/gi,
     /(\b(AND|OR)\s+\d+\s*=\s*\d+)/gi,
-    /('|(\\')|(;|--|\||`|@@|char|nchar|varchar|nvarchar|table)/gi,
+    /(\'|\\\'|;|--|\||`|@@|char|nchar|varchar|nvarchar|table)/gi,
     /(CAST|CONVERT|DECLARE|EXEC|EXECUTE|UNION|SELECT|INSERT|UPDATE|DELETE)/gi,
     /(\bUNION\s+(ALL\s+)?SELECT\b)/gi,
     /(\bDROP\s+(TABLE|DATABASE)\b)/gi,

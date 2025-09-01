@@ -1,4 +1,3 @@
-
 import { z } from 'zod';
 
 // Agent roles
@@ -108,41 +107,6 @@ export const AgentResponseSchema = z.object({
   handoffTarget: z.string().optional(),
   followUpQuestions: z.array(z.string()).default([]),
   metadata: z.record(z.any()).optional(),
-});
-
-export type AgentResponse = z.infer<typeof AgentResponseSchema>;
-
-// Agent configuration schema
-export const AgentConfigSchema = z.object({
-  name: z.string().min(1),
-  role: z.enum(['financial_advisor', 'budget_coach', 'transaction_analyst', 'insight_generator', 'onboarding_specialist', 'voice_kyc', 'content_creator', 'personal_ai']),
-  instructions: z.string().min(1),
-  model: z.string().optional(),
-  temperature: z.number().min(0).max(2).optional(),
-  maxTokens: z.number().positive().optional(),
-  tools: z.array(z.string()).optional(),
-  handoffs: z.array(z.string()).optional(),
-  isActive: z.boolean().optional(),
-  priority: z.number().min(1).max(10).optional(),
-  specializations: z.array(z.string()).optional(),
-});
-
-export type AgentConfig = z.infer<typeof AgentConfigSchema>;
-
-// Agent response schema
-export const AgentResponseSchema = z.object({
-  response: z.string().min(1),
-  confidence: z.number().min(0).max(100).optional(),
-  suggestedActions: z.array(z.object({
-    type: z.enum(['create_envelope', 'transfer_funds', 'update_budget', 'set_goal', 'analyze_spending']),
-    description: z.string(),
-    parameters: z.record(z.any()).optional(),
-    priority: z.enum(['low', 'medium', 'high']).optional(),
-  })).optional(),
-  handoffTarget: z.string().optional(),
-  followUpQuestions: z.array(z.string()).optional(),
-  metadata: z.record(z.any()).optional(),
-  agentName: z.string().optional(),
 });
 
 export type AgentResponse = z.infer<typeof AgentResponseSchema>;
