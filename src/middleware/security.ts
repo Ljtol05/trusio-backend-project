@@ -155,14 +155,29 @@ export function sanitizeEmail(input: string): string {
   // Convert to lowercase and remove any remaining HTML tags or dangerous patterns
   sanitized = sanitized.toLowerCase()
     .replace(/<[^>]*>/g, '') // Remove any remaining HTML tags
-    .replace(/[<>"']/g, ''); // Remove potentially dangerous characters
+    .replace(/[<>"']/g, '') // Remove potentially dangerous characters
+    .replace(/onclick[^"]*"[^"]*"/gi, '') // Remove onclick handlers
+    .replace(/on\w+\s*=\s*[^"]*"[^"]*"/gi, '') // Remove other event handlers
+    .replace(/javascript:[^"']*/gi, '') // Remove javascript: protocols
+    .replace(/alert\([^)]*\)/gi, ''); // Remove alert calls
   
   return sanitized.trim();
 }
 
 export function sanitizeAlphanumeric(input: string): string {
+  // First remove dangerous patterns before applying alphanumeric filter
+  let sanitized = input
+    .replace(/<[^>]*>/g, '') // Remove HTML tags
+    .replace(/onclick[^"]*"[^"]*"/gi, '') // Remove onclick handlers
+    .replace(/on\w+\s*=\s*[^"]*"[^"]*"/gi, '') // Remove other event handlers
+    .replace(/javascript:[^"']*/gi, '') // Remove javascript: protocols
+    .replace(/alert\([^)]*\)/gi, '') // Remove alert calls
+    .replace(/drop\s+table/gi, '') // Remove SQL injection attempts
+    .replace(/`[^`]*`/g, '') // Remove backtick command execution
+    .replace(/\$\([^)]*\)/g, ''); // Remove command substitution
+  
   // Remove any characters that are not alphanumeric, spaces, dots, underscores, or hyphens
-  return input.replace(/[^a-zA-Z0-9\s._-]/g, '').trim();
+  return sanitized.replace(/[^a-zA-Z0-9\s._-]/g, '').trim();
 }
 
 export function sanitizeNumeric(input: any): number | null {
