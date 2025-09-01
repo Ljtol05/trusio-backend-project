@@ -225,6 +225,18 @@ class ToolRegistry {
       };
     }
   }
+
+  // Helper to register multiple tools at once
+  private registerTools(tools: Record<string, ToolDefinition>) {
+    for (const toolName in tools) {
+      if (Object.hasOwnProperty.call(tools, toolName)) {
+        const toolDefinition = tools[toolName];
+        // Assuming a default category if not provided or inferring from tool name if possible
+        const category = toolDefinition.category || 'uncategorized';
+        this.registerTool(toolName, toolDefinition, category);
+      }
+    }
+  }
 }
 
 // Export singleton instance

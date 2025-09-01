@@ -30,35 +30,80 @@ const transferFundsSchema = z.object({
 
 export const create_envelope = {
   name: 'create_envelope',
-  description: 'Create a new envelope for budget allocation',
-  parameters: {
-    type: 'object',
-    properties: {
-      userId: { type: 'string', description: 'User ID' },
-      name: { type: 'string', description: 'Envelope name' },
-      initialBalance: { type: 'number', description: 'Initial balance in cents' },
-      icon: { type: 'string', description: 'Icon name for envelope' },
-      color: { type: 'string', description: 'Color theme for envelope' }
-    },
-    required: ['userId', 'name']
-  },
-  async execute(parameters: any, context: any) {
-    const { userId, name, initialBalance = 0, icon = 'folder', color = 'blue' } = parameters;
-
-    // Mock implementation for now
-    return {
-      success: true,
-      envelope: {
-        id: `envelope_${Date.now()}`,
-        userId,
-        name,
-        balanceCents: initialBalance,
-        icon,
-        color,
-        createdAt: new Date()
+  description: 'Create a new budget envelope',
+  category: 'envelope',
+  execute: async (params: CreateEnvelopeParams, context: FinancialContext): Promise<ToolExecutionResult> => {
+    const startTime = Date.now();
+    try {
+      // Validation checks
+      if (!params.name || params.name.length > 100) {
+        return {
+          success: false,
+          error: 'Envelope name validation failed: must be 1-100 characters',
+          duration: Date.now() - startTime,
+          timestamp: new Date(),
+          toolName: 'create_envelope',
+        };
       }
-    };
-  }
+
+      if (params.targetAmount && (params.targetAmount < 0 || params.targetAmount > Number.MAX_SAFE_INTEGER)) {
+        return {
+          success: false,
+          error: 'Target amount validation failed: must be within valid range',
+          duration: Date.now() - startTime,
+          timestamp: new Date(),
+          toolName: 'create_envelope',
+        };
+      }
+
+      if (params.category && params.category.length > 50) {
+        return {
+          success: false,
+          error: 'Category validation failed: must be under 50 characters',
+          duration: Date.now() - startTime,
+          timestamp: new Date(),
+          toolName: 'create_envelope',
+        };
+      }
+
+      logger.info('Creating envelope', { params, userId: context.userId });
+
+      const envelope = await db.envelope.create({
+        data: {
+          userId: context.userId,
+          name: params.name,
+          balanceCents: Math.round(params.initialBalance * 100),
+          icon: params.icon || 'wallet',
+          color: params.color || 'blue',
+          order: params.order || 0,
+          isActive: true,
+        },
+      });
+
+      return {
+        success: true,
+        result: {
+          id: envelope.id,
+          name: envelope.name,
+          balance: envelope.balanceCents / 100,
+          icon: envelope.icon,
+          color: envelope.color,
+        },
+        duration: Date.now() - startTime,
+        timestamp: new Date(),
+        toolName: 'create_envelope',
+      };
+    } catch (error) {
+      logger.error('Failed to create envelope', { error, params });
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error occurred',
+        duration: Date.now() - startTime,
+        timestamp: new Date(),
+        toolName: 'create_envelope',
+      };
+    }
+  },
 };
 
 export const createEnvelopeTool = create_envelope;
