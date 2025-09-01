@@ -1,0 +1,483 @@
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ Failed Suites 10 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  OpenAI_Agent_Docs/OpenAI_Agent_Examples_Repo/integration-tests/bun.test.ts > Bun
+TypeError: execa is not a function
+ ❯ OpenAI_Agent_Docs/OpenAI_Agent_Examples_Repo/integration-tests/bun.test.ts:9:11
+      7|   beforeAll(async () => {
+      8|     // remove lock file to avoid errors
+      9|     await execa`rm -f bun.lock`;
+       |           ^
+     10|     console.log('[bun] Removing node_modul…
+     11|     await execa`rm -rf node_modules`;
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/14]⎯
+
+ FAIL  OpenAI_Agent_Docs/OpenAI_Agent_Examples_Repo/integration-tests/bun.test.ts > Bun
+TypeError: execa is not a function
+ ❯ OpenAI_Agent_Docs/OpenAI_Agent_Examples_Repo/integration-tests/bun.test.ts:22:11
+     20| 
+     21|   afterAll(async () => {
+     22|     await execa`rm -f bun.lock`;
+       |           ^
+     23|   });
+     24| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/14]⎯
+
+ FAIL  OpenAI_Agent_Docs/OpenAI_Agent_Examples_Repo/integration-tests/cloudflare.test.ts > Cloudflare Workers
+TypeError: execa is not a function
+ ❯ OpenAI_Agent_Docs/OpenAI_Agent_Examples_Repo/integration-tests/cloudflare.test.ts:13:11
+     11|   beforeAll(async () => {
+     12|     // Remove lock file to avoid errors
+     13|     await execa`rm -f package-lock.json`;
+       |           ^
+     14|     console.log('[cloudflare] Removing nod…
+     15|     await execa`rm -rf node_modules`;
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/14]⎯
+
+ FAIL  OpenAI_Agent_Docs/OpenAI_Agent_Examples_Repo/integration-tests/deno.test.ts > Deno
+TypeError: execa is not a function
+ ❯ OpenAI_Agent_Docs/OpenAI_Agent_Examples_Repo/integration-tests/deno.test.ts:9:11
+      7|   beforeAll(async () => {
+      8|     // Remove lock file to avoid errors
+      9|     await execa`rm -f deno.lock`;
+       |           ^
+     10|     console.log('[deno] Removing node_modu…
+     11|     await execa`rm -rf node_modules`;
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/14]⎯
+
+ FAIL  OpenAI_Agent_Docs/OpenAI_Agent_Examples_Repo/integration-tests/deno.test.ts > Deno
+TypeError: execa is not a function
+ ❯ OpenAI_Agent_Docs/OpenAI_Agent_Examples_Repo/integration-tests/deno.test.ts:22:11
+     20| 
+     21|   afterAll(async () => {
+     22|     await execa`rm -f deno.lock`;
+       |           ^
+     23|   });
+     24| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/14]⎯
+
+ FAIL  OpenAI_Agent_Docs/OpenAI_Agent_Examples_Repo/integration-tests/node.test.ts > Node.js
+TypeError: execa is not a function
+ ❯ OpenAI_Agent_Docs/OpenAI_Agent_Examples_Repo/integration-tests/node.test.ts:18:11
+     16|     // remove lock file to avoid errors
+     17|     console.log('[node] Removing node_modu…
+     18|     await execa`rm -rf node_modules`;
+       |           ^
+     19|     console.log('[node] Installing depende…
+     20|     await execa`npm install`;
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/14]⎯
+
+ FAIL  OpenAI_Agent_Docs/OpenAI_Agent_Examples_Repo/integration-tests/vite-react.test.ts [ OpenAI_Agent_Docs/OpenAI_Agent_Examples_Repo/integration-tests/vite-react.test.ts ]
+ FAIL  OpenAI_Agent_Docs/openai-agents-js/integration-tests/vite-react.test.ts [ OpenAI_Agent_Docs/openai-agents-js/integration-tests/vite-react.test.ts ]
+Error: Failed to load url playwright (resolved id: playwright) in /home/runner/workspace/OpenAI_Agent_Docs/OpenAI_Agent_Examples_Repo/integration-tests/vite-react.test.ts. Does the file exist?
+ ❯ loadAndTransform node_modules/vite/dist/node/chunks/dep-C6uTJdX2.js:51968:17
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/14]⎯
+
+ FAIL  OpenAI_Agent_Docs/openai-agents-js/integration-tests/bun.test.ts > Bun
+TypeError: execa is not a function
+ ❯ OpenAI_Agent_Docs/openai-agents-js/integration-tests/bun.test.ts:9:11
+      7|   beforeAll(async () => {
+      8|     // remove lock file to avoid errors
+      9|     await execa`rm -f bun.lock`;
+       |           ^
+     10|     console.log('[bun] Removing node_modul…
+     11|     await execa`rm -rf node_modules`;
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/14]⎯
+
+ FAIL  OpenAI_Agent_Docs/openai-agents-js/integration-tests/bun.test.ts > Bun
+TypeError: execa is not a function
+ ❯ OpenAI_Agent_Docs/openai-agents-js/integration-tests/bun.test.ts:22:11
+     20| 
+     21|   afterAll(async () => {
+     22|     await execa`rm -f bun.lock`;
+       |           ^
+     23|   });
+     24| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/14]⎯
+
+ FAIL  OpenAI_Agent_Docs/openai-agents-js/integration-tests/cloudflare.test.ts > Cloudflare Workers
+TypeError: execa is not a function
+ ❯ OpenAI_Agent_Docs/openai-agents-js/integration-tests/cloudflare.test.ts:13:11
+     11|   beforeAll(async () => {
+     12|     // Remove lock file to avoid errors
+     13|     await execa`rm -f package-lock.json`;
+       |           ^
+     14|     console.log('[cloudflare] Removing nod…
+     15|     await execa`rm -rf node_modules`;
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/14]⎯
+
+ FAIL  OpenAI_Agent_Docs/openai-agents-js/integration-tests/deno.test.ts > Deno
+TypeError: execa is not a function
+ ❯ OpenAI_Agent_Docs/openai-agents-js/integration-tests/deno.test.ts:9:11
+      7|   beforeAll(async () => {
+      8|     // Remove lock file to avoid errors
+      9|     await execa`rm -f deno.lock`;
+       |           ^
+     10|     console.log('[deno] Removing node_modu…
+     11|     await execa`rm -rf node_modules`;
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/14]⎯
+
+ FAIL  OpenAI_Agent_Docs/openai-agents-js/integration-tests/deno.test.ts > Deno
+TypeError: execa is not a function
+ ❯ OpenAI_Agent_Docs/openai-agents-js/integration-tests/deno.test.ts:22:11
+     20| 
+     21|   afterAll(async () => {
+     22|     await execa`rm -f deno.lock`;
+       |           ^
+     23|   });
+     24| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[12/14]⎯
+
+ FAIL  OpenAI_Agent_Docs/openai-agents-js/integration-tests/node.test.ts > Node.js
+TypeError: execa is not a function
+ ❯ OpenAI_Agent_Docs/openai-agents-js/integration-tests/node.test.ts:18:11
+     16|     // remove lock file to avoid errors
+     17|     console.log('[node] Removing node_modu…
+     18|     await execa`rm -rf node_modules`;
+       |           ^
+     19|     console.log('[node] Installing depende…
+     20|     await execa`npm install`;
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[13/14]⎯
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ Unhandled Errors ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+
+Vitest caught 12 unhandled errors during the test run.
+This might cause false positive tests. Resolve unhandled errors to make sure your tests are not affected.
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ Uncaught Exception ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Error: Unhandled error. ({
+  type: 'error',
+  error: {
+    type: 'error',
+    event_id: 'event_CAngaSARhjFl6jHH9n5zW',
+    error: {
+      type: 'invalid_request_error',
+      code: null,
+      message: 'Invalid realtime token',
+      param: null,
+      event_id: null
+    }
+  }
+})
+ ❯ EventEmitter.emit node:events:507:17
+ ❯ TwilioRealtimeTransportLayer.emit node_modules/@openai/agents/node_modules/@openai/agents-core/src/lifecycle.ts:33:30
+ ❯ TwilioRealtimeTransportLayer._onMessage node_modules/@openai/agents/node_modules/@openai/agents-realtime/src/openaiRealtimeBase.ts:179:12
+ ❯ WebSocket.<anonymous> node_modules/@openai/agents/node_modules/@openai/agents-realtime/src/openaiRealtimeWebsocket.ts:204:12
+ ❯ callListener node_modules/ws/lib/event-target.js:290:14
+ ❯ WebSocket.onMessage node_modules/ws/lib/event-target.js:209:9
+ ❯ WebSocket.emit node:events:518:28
+ ❯ Receiver.receiverOnMessage node_modules/ws/lib/websocket.js:1220:20
+ ❯ Receiver.emit node:events:518:28
+ ❯ Receiver.dataMessage node_modules/ws/lib/receiver.js:596:14
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'ERR_UNHANDLED_ERROR', context: { type: 'error', error: { type: 'error', event_id: 'event_CAngaSARhjFl6jHH9n5zW', error: { type: 'invalid_request_error', code: null, message: 'Invalid realtime token', param: null, event_id: null } } } }
+This error originated in "OpenAI_Agent_Docs/OpenAI_Agent_Examples_Repo/packages/agents-extensions/test/index.test.ts" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.
+The latest test that might've caused the error is "interrupt clamps overshoot and emits integer audio_end_ms". It might mean one of the following:
+- The error was thrown, while Vitest was running this test.
+- If the error occurred after the test had been completed, this was the last documented test before it was thrown.
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ Uncaught Exception ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Error: Unhandled error. ({
+  type: 'error',
+  error: {
+    type: 'error',
+    event_id: 'event_CAngaCBs2FReO6RbqGWox',
+    error: {
+      type: 'invalid_request_error',
+      code: null,
+      message: 'Invalid realtime token',
+      param: null,
+      event_id: null
+    }
+  }
+})
+ ❯ EventEmitter.emit node:events:507:17
+ ❯ TwilioRealtimeTransportLayer.emit node_modules/@openai/agents/node_modules/@openai/agents-core/src/lifecycle.ts:33:30
+ ❯ TwilioRealtimeTransportLayer._onMessage node_modules/@openai/agents/node_modules/@openai/agents-realtime/src/openaiRealtimeBase.ts:179:12
+ ❯ WebSocket.<anonymous> node_modules/@openai/agents/node_modules/@openai/agents-realtime/src/openaiRealtimeWebsocket.ts:204:12
+ ❯ callListener node_modules/ws/lib/event-target.js:290:14
+ ❯ WebSocket.onMessage node_modules/ws/lib/event-target.js:209:9
+ ❯ WebSocket.emit node:events:518:28
+ ❯ Receiver.receiverOnMessage node_modules/ws/lib/websocket.js:1220:20
+ ❯ Receiver.emit node:events:518:28
+ ❯ Receiver.dataMessage node_modules/ws/lib/receiver.js:596:14
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'ERR_UNHANDLED_ERROR', context: { type: 'error', error: { type: 'error', event_id: 'event_CAngaCBs2FReO6RbqGWox', error: { type: 'invalid_request_error', code: null, message: 'Invalid realtime token', param: null, event_id: null } } } }
+This error originated in "OpenAI_Agent_Docs/openai-agents-js/packages/agents-extensions/test/index.test.ts" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.
+The latest test that might've caused the error is "interrupt clamps overshoot and emits integer audio_end_ms". It might mean one of the following:
+- The error was thrown, while Vitest was running this test.
+- If the error occurred after the test had been completed, this was the last documented test before it was thrown.
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ Uncaught Exception ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Error: Unhandled error. ({
+  type: 'error',
+  error: {
+    type: 'error',
+    event_id: 'event_CAngahIA7nRqapbb0rClT',
+    error: {
+      type: 'invalid_request_error',
+      code: null,
+      message: 'Invalid realtime token',
+      param: null,
+      event_id: null
+    }
+  }
+})
+ ❯ EventEmitter.emit node:events:507:17
+ ❯ TwilioRealtimeTransportLayer.emit node_modules/@openai/agents/node_modules/@openai/agents-core/src/lifecycle.ts:33:30
+ ❯ TwilioRealtimeTransportLayer._onMessage node_modules/@openai/agents/node_modules/@openai/agents-realtime/src/openaiRealtimeBase.ts:179:12
+ ❯ WebSocket.<anonymous> node_modules/@openai/agents/node_modules/@openai/agents-realtime/src/openaiRealtimeWebsocket.ts:204:12
+ ❯ callListener node_modules/ws/lib/event-target.js:290:14
+ ❯ WebSocket.onMessage node_modules/ws/lib/event-target.js:209:9
+ ❯ WebSocket.emit node:events:518:28
+ ❯ Receiver.receiverOnMessage node_modules/ws/lib/websocket.js:1220:20
+ ❯ Receiver.emit node:events:518:28
+ ❯ Receiver.dataMessage node_modules/ws/lib/receiver.js:596:14
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'ERR_UNHANDLED_ERROR', context: { type: 'error', error: { type: 'error', event_id: 'event_CAngahIA7nRqapbb0rClT', error: { type: 'invalid_request_error', code: null, message: 'Invalid realtime token', param: null, event_id: null } } } }
+This error originated in "OpenAI_Agent_Docs/OpenAI_Agent_Examples_Repo/packages/agents-extensions/test/index.test.ts" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ Uncaught Exception ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Error: Unhandled error. ({
+  type: 'error',
+  error: {
+    type: 'error',
+    event_id: 'event_CAngbrRDgS3THxa3c19g9',
+    error: {
+      type: 'invalid_request_error',
+      code: null,
+      message: 'Invalid realtime token',
+      param: null,
+      event_id: null
+    }
+  }
+})
+ ❯ EventEmitter.emit node:events:507:17
+ ❯ TwilioRealtimeTransportLayer.emit node_modules/@openai/agents/node_modules/@openai/agents-core/src/lifecycle.ts:33:30
+ ❯ TwilioRealtimeTransportLayer._onMessage node_modules/@openai/agents/node_modules/@openai/agents-realtime/src/openaiRealtimeBase.ts:179:12
+ ❯ WebSocket.<anonymous> node_modules/@openai/agents/node_modules/@openai/agents-realtime/src/openaiRealtimeWebsocket.ts:204:12
+ ❯ callListener node_modules/ws/lib/event-target.js:290:14
+ ❯ WebSocket.onMessage node_modules/ws/lib/event-target.js:209:9
+ ❯ WebSocket.emit node:events:518:28
+ ❯ Receiver.receiverOnMessage node_modules/ws/lib/websocket.js:1220:20
+ ❯ Receiver.emit node:events:518:28
+ ❯ Receiver.dataMessage node_modules/ws/lib/receiver.js:596:14
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'ERR_UNHANDLED_ERROR', context: { type: 'error', error: { type: 'error', event_id: 'event_CAngbrRDgS3THxa3c19g9', error: { type: 'invalid_request_error', code: null, message: 'Invalid realtime token', param: null, event_id: null } } } }
+This error originated in "OpenAI_Agent_Docs/openai-agents-js/packages/agents-extensions/test/index.test.ts" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ Unhandled Rejection ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+TypeError: Command failed with ERR_INVALID_ARG_TYPE: [object Object]
+The "file" argument must be of type string. Received an instance of Object
+ ❯ normalizeSpawnArguments node:child_process:540:3
+ ❯ Object.spawn node:child_process:747:13
+ ❯ Module.execa node_modules/execa/index.js:88:26
+ ❯ OpenAI_Agent_Docs/OpenAI_Agent_Examples_Repo/integration-tests/cloudflare.test.ts:4:15
+      2| import { execa as execaBase, ResultPromise…
+      3| 
+      4| const execa = execaBase({
+       |               ^
+      5|   cwd: './integration-tests/cloudflare-wor…
+      6| });
+ ❯ VitestExecutor.runModule node_modules/vite-node/dist/client.mjs:362:5
+ ❯ VitestExecutor.directRequest node_modules/vite-node/dist/client.mjs:346:5
+ ❯ VitestExecutor.cachedRequest node_modules/vite-node/dist/client.mjs:189:14
+ ❯ VitestExecutor.executeId node_modules/vite-node/dist/client.mjs:165:12
+ ❯ collectTests node_modules/@vitest/runner/dist/index.js:628:7
+ ❯ startTests node_modules/@vitest/runner/dist/index.js:964:17
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'ERR_INVALID_ARG_TYPE', originalMessage: 'The "file" argument must be of type string. Received an instance of Object', shortMessage: 'Command failed with ERR_INVALID_ARG_TYPE: [object Object]\nThe "file" argument must be of type string. Received an instance of Object', command: '[object Object]', escapedCommand: '[object Object]', exitCode: undefined, signal: undefined, signalDescription: undefined, stdout: '', stderr: '', cwd: '/home/runner/workspace', all: '', failed: true, timedOut: false, isCanceled: false, killed: false }
+This error originated in "OpenAI_Agent_Docs/OpenAI_Agent_Examples_Repo/integration-tests/cloudflare.test.ts" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ Unhandled Rejection ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+TypeError: Command failed with ERR_INVALID_ARG_TYPE: [object Object]
+The "file" argument must be of type string. Received an instance of Object
+ ❯ normalizeSpawnArguments node:child_process:540:3
+ ❯ Object.spawn node:child_process:747:13
+ ❯ Module.execa node_modules/execa/index.js:88:26
+ ❯ OpenAI_Agent_Docs/openai-agents-js/integration-tests/cloudflare.test.ts:4:15
+      2| import { execa as execaBase, ResultPromise…
+      3| 
+      4| const execa = execaBase({
+       |               ^
+      5|   cwd: './integration-tests/cloudflare-wor…
+      6| });
+ ❯ VitestExecutor.runModule node_modules/vite-node/dist/client.mjs:362:5
+ ❯ VitestExecutor.directRequest node_modules/vite-node/dist/client.mjs:346:5
+ ❯ VitestExecutor.cachedRequest node_modules/vite-node/dist/client.mjs:189:14
+ ❯ VitestExecutor.executeId node_modules/vite-node/dist/client.mjs:165:12
+ ❯ collectTests node_modules/@vitest/runner/dist/index.js:628:7
+ ❯ startTests node_modules/@vitest/runner/dist/index.js:964:17
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'ERR_INVALID_ARG_TYPE', originalMessage: 'The "file" argument must be of type string. Received an instance of Object', shortMessage: 'Command failed with ERR_INVALID_ARG_TYPE: [object Object]\nThe "file" argument must be of type string. Received an instance of Object', command: '[object Object]', escapedCommand: '[object Object]', exitCode: undefined, signal: undefined, signalDescription: undefined, stdout: '', stderr: '', cwd: '/home/runner/workspace', all: '', failed: true, timedOut: false, isCanceled: false, killed: false }
+This error originated in "OpenAI_Agent_Docs/openai-agents-js/integration-tests/cloudflare.test.ts" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ Unhandled Rejection ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+TypeError: Command failed with ERR_INVALID_ARG_TYPE: [object Object]
+The "file" argument must be of type string. Received an instance of Object
+ ❯ normalizeSpawnArguments node:child_process:540:3
+ ❯ Object.spawn node:child_process:747:13
+ ❯ Module.execa node_modules/execa/index.js:88:26
+ ❯ OpenAI_Agent_Docs/OpenAI_Agent_Examples_Repo/integration-tests/node.test.ts:4:15
+      2| import { execa as execaBase } from 'execa';
+      3| 
+      4| const execa = execaBase({
+       |               ^
+      5|   cwd: './integration-tests/node',
+      6|   env: {
+ ❯ VitestExecutor.runModule node_modules/vite-node/dist/client.mjs:362:5
+ ❯ VitestExecutor.directRequest node_modules/vite-node/dist/client.mjs:346:5
+ ❯ VitestExecutor.cachedRequest node_modules/vite-node/dist/client.mjs:189:14
+ ❯ VitestExecutor.executeId node_modules/vite-node/dist/client.mjs:165:12
+ ❯ collectTests node_modules/@vitest/runner/dist/index.js:628:7
+ ❯ startTests node_modules/@vitest/runner/dist/index.js:964:17
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'ERR_INVALID_ARG_TYPE', originalMessage: 'The "file" argument must be of type string. Received an instance of Object', shortMessage: 'Command failed with ERR_INVALID_ARG_TYPE: [object Object]\nThe "file" argument must be of type string. Received an instance of Object', command: '[object Object]', escapedCommand: '[object Object]', exitCode: undefined, signal: undefined, signalDescription: undefined, stdout: '', stderr: '', cwd: '/home/runner/workspace', all: '', failed: true, timedOut: false, isCanceled: false, killed: false }
+This error originated in "OpenAI_Agent_Docs/OpenAI_Agent_Examples_Repo/integration-tests/node.test.ts" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ Unhandled Rejection ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+TypeError: Command failed with ERR_INVALID_ARG_TYPE: [object Object]
+The "file" argument must be of type string. Received an instance of Object
+ ❯ normalizeSpawnArguments node:child_process:540:3
+ ❯ Object.spawn node:child_process:747:13
+ ❯ Module.execa node_modules/execa/index.js:88:26
+ ❯ OpenAI_Agent_Docs/openai-agents-js/integration-tests/node.test.ts:4:15
+      2| import { execa as execaBase } from 'execa';
+      3| 
+      4| const execa = execaBase({
+       |               ^
+      5|   cwd: './integration-tests/node',
+      6|   env: {
+ ❯ VitestExecutor.runModule node_modules/vite-node/dist/client.mjs:362:5
+ ❯ VitestExecutor.directRequest node_modules/vite-node/dist/client.mjs:346:5
+ ❯ VitestExecutor.cachedRequest node_modules/vite-node/dist/client.mjs:189:14
+ ❯ VitestExecutor.executeId node_modules/vite-node/dist/client.mjs:165:12
+ ❯ collectTests node_modules/@vitest/runner/dist/index.js:628:7
+ ❯ startTests node_modules/@vitest/runner/dist/index.js:964:17
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'ERR_INVALID_ARG_TYPE', originalMessage: 'The "file" argument must be of type string. Received an instance of Object', shortMessage: 'Command failed with ERR_INVALID_ARG_TYPE: [object Object]\nThe "file" argument must be of type string. Received an instance of Object', command: '[object Object]', escapedCommand: '[object Object]', exitCode: undefined, signal: undefined, signalDescription: undefined, stdout: '', stderr: '', cwd: '/home/runner/workspace', all: '', failed: true, timedOut: false, isCanceled: false, killed: false }
+This error originated in "OpenAI_Agent_Docs/openai-agents-js/integration-tests/node.test.ts" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ Unhandled Rejection ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+TypeError: Command failed with ERR_INVALID_ARG_TYPE: [object Object]
+The "file" argument must be of type string. Received an instance of Object
+ ❯ normalizeSpawnArguments node:child_process:540:3
+ ❯ Object.spawn node:child_process:747:13
+ ❯ Module.execa node_modules/execa/index.js:88:26
+ ❯ OpenAI_Agent_Docs/OpenAI_Agent_Examples_Repo/integration-tests/deno.test.ts:4:15
+      2| import { execa as execaBase } from 'execa';
+      3| 
+      4| const execa = execaBase({ cwd: './integrat…
+       |               ^
+      5| 
+      6| describe('Deno', () => {
+ ❯ VitestExecutor.runModule node_modules/vite-node/dist/client.mjs:362:5
+ ❯ VitestExecutor.directRequest node_modules/vite-node/dist/client.mjs:346:5
+ ❯ VitestExecutor.cachedRequest node_modules/vite-node/dist/client.mjs:189:14
+ ❯ VitestExecutor.executeId node_modules/vite-node/dist/client.mjs:165:12
+ ❯ collectTests node_modules/@vitest/runner/dist/index.js:628:7
+ ❯ startTests node_modules/@vitest/runner/dist/index.js:964:17
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'ERR_INVALID_ARG_TYPE', originalMessage: 'The "file" argument must be of type string. Received an instance of Object', shortMessage: 'Command failed with ERR_INVALID_ARG_TYPE: [object Object]\nThe "file" argument must be of type string. Received an instance of Object', command: '[object Object]', escapedCommand: '[object Object]', exitCode: undefined, signal: undefined, signalDescription: undefined, stdout: '', stderr: '', cwd: '/home/runner/workspace', all: '', failed: true, timedOut: false, isCanceled: false, killed: false }
+This error originated in "OpenAI_Agent_Docs/OpenAI_Agent_Examples_Repo/integration-tests/deno.test.ts" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ Unhandled Rejection ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+TypeError: Command failed with ERR_INVALID_ARG_TYPE: [object Object]
+The "file" argument must be of type string. Received an instance of Object
+ ❯ normalizeSpawnArguments node:child_process:540:3
+ ❯ Object.spawn node:child_process:747:13
+ ❯ Module.execa node_modules/execa/index.js:88:26
+ ❯ OpenAI_Agent_Docs/openai-agents-js/integration-tests/deno.test.ts:4:15
+      2| import { execa as execaBase } from 'execa';
+      3| 
+      4| const execa = execaBase({ cwd: './integrat…
+       |               ^
+      5| 
+      6| describe('Deno', () => {
+ ❯ VitestExecutor.runModule node_modules/vite-node/dist/client.mjs:362:5
+ ❯ VitestExecutor.directRequest node_modules/vite-node/dist/client.mjs:346:5
+ ❯ VitestExecutor.cachedRequest node_modules/vite-node/dist/client.mjs:189:14
+ ❯ VitestExecutor.executeId node_modules/vite-node/dist/client.mjs:165:12
+ ❯ collectTests node_modules/@vitest/runner/dist/index.js:628:7
+ ❯ startTests node_modules/@vitest/runner/dist/index.js:964:17
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'ERR_INVALID_ARG_TYPE', originalMessage: 'The "file" argument must be of type string. Received an instance of Object', shortMessage: 'Command failed with ERR_INVALID_ARG_TYPE: [object Object]\nThe "file" argument must be of type string. Received an instance of Object', command: '[object Object]', escapedCommand: '[object Object]', exitCode: undefined, signal: undefined, signalDescription: undefined, stdout: '', stderr: '', cwd: '/home/runner/workspace', all: '', failed: true, timedOut: false, isCanceled: false, killed: false }
+This error originated in "OpenAI_Agent_Docs/openai-agents-js/integration-tests/deno.test.ts" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ Unhandled Rejection ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+TypeError: Command failed with ERR_INVALID_ARG_TYPE: [object Object]
+The "file" argument must be of type string. Received an instance of Object
+ ❯ normalizeSpawnArguments node:child_process:540:3
+ ❯ Object.spawn node:child_process:747:13
+ ❯ Module.execa node_modules/execa/index.js:88:26
+ ❯ OpenAI_Agent_Docs/OpenAI_Agent_Examples_Repo/integration-tests/bun.test.ts:4:15
+      2| import { execa as execaBase } from 'execa';
+      3| 
+      4| const execa = execaBase({ cwd: './integrat…
+       |               ^
+      5| 
+      6| describe('Bun', () => {
+ ❯ VitestExecutor.runModule node_modules/vite-node/dist/client.mjs:362:5
+ ❯ VitestExecutor.directRequest node_modules/vite-node/dist/client.mjs:346:5
+ ❯ VitestExecutor.cachedRequest node_modules/vite-node/dist/client.mjs:189:14
+ ❯ VitestExecutor.executeId node_modules/vite-node/dist/client.mjs:165:12
+ ❯ collectTests node_modules/@vitest/runner/dist/index.js:628:7
+ ❯ startTests node_modules/@vitest/runner/dist/index.js:964:17
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'ERR_INVALID_ARG_TYPE', originalMessage: 'The "file" argument must be of type string. Received an instance of Object', shortMessage: 'Command failed with ERR_INVALID_ARG_TYPE: [object Object]\nThe "file" argument must be of type string. Received an instance of Object', command: '[object Object]', escapedCommand: '[object Object]', exitCode: undefined, signal: undefined, signalDescription: undefined, stdout: '', stderr: '', cwd: '/home/runner/workspace', all: '', failed: true, timedOut: false, isCanceled: false, killed: false }
+This error originated in "OpenAI_Agent_Docs/OpenAI_Agent_Examples_Repo/integration-tests/bun.test.ts" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ Unhandled Rejection ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+TypeError: Command failed with ERR_INVALID_ARG_TYPE: [object Object]
+The "file" argument must be of type string. Received an instance of Object
+ ❯ normalizeSpawnArguments node:child_process:540:3
+ ❯ Object.spawn node:child_process:747:13
+ ❯ Module.execa node_modules/execa/index.js:88:26
+ ❯ OpenAI_Agent_Docs/openai-agents-js/integration-tests/bun.test.ts:4:15
+      2| import { execa as execaBase } from 'execa';
+      3| 
+      4| const execa = execaBase({ cwd: './integrat…
+       |               ^
+      5| 
+      6| describe('Bun', () => {
+ ❯ VitestExecutor.runModule node_modules/vite-node/dist/client.mjs:362:5
+ ❯ VitestExecutor.directRequest node_modules/vite-node/dist/client.mjs:346:5
+ ❯ VitestExecutor.cachedRequest node_modules/vite-node/dist/client.mjs:189:14
+ ❯ VitestExecutor.executeId node_modules/vite-node/dist/client.mjs:165:12
+ ❯ collectTests node_modules/@vitest/runner/dist/index.js:628:7
+ ❯ startTests node_modules/@vitest/runner/dist/index.js:964:17
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'ERR_INVALID_ARG_TYPE', originalMessage: 'The "file" argument must be of type string. Received an instance of Object', shortMessage: 'Command failed with ERR_INVALID_ARG_TYPE: [object Object]\nThe "file" argument must be of type string. Received an instance of Object', command: '[object Object]', escapedCommand: '[object Object]', exitCode: undefined, signal: undefined, signalDescription: undefined, stdout: '', stderr: '', cwd: '/home/runner/workspace', all: '', failed: true, timedOut: false, isCanceled: false, killed: false }
+This error originated in "OpenAI_Agent_Docs/openai-agents-js/integration-tests/bun.test.ts" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+
+ Test Files  10 failed | 127 passed (137)
+      Tests  827 passed (837)
+     Errors  12 errors
+   Start at  01:31:34
+   Duration  31.59s (transform 3.20s, setup 15ms, collect 28.84s, tests 3.83s, environment 39ms, prepare 21.75s)
